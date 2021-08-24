@@ -1,0 +1,31 @@
+﻿<Window
+    x:Class="CodeWriter_WinUI_TestApp.MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+    xmlns:codewriter="using:CodeWriter_WinUI"
+    mc:Ignorable="d" >
+
+    <Grid DataContext="{x:Bind VM}">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition  />
+        </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"  />
+            <RowDefinition Height="*"  />
+        </Grid.RowDefinitions>
+        <StackPanel Orientation="Horizontal" Spacing="6" >
+            <Button x:Name="Btn_Load" Content="Load Textfile" Click="Btn_Load_Click"/>
+            <Button x:Name="Btn_Save" Visibility="Collapsed" Content="Save Text" Click="Btn_Save_Click"/>
+            <Slider Width="150" Header="Font Size"  Value="{Binding FontSize, Mode=TwoWay}" Minimum="6" Maximum="36"/>
+            <CheckBox  Content="Unsaved Changes" IsChecked="{Binding UnsavedChanges, Mode=OneWay}" IsHitTestVisible="False" />
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <TextBlock Text="{Binding ElementName=CW, Path=Selection.Start}"></TextBlock>
+                <TextBlock Text="-->"></TextBlock>
+                <TextBlock Text="{Binding ElementName=CW, Path=Selection.End}"></TextBlock>
+            </StackPanel>
+        </StackPanel>
+        <codewriter:CodeWriter x:Name="CW" Grid.Row="1" Text="{Binding Text, Mode=TwoWay}" FontSize="{Binding FontSize, Mode=OneWay}" />
+    </Grid>
+</Window>
