@@ -4,212 +4,44 @@ using Microsoft.Graphics.Canvas.Text;
 using Microsoft.Graphics.Canvas.UI.Xaml;
 using Microsoft.UI;
 using Microsoft.UI.Input.Experimental;
-using Microsoft.UI.Text;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
-using Microsoft.UI.Xaml.Documents;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using System;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Linq;
 using System.Numerics;
 using System.Runtime.CompilerServices;
-using System.Text.RegularExpressions;
-using System.Threading.Tasks;
 using Windows.Foundation;
-using Windows.Media.Protection;
 using Windows.System;
 using Windows.UI;
 using Windows.UI.Core;
 
 namespace CodeWriter_WinUI
 {
-    
-    public enum VisibleState : byte
-    {
-        Visible, StartOfHiddenBlock, Hidden
-    }
-
-    public static class Extensions
-    {
-        public static Vector2 Center(this Rect rect)
-        {
-            return new Vector2((float)rect.X + (float)rect.Width / 2, (float)rect.Y + (float)rect.Height / 2);
-        }
-
-        public static System.Drawing.Point ToDrawingPoint(this Windows.Foundation.Point point)
-        {
-            return new System.Drawing.Point((int)point.X, (int)point.Y);
-        }
-
-        public static Windows.Foundation.Point ToFoundationPoint(this System.Drawing.Point point)
-        {
-            return new Windows.Foundation.Point(point.X, point.Y);
-        }
-
-        public static Windows.UI.Color ToUIColor(this System.Drawing.Color color)
-        {
-            return Windows.UI.Color.FromArgb(color.A, color.R, color.G, color.B);
-        }
-        public static Vector2 ToVector2(this System.Drawing.Point point)
-        {
-            return new Vector2((float)point.X, (float)point.Y);
-        }
-    }
-
-    public static class RichEditBoxExtensions
-    {
-        public static readonly DependencyProperty BindableInlinesProperty =
-            DependencyProperty.RegisterAttached("BindableInlines", typeof(ObservableCollection<Line>), typeof(RichEditBoxExtensions), new PropertyMetadata(null, OnBindableInlinesChanged));
-
-        public static ObservableCollection<Line> GetBindableInlines(DependencyObject obj)
-        {
-            return (ObservableCollection<Line>)obj.GetValue(BindableInlinesProperty);
-        }
-
-        public static void SetBindableInlines(DependencyObject obj, ObservableCollection<Line> value)
-        {
-            obj.SetValue(BindableInlinesProperty, value);
-        }
-        private static void OnBindableInlinesChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
-        {
-            var Target = d as RichEditBox;
-
-            if (Target != null && e.NewValue != e.OldValue)
-            {
-                Target.Document.SetText(TextSetOptions.None, "");
-                Target.Document.Selection.StartPosition = 0;
-                foreach (Line line in (ObservableCollection<Line>)e.NewValue)
-                {
-                    foreach (CharElement inline in line.CharGroups)
-                    {
-                        switch (inline)
-                        {
-                            case Char c:
-                                if (c.C != '\n')
-                                {
-                                    //Run r = new Run() { Text = c.C.ToString(), Foreground = c.ForeGround };
-                                    // c.R.Text = c.C.ToString();
-                                    Target.Document.Selection.CharacterFormat.ForegroundColor = c.ForeGround;
-                                    Target.Document.Selection.TypeText(c.C.ToString());
-                                }
-                                else
-                                    Target.Document.Selection.TypeText("\n");
-
-                                break;
-
-                                // case CharGroup c: Target.Inlines.Add(new Run() { Text = new string(c.C.Select(x => x.C).ToArray()), Foreground = c.ForeGround }); break;
-                        }
-                    }
-                    Target.Document.Selection.TypeText("\n");
-                }
-            }
-        }
-    }
-
-    public static class TextBlockExtensions
-    {
-        public static readonly DependencyProperty BindableInlinesProperty =
-            DependencyProperty.RegisterAttached("BindableInlines", typeof(IEnumerable<CharElement>), typeof(TextBlockExtensions), new PropertyMetadata(null, OnBindableInlinesChanged));
-
-        public static IEnumerable<CharElement> GetBindableInlines(DependencyObject obj)
-        {
-            return (IEnumerable<CharElement>)obj.GetValue(BindableInlinesProperty);
-        }
-
-        public static void SetBindableInlines(DependencyObject obj, IEnumerable<CharElement> value)
-        {
-            obj.SetValue(BindableInlinesProperty, value);
-        }
-        private static void OnBindableInlinesChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
-        {
-            var Target = d as TextBlock;
-
-            if (Target != null && e.NewValue != e.OldValue)
-            {
-                Target.Inlines.Clear();
-                foreach (CharElement inline in (IEnumerable<CharElement>)e.NewValue)
-                {
-                    switch (inline)
-                    {
-                        case Char c:
-                            if (c.C == '\t')
-                            {
-                                Run r = new Run() { Text = " ", Foreground = new SolidColorBrush(c.ForeGround) };
-                                Target.Inlines.Add(r);
-                            }
-                            else if (c.C != '\n')
-                            {
-                                Run r = new Run() { Text = c.C.ToString(), Foreground = new SolidColorBrush( c.ForeGround) };
-                                // c.R.Text = c.C.ToString();
-                                Target.Inlines.Add(r);
-                            }
-                            else
-                                Target.Inlines.Add(new LineBreak() { });
-
-                            break;
-
-                        case CharGroup c: Target.Inlines.Add(new Run() { Text = new string(c.C.Select(x => x.C).ToArray()), Foreground = new SolidColorBrush(c.ForeGround) }); break;
-                    }
-                }
-            }
-        }
-    }
-
-    public class Char : CharElement
-    {
-        public Char(char c)
-        {
-            C = c;
-        }
-    }
-
-    public class CharElement : Bindable
-    {
-        public char C { get => Get(' '); set => Set(value); }
-
-        public Color ForeGround { get => Get(Colors.White); set { Set(value); } }
-       
-        public Run R { get => Get(new Run() { Text = C.ToString() }); set => Set(value); }
-    }
-
-    public class CharGroup : CharElement
-    {
-        public CharGroup()
-        {
-        }
-
-        public new Char[] C { get => Get(new Char[] { }); set => Set(value); }
-    }
-
     public partial class CodeWriter : UserControl, INotifyPropertyChanged
     {
         public static new readonly DependencyProperty FontSizeProperty = DependencyProperty.Register("FontSize", typeof(int), typeof(CodeWriter), new PropertyMetadata(12, (d, e) => ((CodeWriter)d).OnFontSizeChanged(d, e)));
         public static readonly DependencyProperty TextProperty = DependencyProperty.Register("Text", typeof(string), typeof(CodeWriter), new PropertyMetadata("", (d, e) => ((CodeWriter)d).OnTextChanged(d, e)));
         public bool needsInitialize = true;
         private Dictionary<string, object> _properties = new Dictionary<string, object>();
+        private float CharOffset = 0;
         private ScrollBar HorizontalScroll;
+        private int iCharOffset = 0;
         private bool IsSettingValue = false;
         private DateTime lastScroll = DateTime.Now;
         private bool middleClickScrollingActivated = false;
         private List<VirtualKey> Modifiers = new List<VirtualKey>();
-
+        bool isCanvasLoaded = false;
         private ScrollBar VerticalScroll;
 
         public CodeWriter()
         {
+            Options = new CodeWriterOptions();
             InitializeComponent();
-            Resources.TryGetValue("CWVM", out object Vm);
-            if (Vm != null)
-            {
-                Options = Vm as CodeWriterOptions;
-            }
-            else
-                Options = new CodeWriterOptions();
             CharacterReceived += CodeWriter_CharacterReceived;
             Invalidate();
         }
@@ -218,6 +50,8 @@ namespace CodeWriter_WinUI
         {
             Options = codeWriterViewModel;
             InitializeComponent();
+            CharacterReceived += CodeWriter_CharacterReceived;
+            Invalidate();
         }
 
         public event PropertyChangedEventHandler PropertyChanged;
@@ -231,8 +65,6 @@ namespace CodeWriter_WinUI
         public float CharHeight { get => Get(12f); set { Set(value); } }
 
         public float CharWidth { get; set; } = 8;
-
-        public CodeWriterOptions Options { get; set; }
 
         public CoreCursor Cursor
         {
@@ -249,8 +81,6 @@ namespace CodeWriter_WinUI
             }
         }
 
-        public Range draggedRange { get; private set; }
-
         public new int FontSize
         {
             get => (int)GetValue(FontSizeProperty);
@@ -258,25 +88,18 @@ namespace CodeWriter_WinUI
         }
 
         public bool isLineSelect { get; private set; } = false;
-
         public bool isSelecting { get; private set; } = false;
-
         public bool IsSelection { get => Selection.Start.iChar != Selection.End.iChar | Selection.Start.iLine != Selection.End.iLine; }
-
         public int LeftIndent { get; private set; } = 0;
-
         public double LeftIndentLine { get; private set; } = 44;
-
         public Windows.UI.Color LineNumberColor { get => Get(Colors.DeepSkyBlue); set => Set(value); }
-
         public List<Line> Lines { get => Get(new List<Line>()); set => Set(value); }
-
         public int lineSelectFrom { get; private set; } = 0;
 
-        //public IncrementalLoadingCollection<LinesSource, Line> IncrementalLines { get => Get(new IncrementalLoadingCollection<LinesSource, Line>()); set => Set(value); }
         public bool mouseIsDrag { get; private set; } = false;
 
         public bool mouseIsDragDrop { get; private set; } = false;
+        public CodeWriterOptions Options { get; set; }
 
         public SelectionRange Selection
         {
@@ -309,8 +132,6 @@ namespace CodeWriter_WinUI
             set => SetValue(TextProperty, value);
         }
 
-        public bool VirtualSpace { get; private set; }
-
         public List<Line> VisibleLines { get => Get(new List<Line>()); set => Set(value); }
 
         public bool WordWrap { get; private set; } = true;
@@ -323,17 +144,15 @@ namespace CodeWriter_WinUI
             set => Lines[place.iLine][place.iChar] = value;
         }
 
-        /// <summary>
-        /// Gets Line
-        /// </summary>
         public Line this[int iLine]
         {
             get { return Lines[iLine]; }
         }
+
         public static int IntLength(int i)
         {
             if (i < 0)
-                throw new ArgumentOutOfRangeException();
+                return 1;
             if (i == 0)
                 return 1;
             return (int)Math.Floor(Math.Log10(i)) + 1;
@@ -342,32 +161,6 @@ namespace CodeWriter_WinUI
         public void Invalidate()
         {
             DrawText();
-        }
-
-        public void OnScroll(ScrollOrientation scrollOrientation, ScrollEventType se, int value, bool alignByLines)
-        {
-            //HideHints();
-
-            if (scrollOrientation == ScrollOrientation.VerticalScroll)
-            {
-                //align by line height
-                int newValue = value;
-                if (alignByLines)
-                    newValue = (int)(Math.Ceiling(1d * newValue / CharHeight) * CharHeight);
-                //
-                //VerticalScroll.Value = Math.Max(VerticalScroll.Minimum, Math.Min(VerticalScroll.Maximum, newValue));
-            }
-            //if (scrollOrientation == ScrollOrientation.HorizontalScroll)
-            //    HorizontalScroll.Value = Math.Max(HorizontalScroll.Minimum, Math.Min(HorizontalScroll.Maximum, value));
-
-            //UpdateScrollbars();
-
-            // RestoreHints();
-
-            Invalidate();
-            //
-            // base.OnScroll(se);
-            //OnVisibleRangeChanged();
         }
 
         protected T Get<T>(T defaultVal = default, [CallerMemberName] string name = null)
@@ -386,9 +179,8 @@ namespace CodeWriter_WinUI
 
         protected void Set<T>(T value, [CallerMemberName] string name = null)
         {
-            if (name != "Blocks")
-                if (Equals(value, Get<T>(value, name)))
-                    return;
+            if (Equals(value, Get<T>(value, name)))
+                return;
             _properties[name] = value;
             OnPropertyChanged(name);
         }
@@ -430,23 +222,9 @@ namespace CodeWriter_WinUI
             }
         }
 
-        private void DoScrollVertical(int countLines, int direction, int oldScrollValue = 0)
+        private void Content_Loaded(object sender, RoutedEventArgs e)
         {
-            if (VerticalScroll.Visibility == Visibility.Visible)
-            {
-                int height = (int)ActualHeight;
-                int numberOfVisibleLines = (int)(height / CharHeight);
-
-                int offset;
-                if ((countLines == -1) || (countLines > numberOfVisibleLines))
-                    offset = (int)CharHeight * numberOfVisibleLines;
-                else
-                    offset = (int)CharHeight * countLines;
-
-                int newScrollPos = oldScrollValue + (Math.Sign(direction) * offset);
-
-                OnScroll(ScrollOrientation.VerticalScroll, direction > 0 ? ScrollEventType.SmallDecrement : ScrollEventType.SmallIncrement, newScrollPos, true);
-            }
+            Invalidate();
         }
 
         private void DrawSelectionCell(CanvasDrawingSession session, int x, int y)
@@ -456,20 +234,21 @@ namespace CodeWriter_WinUI
 
         private void DrawText()
         {
-            CanvasTextFormat textFormat = new CanvasTextFormat
+            if (isCanvasLoaded)
             {
-                FontFamily = "Consolas",
-                FontSize = FontSize,
-                WordWrapping = CanvasWordWrapping.WholeWord,
-            };
+                CanvasTextFormat textFormat = new CanvasTextFormat
+                {
+                    FontFamily = "Consolas",
+                    FontSize = FontSize
+                };
 
-            Size size = MeasureTextSize("│", textFormat);
-            Size sizew = MeasureTextSize("–", textFormat);
+                Size size = MeasureTextSize(TextCancas.Device, "│", textFormat);
+                Size sizew = MeasureTextSize(TextCancas.Device, "–", textFormat);
 
-            CharHeight = (float)size.Height * 1.03f; //(FontSize * 1.2f);
-            CharWidth = (float)sizew.Width * 1.31f; //(FontSize * 565f / 1024f);
+                CharHeight = (float)size.Height * 1.03f;
+                CharWidth = (float)sizew.Width * 1.31f;
+            }
 
-          
             if (VerticalScroll != null && Lines != null)
             {
                 VerticalScroll.Maximum = (Lines.Count + 1) * CharHeight - Scroll.ActualHeight;
@@ -498,15 +277,7 @@ namespace CodeWriter_WinUI
                     }
                 }
                 VisibleLines = vis;
-                //VisibleLines = new ObservableCollection<Line>(Lines.Where(x => x.LineNumber <= EndLine && x.LineNumber >= StartLine));
 
-                //foreach (Line l in VisibleLines)
-                //{
-                //    //l.LineText = l.LineText;
-                //    //App.VM.Log(l.LineText +string.Join( "",l.Inlines.Select(x=>((Run)x).Text)));
-                //    if (l.CharGroups.Count > MaxChars)
-                //        l.CharGroups.Insert(MaxChars, new CharElement)
-                //}
                 Options.LineNumberWidth = new GridLength(CharWidth * IntLength(Lines.Count), GridUnitType.Pixel);
                 Options.LeftMargin = new Thickness(Options.LeftWidth, 0, 0, 0);
                 Options.FontSize = FontSize;
@@ -522,9 +293,6 @@ namespace CodeWriter_WinUI
             HorizontalScroll = sender as ScrollBar;
         }
 
-        private float CharOffset = 0;
-        private int iCharOffset = 0;
-
         private void HorizontalScroll_ValueChanged(object sender, RangeBaseValueChangedEventArgs e)
         {
             if (e.NewValue == e.OldValue)
@@ -533,7 +301,7 @@ namespace CodeWriter_WinUI
             }
             float n = Math.Max((int)(e.NewValue / CharWidth - 1) * CharWidth, 0);
             CharOffset = n;
-            iCharOffset = (int) (n / CharWidth);
+            iCharOffset = (int)(n / CharWidth);
             Options.HorizontalOffset = new Thickness(-n, 0, 0, 0);
             BeamCanvas.Invalidate();
             SelectionCanvas.Invalidate();
@@ -558,9 +326,8 @@ namespace CodeWriter_WinUI
             Invalidate();
         }
 
-        private Windows.Foundation.Size MeasureTextSize(string text, CanvasTextFormat textFormat, float limitedToWidth = 0.0f, float limitedToHeight = 0.0f)
+        private Windows.Foundation.Size MeasureTextSize(CanvasDevice device, string text, CanvasTextFormat textFormat, float limitedToWidth = 0.0f, float limitedToHeight = 0.0f)
         {
-            var device = CanvasDevice.GetSharedDevice();
 
             var layout = new CanvasTextLayout(device, text, textFormat, limitedToWidth, limitedToHeight);
 
@@ -623,10 +390,10 @@ namespace CodeWriter_WinUI
 
         private Place PointerToPlace(ExpPointerPoint currentpoint)
         {
-            int iline = Math.Min((int)(currentpoint.Position.Y / CharHeight) + VisibleLines[0].LineNumber - 1, Lines.Count-1);
+            int iline = Math.Min((int)(currentpoint.Position.Y / CharHeight) + VisibleLines[0].LineNumber - 1, Lines.Count - 1);
             int ichar = 0;
             if ((int)currentpoint.Position.X - Options.LeftWidth - Options.HorizontalOffset.Left > 0)
-                 ichar = Math.Min((int)((currentpoint.Position.X - Options.LeftWidth - Options.HorizontalOffset.Left + CharWidth *2/3) / CharWidth ) , Lines[iline].Count);
+                ichar = Math.Min((int)((currentpoint.Position.X - Options.LeftWidth - Options.HorizontalOffset.Left + CharWidth * 2 / 3) / CharWidth), Lines[iline].Count);
 
             return new Place(ichar, iline);
         }
@@ -672,15 +439,14 @@ namespace CodeWriter_WinUI
                     case VirtualKey.Delete:
                         if (CursorPlace.iChar == Lines[CursorPlace.iLine].Count && CursorPlace.iLine < Lines.Count)
                         {
-                             storetext = Lines[CursorPlace.iLine+1].LineText;
-                            Lines.RemoveAt(CursorPlace.iLine+1);
+                            storetext = Lines[CursorPlace.iLine + 1].LineText;
+                            Lines.RemoveAt(CursorPlace.iLine + 1);
                             Lines[CursorPlace.iLine].LineText += storetext;
                             Invalidate();
                         }
                         else
                         {
                             Lines[CursorPlace.iLine].LineText = Lines[CursorPlace.iLine].LineText.Remove(CursorPlace.iChar, 1);
-                            
                         }
                         TextChanged();
 
@@ -704,7 +470,7 @@ namespace CodeWriter_WinUI
                         {
                             if (CursorPlace.iChar == 0)
                             {
-                                 storetext = Lines[CursorPlace.iLine].LineText;
+                                storetext = Lines[CursorPlace.iLine].LineText;
                                 Lines.RemoveAt(CursorPlace.iLine);
                                 Place newplace = CursorPlace;
                                 newplace.iLine--;
@@ -887,14 +653,54 @@ namespace CodeWriter_WinUI
             var ch = (sender as TextBlock).DataContext as Char;
         }
 
-        private  void TextChanged()
+        private void TextCancas_Draw(CanvasControl sender, CanvasDrawEventArgs args)
+        {
+            if (VisibleLines.Count > 0)
+
+            {
+                float LineNumberWidth = CharWidth * IntLength(Lines.Count);
+                float FoldingMarkerWidth = CharWidth;
+                float ErrorMarkerWidth = CharWidth / 2;
+                for (int iLine = VisibleLines[0].LineNumber - 1; iLine < VisibleLines.Last().LineNumber; iLine++)
+                {
+                    float y = CharHeight * (iLine - VisibleLines[0].LineNumber + 1);
+                    args.DrawingSession.FillRectangle(0, y, Options.LeftWidth, CharHeight, Color.FromArgb(255, 40, 40, 40));
+                    args.DrawingSession.DrawText((iLine + 1).ToString(), CharWidth * IntLength(Lines.Count), y, Color.FromArgb(255, 40, 140, 200), new CanvasTextFormat() { FontFamily = "Consolas", FontSize = FontSize, HorizontalAlignment = CanvasHorizontalAlignment.Right });
+
+                    if (Lines[iLine].IsFoldStart)
+                    {
+                        args.DrawingSession.DrawText("⯆", LineNumberWidth + FoldingMarkerWidth, y, Color.FromArgb(255, 40, 80, 140), new CanvasTextFormat() { FontFamily = "Consolas", FontSize = FontSize, HorizontalAlignment = CanvasHorizontalAlignment.Center });
+                    }
+
+                    if (Lines[iLine].IsError)
+                    {
+                        args.DrawingSession.FillRectangle(LineNumberWidth + FoldingMarkerWidth * 2, y, ErrorMarkerWidth, CharHeight, Color.FromArgb(255, 200, 40, 40));
+                    }
+
+                    if (Lines[iLine].IsWarning)
+                    {
+                        args.DrawingSession.FillRectangle(LineNumberWidth + FoldingMarkerWidth * 2 + ErrorMarkerWidth, y, ErrorMarkerWidth, CharHeight, Color.FromArgb(255, 180, 180, 40));
+                    }
+
+                    int lastChar = Math.Min(iCharOffset + (int)(Scroll.ActualWidth / CharWidth), Lines[iLine].Count);
+                    for (int iChar = iCharOffset; iChar < lastChar; iChar++)
+                    {
+                        float x = Options.LeftWidth + CharWidth * (iChar - iCharOffset);
+
+                        Char c = Lines[iLine][iChar];
+                        args.DrawingSession.DrawText(c.C.ToString(), x, y, c.ForeGround, new CanvasTextFormat() { FontFamily = "Consolas", FontSize = FontSize });
+                    }
+                }
+            }
+        }
+
+        private void TextChanged()
         {
             TextCancas.Invalidate();
             IsSettingValue = true;
             string t = string.Join("\n", Lines.Select(x => x.LineText));
             Text = t;
             IsSettingValue = false;
-
         }
 
         private void TextControl_PointerMoved(object sender, PointerRoutedEventArgs e)
@@ -962,465 +768,25 @@ namespace CodeWriter_WinUI
             Invalidate();
         }
 
-        private void Content_Loaded(object sender, RoutedEventArgs e)
+        private void TextCancas_Loaded(object sender, RoutedEventArgs e)
         {
-            Invalidate();
+           
         }
 
-        private void TextCancas_Draw(CanvasControl sender, CanvasDrawEventArgs args)
+        private void TextCancas_CreateResources(CanvasControl sender, Microsoft.Graphics.Canvas.UI.CanvasCreateResourcesEventArgs args)
         {
-            if (VisibleLines.Count > 0)
-
+            CanvasTextFormat textFormat = new CanvasTextFormat
             {
-                float LineNumberWidth = CharWidth * IntLength(Lines.Count);
-                float FoldingMarkerWidth =  CharWidth;
-                float ErrorMarkerWidth = CharWidth/2;
-                for (int iLine = VisibleLines[0].LineNumber - 1; iLine < VisibleLines.Last().LineNumber; iLine++)
-                {
-                    float y = CharHeight * (iLine - VisibleLines[0].LineNumber + 1);
-                    args.DrawingSession.FillRectangle(0, y, Options.LeftWidth, CharHeight, Color.FromArgb(255, 40, 40, 40));
-                    args.DrawingSession.DrawText((iLine+1).ToString(), CharWidth * IntLength(Lines.Count), y, Color.FromArgb(255, 40, 140, 200), new CanvasTextFormat() { FontFamily = "Consolas", FontSize = FontSize, HorizontalAlignment = CanvasHorizontalAlignment.Right });
+                FontFamily = "Consolas",
+                FontSize = FontSize
+            };
 
-                    if (Lines[iLine].IsFoldStart)
-                    {
-                        args.DrawingSession.DrawText("⯆", LineNumberWidth + FoldingMarkerWidth, y, Color.FromArgb(255, 40, 80, 140), new CanvasTextFormat() { FontFamily = "Consolas", FontSize = FontSize, HorizontalAlignment = CanvasHorizontalAlignment.Center });
-                    }
+            Size size = MeasureTextSize(sender.Device, "│", textFormat);
+            Size sizew = MeasureTextSize(sender.Device, "–", textFormat);
 
-                    if (Lines[iLine].IsError)
-                    {
-                        args.DrawingSession.FillRectangle(LineNumberWidth + FoldingMarkerWidth * 2, y, ErrorMarkerWidth, CharHeight, Color.FromArgb(255, 200, 40, 40));
-                    }
-
-                    if (Lines[iLine].IsWarning)
-                    {
-                        args.DrawingSession.FillRectangle(LineNumberWidth + FoldingMarkerWidth * 2+ErrorMarkerWidth, y, ErrorMarkerWidth, CharHeight, Color.FromArgb(255, 180, 180, 40));
-                    }
-
-                    int lastChar = Math.Min(iCharOffset + (int)(Scroll.ActualWidth/CharWidth), Lines[iLine].Count);
-                    for (int iChar = iCharOffset; iChar < lastChar; iChar++)
-                    {
-                        float x = Options.LeftWidth + CharWidth * (iChar - iCharOffset);
-
-                        Char c = Lines[iLine][iChar];
-                        args.DrawingSession.DrawText(c.C.ToString(), x, y, c.ForeGround, new CanvasTextFormat() { FontFamily = "Consolas", FontSize = FontSize});
-                    }
-                }
-
-            }
+            CharHeight = (float)size.Height * 1.03f;
+            CharWidth = (float)sizew.Width * 1.31f;
+            isCanvasLoaded = true;
         }
-    }
-
-    public class CodeWriterOptions : Bindable
-    {
-        public double CharHeight { get => Get(16d); set => Set(value); }
-        public GridLength ErrorWidth { get => Get(new GridLength(LineNumberWidth.Value, GridUnitType.Pixel)); set => Set(value); }
-        public int FoldingMarkerWidth { get => Get((int)FontSize / 2); set { Set(value); } }
-        public GridLength FoldingWidth { get => Get(new GridLength(FontSize, GridUnitType.Pixel)); set => Set(value); }
-        public int FontSize { get => Get(16); set { Set(value); FoldingWidth = new(value); FoldingMarkerWidth = (int)value / 2; } }
-        public Thickness HorizontalOffset { get => Get(new Thickness(0, 0, 0, 0)); set { Set(value); } }
-        public Thickness LeftMargin { get => Get(new Thickness(LeftWidth, 0, 0, 0)); set => Set(value); }
-        public int LeftWidth { get => (int)LineNumberWidth.Value + (int)ErrorWidth.Value + (int)FoldingWidth.Value + (int)MarkerWidth.Value; }
-        public SolidColorBrush LineNumberColor { get => Get(new SolidColorBrush(Colors.DeepSkyBlue)); set => Set(value); }
-        public GridLength LineNumberWidth { get => Get(new GridLength(12, GridUnitType.Pixel)); set => Set(value); }
-        public GridLength MarkerWidth { get => Get(new GridLength(2, GridUnitType.Pixel)); set => Set(value); }
-    }
-    public class Folding : Bindable
-    {
-        public int Endline { get => Get(0); set => Set(value); }
-        public int StartLine { get => Get(0); set => Set(value); }
-    }
-
-    public class HighlightRange
-    {
-        public Place End { get; set; }
-        public Place Start { get; set; }
-    }
-
-    public class Line : Bindable
-    {
-        public VisibleState VisibleState = VisibleState.Visible;
-        internal int wordWrapIndent = 0;
-        public ObservableCollection<CharElement> CharGroups { get => Get(new ObservableCollection<CharElement>()); set => Set(value); }
-        public ObservableCollection<Char> Chars { get => Get(new ObservableCollection<Char>()); set => Set(value); }
-        public int Count
-        {
-            get { return Chars.Count; }
-        }
-
-        public bool IsError { get => Get(false); set => Set(value); }
-        public bool IsWarning { get => Get(false); set => Set(value); }
-        public string ErrorText { get => Get(""); set => Set(value); }
-        public string WarningText { get => Get(""); set => Set(value); }
-        public Folding Folding { get => Get(new Folding()); set => Set(value); }
-        public string FoldingEndMarker { get; set; }
-        public string FoldingStartMarker { get; set; }
-        public IEnumerable<Inline> Inlines { get => Get(new ObservableCollection<Inline>()); set => Set(value); }
-        public bool IsChanged { get; set; }
-        public bool IsFoldEnd { get => Get(false); set => Set(value); }
-        public bool IsFoldInner { get => Get(false); set => Set(value); }
-        public bool IsFoldInnerEnd { get => Get(false); set => Set(value); }
-        public bool IsFoldStart { get => Get(false); set => Set(value); }
-        public bool IsReadOnly
-        {
-            get { return false; }
-        }
-
-        public SolidColorBrush IsSelected { get => Get(new SolidColorBrush(Colors.Transparent)); set => Set(value); }
-        public DateTime LastVisit { get; set; }
-        public int LineNumber { get => Get(0); set => Set(value); }
-        public string LineText
-        {
-            get => Get("");
-            set
-            {
-                Set(value);
-                Chars = FormattedText(value);
-                //CharGroups = FormattedText(value);
-                IsFoldStart = FoldableStart(value);
-                IsFoldInnerEnd = FoldableEnd(value);
-                IsFoldInner = !IsFoldStart && !IsFoldInnerEnd;
-                IsError = Error(value);
-                IsWarning = Warning(value);
-                Inlines = new ObservableCollection<Inline>(value.Select(x => new Run() { Text = x.ToString() }));
-            }
-        }
-
-        public bool Marker { get => Get(false); set => Set(value); }
-        public SolidColorBrush MarkerColor { get => Get(new SolidColorBrush(Colors.ForestGreen)); set => Set(value); }
-        public int startY { get => Get(0); set => Set(value); }
-        public int WordWrapStringsCount { get; internal set; }
-
-        public Char this[int index]
-        {
-            get
-            {
-                return Chars[index];
-            }
-            set
-            {
-                Chars[index] = value;
-            }
-        }
-
-        public void Add(Char item)
-        {
-            Chars.Add(item);
-        }
-
-        public virtual void AddRange(IEnumerable<Char> collection)
-        {
-            //Chars.AddRange(collection);
-        }
-
-        public void Clear()
-        {
-            Chars.Clear();
-        }
-
-        public bool Contains(Char item)
-        {
-            return Chars.Contains(item);
-        }
-
-        public void CopyTo(Char[] array, int arrayIndex)
-        {
-            Chars.CopyTo(array, arrayIndex);
-        }
-
-        private bool Error(string text)
-        {
-            bool error = false;
-            error = text.Count(x => x == '[') != text.Count(x => x == ']');
-            ErrorText = "Line does not contain the same number of opening and closing brackets";
-            return error;
-        }
-
-        private bool Warning(string text)
-        {
-            bool error = false;
-            error = text.Count() == 6;
-            WarningText = "Line contains 6 characters!";
-            return error;
-        }
-
-        public ObservableCollection<Char> FormattedText(string text)
-        {
-            List<Char> groups = new();
-
-            groups = text.Select(x => new Char(x)).ToList();
-
-            MatchCollection math = Regex.Matches(text, @"\$.*?\$");
-            foreach (Match match in math)
-            {
-                for (int i = match.Index; i < match.Index + match.Length; i++)
-                {
-                    groups[i].ForeGround = Color.FromArgb(255, 220, 160, 60);
-                }
-            }
-
-            MatchCollection options = Regex.Matches(text, @"(\w+?\s*?)(=)");
-            foreach (Match optionmatch in options)
-            {
-                for (int i = optionmatch.Groups[0].Captures[0].Index; i < optionmatch.Groups[0].Captures[0].Index + optionmatch.Groups[0].Captures[0].Length - 1; i++)
-                {
-                    groups[i].ForeGround = Color.FromArgb(255, 120, 120, 120);
-                }
-            }
-
-            MatchCollection commands = Regex.Matches(text, @"\\.+?\b");
-            foreach (Match match in commands)
-            {
-                for (int i = match.Index; i < match.Index + match.Length; i++)
-                {
-                    groups[i].ForeGround = Windows.UI.Color.FromArgb(255, 40, 120, 200);
-                }
-            }
-
-            MatchCollection startstops = Regex.Matches(text, @"\\(start|stop).+?\b");
-            foreach (Match match in startstops)
-            {
-                for (int i = match.Index; i < match.Index + match.Length; i++)
-                {
-                    groups[i].ForeGround = Color.FromArgb(255, 40, 180, 140);
-                }
-            }
-
-            MatchCollection brackets = Regex.Matches(text, @"(?<!\\)\[|(?<!\\)\]");
-            foreach (Match match in brackets)
-            {
-                for (int i = match.Index; i < match.Index + match.Length; i++)
-                {
-                    groups[i].ForeGround = Color.FromArgb(255, 80, 40, 180);
-                }
-            }
-
-            MatchCollection braces = Regex.Matches(text, @"(?<!\\)\{|(?<!\\)\}");
-            foreach (Match match in braces)
-            {
-                for (int i = match.Index; i < match.Index + match.Length; i++)
-                {
-                    groups[i].ForeGround = Color.FromArgb(255, 120, 80, 220);
-                }
-            }
-
-            MatchCollection refs = Regex.Matches(text, @"(sec|eq|tab|fig):\w+");
-            foreach (Match match in refs)
-            {
-                for (int i = match.Index; i < match.Index + match.Length; i++)
-                {
-                    groups[i].ForeGround =Color.FromArgb(255, 180, 120, 40);
-                }
-            }
-
-            MatchCollection linecomment = Regex.Matches(text, @"\%.*");
-            foreach (Match match in linecomment)
-            {
-                for (int i = match.Index; i < match.Index + match.Length; i++)
-                {
-                    groups[i].ForeGround = Color.FromArgb(255, 40, 180, 80);
-                }
-            }
-
-            //int lastindex = 0;
-            //while (groups.Count - lastindex > CodeWriter.MaxChars)
-            //{
-            //    groups.Insert(CodeWriter.MaxChars + lastindex, new Char('\n'));
-            //    lastindex += CodeWriter.MaxChars + 1;
-            //}
-
-            return new(groups);
-        }
-
-        public IEnumerator<Char> GetEnumerator()
-        {
-            return Chars.GetEnumerator();
-        }
-
-        public int IndexOf(Char item)
-        {
-            return Chars.IndexOf(item);
-        }
-
-        public void Insert(int index, Char item)
-        {
-            Chars.Insert(index, item);
-        }
-
-        public bool Remove(Char item)
-        {
-            return Chars.Remove(item);
-        }
-
-        public void RemoveAt(int index)
-        {
-            Chars.RemoveAt(index);
-        }
-
-        public virtual void RemoveRange(int index, int count)
-        {
-            if (index >= Count)
-                return;
-            //Chars.RemoveRange(index, Math.Min(Count - index, count));
-        }
-
-        public virtual void TrimExcess()
-        {
-            // Chars.TrimExcess();
-        }
-
-        internal void ClearFoldingMarkers()
-        {
-        }
-
-        internal int GetWordWrapStringFinishPosition(int v, Line line)
-        {
-            return 0;
-        }
-
-        internal int GetWordWrapStringIndex(int iChar)
-        {
-            return 0;
-        }
-
-        internal int GetWordWrapStringStartPosition(object v)
-        {
-            return 0;
-        }
-
-        private bool FoldableEnd(string text)
-        {
-            var match = Regex.Match(text, @"\\(stop).+?\b");
-            if (match.Success)
-            {
-                return true;
-            }
-            else return false;
-        }
-
-        private bool FoldableStart(string text)
-        {
-            var match = Regex.Match(text, @"\\(start).+?\b");
-            if (match.Success)
-            {
-                Folding = new Folding() { StartLine = LineNumber, Endline = LineNumber + 3 };
-                return true;
-            }
-            else return false;
-        }
-    }
-    public class Place : IEquatable<Place>
-    {
-        public int iChar = 0;
-        public int iLine = 0;
-
-        public Place()
-        {
-        }
-
-        public Place(int iChar, int iLine)
-        {
-            this.iChar = iChar;
-            this.iLine = iLine;
-        }
-
-        public static Place Empty
-        {
-            get { return new Place(); }
-        }
-
-        public static bool operator !=(Place p1, Place p2)
-        {
-            return !p1.Equals(p2);
-        }
-
-        public static Place operator +(Place p1, Place p2)
-        {
-            return new Place(p1.iChar + p2.iChar, p1.iLine + p2.iLine);
-        }
-
-        public static bool operator <(Place p1, Place p2)
-        {
-            if (p1.iLine < p2.iLine) return true;
-            if (p1.iLine > p2.iLine) return false;
-            if (p1.iChar < p2.iChar) return true;
-            return false;
-        }
-
-        public static bool operator <=(Place p1, Place p2)
-        {
-            if (p1.Equals(p2)) return true;
-            if (p1.iLine < p2.iLine) return true;
-            if (p1.iLine > p2.iLine) return false;
-            if (p1.iChar < p2.iChar) return true;
-            return false;
-        }
-
-        public static bool operator ==(Place p1, Place p2)
-        {
-            return p1.Equals(p2);
-        }
-
-        public static bool operator >(Place p1, Place p2)
-        {
-            if (p1.iLine > p2.iLine) return true;
-            if (p1.iLine < p2.iLine) return false;
-            if (p1.iChar > p2.iChar) return true;
-            return false;
-        }
-
-        public static bool operator >=(Place p1, Place p2)
-        {
-            if (p1.Equals(p2)) return true;
-            if (p1.iLine > p2.iLine) return true;
-            if (p1.iLine < p2.iLine) return false;
-            if (p1.iChar > p2.iChar) return true;
-            return false;
-        }
-
-        public bool Equals(Place other)
-        {
-            return iChar == other.iChar && iLine == other.iLine;
-        }
-
-        public override bool Equals(object obj)
-        {
-            return (obj is Place) && Equals((Place)obj);
-        }
-
-        public override int GetHashCode()
-        {
-            return iChar.GetHashCode() ^ iLine.GetHashCode();
-        }
-
-        public void Offset(int dx, int dy)
-        {
-            iChar += dx;
-            iLine += dy;
-        }
-        public override string ToString()
-        {
-            return "(" + (iLine + 1) + "," + (iChar + 1) + ")";
-        }
-    }
-    public class SelectionRange : Bindable
-    {
-        public SelectionRange(Place place)
-        {
-            Start = place;
-            End = place;
-        }
-
-        public SelectionRange(Place start, Place end)
-        {
-            Start = start;
-            End = end;
-        }
-
-        public SelectionRange()
-        {
-        }
-
-        public Place End { get => Get(new Place()); set => Set(value); }
-        public Place Start { get => Get(new Place()); set => Set(value); }
     }
 }

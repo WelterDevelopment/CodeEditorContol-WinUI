@@ -12,7 +12,6 @@
   </PropertyGroup>
   <ItemGroup>
     <None Remove="CodeWriter.xaml" />
-    <None Remove="UserControl1.xaml" />
   </ItemGroup>
 
   <ItemGroup>
@@ -24,9 +23,6 @@
 
   <ItemGroup>
     <Page Update="CodeWriter.xaml">
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
-    <Page Update="UserControl1.xaml">
       <Generator>MSBuild:Compile</Generator>
     </Page>
   </ItemGroup>

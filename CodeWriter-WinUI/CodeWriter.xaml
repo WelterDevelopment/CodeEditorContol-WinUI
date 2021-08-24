@@ -4,16 +4,15 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:local="using:CodeWriter_WinUI"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:xaml="using:Microsoft.Graphics.Canvas.UI.Xaml"
-    mc:Ignorable="d" FontSize="{x:Bind FontSize, Mode=OneWay}" Foreground="LightGray" FontFamily="Consolas" >
-
-    <UserControl.Resources>
-        <local:CodeWriterOptions x:Key="Options" ></local:CodeWriterOptions>
-    </UserControl.Resources>
-
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+    xmlns:xaml="using:Microsoft.Graphics.Canvas.UI.Xaml"
+    mc:Ignorable="d" 
+    FontSize="{x:Bind FontSize, Mode=OneWay}" Foreground="LightGray" FontFamily="Consolas" 
+      
+    >
     <Grid x:Name="LayoutRoot" >
 
-        <ScrollViewer x:Name="Scroll"  CanBeScrollAnchor="True"  KeyDown="Scroll_KeyDown" KeyUp="Scroll_KeyUp" HorizontalScrollMode="Enabled" HorizontalScrollBarVisibility="Visible" VerticalScrollMode="Enabled" IsDeferredScrollingEnabled="True"   SizeChanged="Scroll_SizeChanged" >
+        <ScrollViewer x:Name="Scroll"   CanBeScrollAnchor="True"  KeyDown="Scroll_KeyDown" KeyUp="Scroll_KeyUp" HorizontalScrollMode="Enabled" HorizontalScrollBarVisibility="Visible" VerticalScrollMode="Enabled" IsDeferredScrollingEnabled="True"   SizeChanged="Scroll_SizeChanged" >
             <ScrollViewer.Template>
                 <ControlTemplate  TargetType="ScrollViewer">
                     <Grid>
@@ -51,72 +50,12 @@
                     </Grid>
                 </ControlTemplate>
             </ScrollViewer.Template>
-            
-            <Grid PointerMoved="TextControl_PointerMoved"  PointerPressed="OnMouseDown" PointerReleased="OnMouseUp" Loaded="Content_Loaded">
+
+            <Grid  x:Name="TextControl" PointerMoved="TextControl_PointerMoved"  PointerPressed="OnMouseDown" PointerReleased="OnMouseUp" Loaded="Content_Loaded">
+                
                 <xaml:CanvasControl HorizontalAlignment="Stretch" VerticalAlignment="Stretch" x:Name="SelectionCanvas" Draw="SelectionCanvas_Draw"></xaml:CanvasControl>
-                <ItemsControl DataContext="{Binding Source={StaticResource Options} }"  ItemsSource="{x:Bind VisibleLines, Mode=OneWay}" x:Name="TextControl">
-                    <ItemsControl.ItemsPanel>
-                        <ItemsPanelTemplate>
-                            <StackPanel  Orientation="Vertical" Spacing="0"></StackPanel>
-                        </ItemsPanelTemplate>
-                    </ItemsControl.ItemsPanel>
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate  >
-                            <Grid  Margin="0" Padding="0" ColumnSpacing="0" >
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="{Binding Source={StaticResource Options}, Path=ErrorWidth, Mode=OneWay}" />
-                                    <ColumnDefinition Width="{Binding Source={StaticResource Options}, Path=LineNumberWidth, Mode=OneWay}" />
-                                    <ColumnDefinition Width="{Binding Source={StaticResource Options}, Path=MarkerWidth, Mode=OneWay}" />
-                                    <ColumnDefinition Width="{Binding Source={StaticResource Options}, Path=FoldingWidth, Mode=OneWay}" />
-                                    <ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
-                                <!--<Border Grid.Column="4"  BorderThickness="0"  Margin="{Binding Source={StaticResource CWVM}, Path=HorizontalOffset, Mode=OneWay}"  Height="{Binding Source={StaticResource CWVM}, Path=CharHeight, Mode=OneWay}" CornerRadius="3" BorderBrush="{Binding IsSelected}" >
-
-                                    <TextBlock CharacterSpacing="0" LineHeight="{Binding CharHeight}" local:TextBlockExtensions.BindableInlines="{Binding CharGroups, Mode=OneWay, UpdateSourceTrigger=PropertyChanged}" TextWrapping="NoWrap" Margin="0" Padding="0"  >
-
-                                    </TextBlock>
-
-                                    --><!-- ObservableCollection<OservableCollection<SomeBindableChar>> causes lots of problems and most of the time the lines wont get printed -->
-                                    <!--<ItemsControl  ItemsSource="{Binding Chars, Mode=OneWay}">
-                                    <ItemsControl.ItemsPanel>
-                                        <ItemsPanelTemplate>
-                                            <StackPanel Orientation="Horizontal" Spacing="0"/>
-                                        </ItemsPanelTemplate>
-                                    </ItemsControl.ItemsPanel>
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate>
-                                            <Border Background="{Binding IsSelected, Mode=OneWay}" BorderThickness="0">
-                                                <TextBlock Width="12" Text="{Binding C, Mode=OneWay}" Foreground="White" ></TextBlock>
-                                            </Border>
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>--><!--
-                                </Border>-->
-                                <!--<Border Grid.Column="0" Background="#252525" >
-                                    <TextBlock  TextAlignment="Center" Text="E" Foreground="OrangeRed" Visibility="{Binding Error, Mode=OneWay}" ></TextBlock>
-                                </Border>
-                                <Border Grid.Column="1" Background="#303030" >
-                                    <TextBlock  TextAlignment="Right" Text="{Binding LineNumber, Mode=OneWay}" Foreground="CadetBlue" ></TextBlock>
-                                </Border>
-                                <Border Grid.Column="2"  VerticalAlignment="Stretch" Background="#303030" >
-                                    <Border Visibility="{Binding Marker, Mode=OneWay}" Background="ForestGreen"></Border>
-                                </Border>
-                                <Grid Grid.Column="3" Background="#353535" >
-                                    <Border VerticalAlignment="Center" HorizontalAlignment="Center" Height="{Binding Source={StaticResource CWVM}, Path=FoldingMarkerWidth, Mode=OneWay}" Width="{Binding Source={StaticResource CWVM}, Path=FoldingMarkerWidth, Mode=OneWay}" BorderThickness="1" BorderBrush="LightGray" Visibility="{Binding IsFoldStart, Mode=OneWay}">
-                                        <TextBlock Text="-"  HorizontalAlignment="Center" VerticalAlignment="Center" HorizontalTextAlignment="Center" ></TextBlock>
-                                    </Border>
-                                    <TextBlock Text="├"  HorizontalAlignment="Center"  HorizontalTextAlignment="Center"  Visibility="{Binding IsFoldInnerEnd, Mode=OneWay}" ></TextBlock>
-                                    <TextBlock Text="│"  HorizontalAlignment="Center"  HorizontalTextAlignment="Center"  Visibility="{Binding IsFoldInner, Mode=OneWay}" ></TextBlock>
-                                    <TextBlock Text="└"  HorizontalAlignment="Center"  HorizontalTextAlignment="Center"  Visibility="{Binding IsFoldEnd, Mode=OneWay}" ></TextBlock>
-                                </Grid>-->
-
-                            </Grid>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
-                <!--<RichEditBox ScrollViewer.HorizontalScrollMode="Disabled" ScrollViewer.VerticalScrollMode="Disabled" FontSize="{x:Bind FontSize}" FontFamily="Consolas" Margin="{Binding Source={StaticResource CWVM}, Path=LeftMargin}" Background="Transparent" CharacterSpacing="0" local:RichEditBoxExtensions.BindableInlines="{x:Bind VisibleLines, Mode=OneWay}"  TextWrapping="NoWrap"   Padding="0"  ></RichEditBox>-->
-                <!--<Border VerticalAlignment="Top" HorizontalAlignment="Left" x:Name="PointerBeam" Width="1" Background="LightGray" Height="{Binding Source={StaticResource CWVM}, Path=FontSize, Mode=OneWay}"></Border>-->
-                <xaml:CanvasControl HorizontalAlignment="Stretch" VerticalAlignment="Stretch" x:Name="TextCancas" Draw="TextCancas_Draw" ></xaml:CanvasControl>
+                <ItemsControl></ItemsControl>
+                <xaml:CanvasControl HorizontalAlignment="Stretch" VerticalAlignment="Stretch" x:Name="TextCancas" CreateResources="TextCancas_CreateResources" Draw="TextCancas_Draw" Loaded="TextCancas_Loaded"></xaml:CanvasControl>
                 <xaml:CanvasControl HorizontalAlignment="Stretch" VerticalAlignment="Stretch" x:Name="BeamCanvas" Draw="BeamCanvas_Draw"></xaml:CanvasControl>
             </Grid>
         </ScrollViewer>
