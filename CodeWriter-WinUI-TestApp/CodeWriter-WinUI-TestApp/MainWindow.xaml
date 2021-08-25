@@ -19,13 +19,14 @@
             <Button x:Name="Btn_Load" Content="Load Textfile" Click="Btn_Load_Click"/>
             <Button x:Name="Btn_Save" Visibility="Collapsed" Content="Save Text" Click="Btn_Save_Click"/>
             <Slider Width="150" Header="Font Size"  Value="{Binding FontSize, Mode=TwoWay}" Minimum="6" Maximum="36"/>
-            <CheckBox  Content="Unsaved Changes" IsChecked="{Binding UnsavedChanges, Mode=OneWay}" IsHitTestVisible="False" />
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <TextBlock Text="Selection: "></TextBlock>
                 <TextBlock Text="{Binding ElementName=CW, Path=Selection.Start}"></TextBlock>
                 <TextBlock Text="-->"></TextBlock>
                 <TextBlock Text="{Binding ElementName=CW, Path=Selection.End}"></TextBlock>
             </StackPanel>
+            <CheckBox  Content="Unsaved Changes" IsChecked="{Binding UnsavedChanges, Mode=OneWay}" IsHitTestVisible="False" />
         </StackPanel>
-        <codewriter:CodeWriter x:Name="CW" Grid.Row="1" Text="{Binding Text, Mode=TwoWay}" FontSize="{Binding FontSize, Mode=OneWay}" />
+        <codewriter:CodeWriter x:Name="CW" Grid.Row="1" Text="{Binding Text, Mode=TwoWay}" FontSize="{Binding FontSize, Mode=TwoWay}" />
     </Grid>
 </Window>

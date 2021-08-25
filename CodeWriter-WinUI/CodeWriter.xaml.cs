@@ -15,6 +15,9 @@ using System.ComponentModel;
 using System.Linq;
 using System.Numerics;
 using System.Runtime.CompilerServices;
+using System.Text.RegularExpressions;
+using System.Windows.Input;
+using Windows.ApplicationModel.DataTransfer;
 using Windows.Foundation;
 using Windows.System;
 using Windows.UI;
@@ -38,19 +41,29 @@ namespace CodeWriter_WinUI
         bool isCanvasLoaded = false;
         private ScrollBar VerticalScroll;
 
+       
+        public int HorizontalOffset { get => Get(0); set { Set(value); } }
+        int ErrorMarkerWidth { get => CharWidth / 2; }
+        int WarningMarkerWidth { get => CharWidth / 2; }
+        int FoldingMarkerWidth { get => CharWidth ; }
+        int TextIndent { get => CharWidth; }
+
+        public int LeftWidth { get => (int)LineNumberWidth + (int)ErrorMarkerWidth + (int)WarningMarkerWidth + (int)FoldingMarkerWidth +TextIndent; }
+        public Color LineNumberColor { get => Get(Color.FromArgb(255, 40, 140, 160)); set => Set(value); }
+        public Color FoldingMarkerColor { get => Get(Color.FromArgb(255, 140, 140, 140)); set => Set(value); }
+        public int LineNumberWidth { get => Get(12); set => Set(value); }
+        public int MarkerWidth { get => Get(2); set => Set(value); }
+
+        private bool pasting = false;
+
         public CodeWriter()
         {
-            Options = new CodeWriterOptions();
             InitializeComponent();
             CharacterReceived += CodeWriter_CharacterReceived;
-            Invalidate();
-        }
-
-        public CodeWriter(CodeWriterOptions codeWriterViewModel)
-        {
-            Options = codeWriterViewModel;
-            InitializeComponent();
-            CharacterReceived += CodeWriter_CharacterReceived;
+            CopyCommand = new RelayCommand(() => Copy());
+            PasteCommand = new RelayCommand(() => {  Paste(); });
+            DeleteCommand = new RelayCommand(() => Delete());
+            CutCommand = new RelayCommand(() => Delete(true));
             Invalidate();
         }
 
@@ -62,9 +75,9 @@ namespace CodeWriter_WinUI
             HorizontalScroll
         }
 
-        public float CharHeight { get => Get(12f); set { Set(value); } }
+        public int CharHeight { get => Get(16); set { Set(value); } }
 
-        public float CharWidth { get; set; } = 8;
+        public int CharWidth { get => Get(8); set { Set(value); } }
 
         public CoreCursor Cursor
         {
@@ -84,22 +97,21 @@ namespace CodeWriter_WinUI
         public new int FontSize
         {
             get => (int)GetValue(FontSizeProperty);
-            set { SetValue(FontSizeProperty, value); Options.FontSize = value; }
+            set { SetValue(FontSizeProperty, value); }
         }
 
         public bool isLineSelect { get; private set; } = false;
         public bool isSelecting { get; private set; } = false;
-        public bool IsSelection { get => Selection.Start.iChar != Selection.End.iChar | Selection.Start.iLine != Selection.End.iLine; }
+
+        public bool IsSelection { get => Get(false); set => Set(value); }
         public int LeftIndent { get; private set; } = 0;
         public double LeftIndentLine { get; private set; } = 44;
-        public Windows.UI.Color LineNumberColor { get => Get(Colors.DeepSkyBlue); set => Set(value); }
         public List<Line> Lines { get => Get(new List<Line>()); set => Set(value); }
         public int lineSelectFrom { get; private set; } = 0;
 
         public bool mouseIsDrag { get; private set; } = false;
 
         public bool mouseIsDragDrop { get; private set; } = false;
-        public CodeWriterOptions Options { get; set; }
 
         public SelectionRange Selection
         {
@@ -110,7 +122,7 @@ namespace CodeWriter_WinUI
                 if (value.Start == value.End)
                     Lines[value.Start.iLine].IsSelected = new SolidColorBrush(Colors.DarkGray);
 
-                var width = Scroll.ActualWidth - Options.LeftWidth;
+                var width = Scroll.ActualWidth - LeftWidth;
                 if (value.End.iChar * CharWidth < HorizontalScroll.Value)
                     HorizontalScroll.Value = value.End.iChar * CharWidth;
                 else if ((value.End.iChar) * CharWidth - width - HorizontalScroll.Value > 0)
@@ -122,6 +134,7 @@ namespace CodeWriter_WinUI
                     VerticalScroll.Value = Math.Min(value.End.iLine * CharHeight - Scroll.ActualHeight, VerticalScroll.Maximum);
 
                 CursorPlace = new Place(value.End.iChar, value.End.iLine);
+                IsSelection = Selection.Start.iChar != Selection.End.iChar | Selection.Start.iLine != Selection.End.iLine;
                 SelectionCanvas.Invalidate();
             }
         }
@@ -131,6 +144,94 @@ namespace CodeWriter_WinUI
             get => (string)GetValue(TextProperty);
             set => SetValue(TextProperty, value);
         }
+
+        public ICommand CopyCommand { get; set; }
+        public ICommand DeleteCommand { get; set; }
+        public ICommand CutCommand { get; set; }
+        public ICommand PasteCommand { get; set; }
+
+        void Copy()
+        {
+            if (IsSelection)
+            {
+                DataPackage dataPackage = new DataPackage();
+                dataPackage.RequestedOperation = DataPackageOperation.Copy;
+                dataPackage.SetText(SelectedText);
+                Clipboard.SetContent(dataPackage);
+            }
+        }
+
+
+
+        void Delete(bool cut = false)
+        {
+            if (IsSelection)
+            {
+                if (cut)
+                {
+                    Copy();
+                }
+
+                if (Selection.Start.iLine == Selection.End.iLine)
+                {
+                    if (Selection.Start.iChar < Selection.End.iChar)
+                    {
+                        Lines[CursorPlace.iLine].LineText = Lines[CursorPlace.iLine].LineText.Remove(Selection.Start.iChar, Selection.End.iChar - Selection.Start.iChar);
+                        Selection = new SelectionRange(Selection.Start, Selection.Start);
+                    }
+                    else
+                    {
+                        Lines[CursorPlace.iLine].LineText = Lines[CursorPlace.iLine].LineText.Remove(Selection.End.iChar, Selection.Start.iChar - Selection.End.iChar);
+                        Selection = new SelectionRange(Selection.End, Selection.End);
+                    }
+                }
+                else
+                {
+
+                }
+
+                TextChanged();
+                Invalidate();
+            }
+        }
+
+        async void Paste()
+        {
+            if (!IsSelection)
+            {
+                string text = "";
+                DataPackageView dataPackageView = Clipboard.GetContent();
+                if (dataPackageView.Contains(StandardDataFormats.Text))
+                {
+                    text += await dataPackageView.GetTextAsync();
+                }
+                Lines[CursorPlace.iLine].LineText = Lines[CursorPlace.iLine].LineText.Insert(CursorPlace.iChar,text);
+                Place end = new(CursorPlace.iChar + text.Length,CursorPlace.iLine);
+                Selection = new(Selection.Start, end) ;
+                TextChanged();
+                Invalidate();
+            }
+        }
+
+        public string SelectedText {get
+            {
+                string text = "";
+                if (Selection.Start.iLine == Selection.End.iLine)
+                {
+                    text = Lines[Selection.Start.iLine].LineText.Substring(Selection.Start.iChar,Selection.End.iChar- Selection.Start.iChar);
+                }
+                else
+                    for (int iLine = Selection.Start.iLine; iLine < Selection.End.iLine; iLine++)
+                    {
+                        if (iLine == Selection.Start.iLine) 
+                            text += Lines[iLine].LineText.Substring(Selection.Start.iChar) + "\n";
+                        else if (iLine == Selection.End.iLine)
+                            text += Lines[iLine].LineText.Substring(0,Selection.End.iChar);
+                        else
+                            text += Lines[iLine].LineText + "\n";
+                    }
+                return text;
+            } }
 
         public List<Line> VisibleLines { get => Get(new List<Line>()); set => Set(value); }
 
@@ -189,11 +290,28 @@ namespace CodeWriter_WinUI
         {
             if (VisibleLines.Count > 0)
             {
-                int x = (int)(Options.LeftWidth + Options.HorizontalOffset.Left + CursorPlace.iChar * CharWidth);
+                int x = (int)(LeftWidth + HorizontalOffset + CursorPlace.iChar * CharWidth);
                 int y = (int)((CursorPlace.iLine - VisibleLines[0].LineNumber + 1) * CharHeight - 1 / 2 * CharHeight);
 
-                if (y <= TextControl.ActualHeight && y >= 0 && x <= TextControl.ActualWidth && x >= Options.LeftWidth)
+                if (y <= TextControl.ActualHeight && y >= 0 && x <= TextControl.ActualWidth && x >= LeftWidth)
                     args.DrawingSession.DrawLine(new Vector2(x, y), new Vector2(x, y + CharHeight), new CanvasSolidColorBrush(sender, Color.FromArgb(255, 200, 200, 200)), 2f);
+
+                int xms = (int)(LeftWidth);
+                int iCharStart = iCharOffset ;
+                int xme = (int)TextControl.ActualWidth;
+                int iCharEnd = iCharStart + (int)((xme-xms)/CharWidth);
+
+                for ( int iChar = iCharStart; iChar < iCharEnd; iChar++)
+                {
+                    int xs = (int)((iChar-iCharStart) * CharWidth)+xms;
+                    if (iChar % 10 == 0)
+                        args.DrawingSession.DrawLine(xs, 0, xs,  CharHeight/8, new CanvasSolidColorBrush(sender, LineNumberColor), 2f);
+                }
+
+                if (Selection.Start == CursorPlace)
+                {
+                    args.DrawingSession.DrawRoundedRectangle(LeftWidth,y,(int)TextControl.ActualWidth-LeftIndent,CharHeight,2,2,FoldingMarkerColor,1);
+                }
             }
         }
 
@@ -245,8 +363,8 @@ namespace CodeWriter_WinUI
                 Size size = MeasureTextSize(TextCancas.Device, "│", textFormat);
                 Size sizew = MeasureTextSize(TextCancas.Device, "–", textFormat);
 
-                CharHeight = (float)size.Height * 1.03f;
-                CharWidth = (float)sizew.Width * 1.31f;
+                CharHeight = (int)(size.Height * 1.03f);
+                CharWidth = (int)(sizew.Width * 1.31f);
             }
 
             if (VerticalScroll != null && Lines != null)
@@ -261,7 +379,7 @@ namespace CodeWriter_WinUI
                     maxchars = l.Count > maxchars ? l.Count : maxchars;
                 }
 
-                HorizontalScroll.Maximum = (maxchars + 1) * CharWidth - Scroll.ActualWidth + Options.LeftWidth;
+                HorizontalScroll.Maximum = (maxchars + 1) * CharWidth - Scroll.ActualWidth + LeftWidth;
                 HorizontalScroll.SmallChange = CharWidth;
                 HorizontalScroll.LargeChange = 3 * CharWidth;
 
@@ -278,10 +396,8 @@ namespace CodeWriter_WinUI
                 }
                 VisibleLines = vis;
 
-                Options.LineNumberWidth = new GridLength(CharWidth * IntLength(Lines.Count), GridUnitType.Pixel);
-                Options.LeftMargin = new Thickness(Options.LeftWidth, 0, 0, 0);
-                Options.FontSize = FontSize;
-                Options.CharHeight = CharHeight;
+                LineNumberWidth = CharWidth * IntLength(Lines.Count);
+                CharHeight = CharHeight;
                 BeamCanvas.Invalidate();
                 SelectionCanvas.Invalidate();
                 TextCancas.Invalidate();
@@ -299,10 +415,10 @@ namespace CodeWriter_WinUI
             {
                 return;
             }
-            float n = Math.Max((int)(e.NewValue / CharWidth - 1) * CharWidth, 0);
+            int n = Math.Max((int)(e.NewValue / CharWidth) * CharWidth, 0);
             CharOffset = n;
             iCharOffset = (int)(n / CharWidth);
-            Options.HorizontalOffset = new Thickness(-n, 0, 0, 0);
+            HorizontalOffset = -n;
             BeamCanvas.Invalidate();
             SelectionCanvas.Invalidate();
             TextCancas.Invalidate();
@@ -339,26 +455,48 @@ namespace CodeWriter_WinUI
 
         private void OnFontSizeChanged(DependencyObject d, DependencyPropertyChangedEventArgs e) => Invalidate();
 
+        Point pos = new Point()        {        };
+
         private void OnMouseDown(object sender, PointerRoutedEventArgs e)
         {
             ExpPointerPoint currentpoint = e.GetCurrentPoint(TextControl);
-
+           
             if (currentpoint.Properties.IsLeftButtonPressed)
             {
-                isLineSelect = currentpoint.Position.X < Options.LeftWidth;
+                isLineSelect = currentpoint.Position.X < LeftWidth;
                 try
                 {
-                    RemoveAllHighlights();
                     isSelecting = true;
                     if (!isLineSelect)
                     {
-                        Place start = PointerToPlace(currentpoint);
-                        Place end = PointerToPlace(currentpoint);
-                        Selection = new(start, end);
+                        if (pos != currentpoint.Position)
+                        {
+                            Place start = PointerToPlace(currentpoint.Position);
+                            Place end = PointerToPlace(currentpoint.Position);
+                            Selection = new(start, end);
+                        }
+                        else
+                        {
+                            Place start = PointerToPlace(pos);
+                            Place end = new Place(start.iChar, start.iLine);
+                            var matches = Regex.Matches(Lines[start.iLine].LineText, @"\b\w+?\b");
+                            foreach (Match match in matches)
+                            {
+                                int istart = match.Index;
+                                int iend = match.Index + match.Length;
+                                if (start.iChar <= iend && start.iChar >= istart)
+                                {
+                                    start.iChar = istart;
+                                    end.iChar = iend;
+                                }
+                            }
+                            Selection = new(start, end);
+                        }
+                        pos = currentpoint.Position;
                     }
                     else
                     {
-                        Place start = PointerToPlace(currentpoint);
+                        Place start = PointerToPlace(currentpoint.Position);
                         Place end = new(Lines[start.iLine].Count, start.iLine);
                         Selection = new(start, end);
                     }
@@ -388,12 +526,12 @@ namespace CodeWriter_WinUI
             }
         }
 
-        private Place PointerToPlace(ExpPointerPoint currentpoint)
+        private Place PointerToPlace(Point currentpoint)
         {
-            int iline = Math.Min((int)(currentpoint.Position.Y / CharHeight) + VisibleLines[0].LineNumber - 1, Lines.Count - 1);
+            int iline = Math.Min((int)(currentpoint.Y / CharHeight) + VisibleLines[0].LineNumber - 1, Lines.Count - 1);
             int ichar = 0;
-            if ((int)currentpoint.Position.X - Options.LeftWidth - Options.HorizontalOffset.Left > 0)
-                ichar = Math.Min((int)((currentpoint.Position.X - Options.LeftWidth - Options.HorizontalOffset.Left + CharWidth * 2 / 3) / CharWidth), Lines[iline].Count);
+            if ((int)currentpoint.X - LeftWidth - HorizontalOffset > 0)
+                ichar = Math.Min((int)((currentpoint.X - LeftWidth - HorizontalOffset + CharWidth * 2 / 3) / CharWidth), Lines[iline].Count);
 
             return new Place(ichar, iline);
         }
@@ -453,20 +591,7 @@ namespace CodeWriter_WinUI
                         break;
 
                     case VirtualKey.Back:
-                        if (IsSelection && Selection.Start.iLine == Selection.End.iLine)
-                        {
-                            if (Selection.Start.iChar < Selection.End.iChar)
-                            {
-                                Lines[CursorPlace.iLine].LineText = Lines[CursorPlace.iLine].LineText.Remove(Selection.Start.iChar, Selection.End.iChar - Selection.Start.iChar);
-                                Selection = new SelectionRange(Selection.Start, Selection.Start);
-                            }
-                            else
-                            {
-                                Lines[CursorPlace.iLine].LineText = Lines[CursorPlace.iLine].LineText.Remove(Selection.End.iChar, Selection.Start.iChar - Selection.End.iChar);
-                                Selection = new SelectionRange(Selection.End, Selection.End);
-                            }
-                        }
-                        else
+                        if (!IsSelection)
                         {
                             if (CursorPlace.iChar == 0)
                             {
@@ -486,6 +611,7 @@ namespace CodeWriter_WinUI
                                 Selection = new SelectionRange(newplace);
                             }
                         }
+                        
                         TextChanged();
                         break;
 
@@ -572,7 +698,10 @@ namespace CodeWriter_WinUI
             }
             else if (Modifiers.Contains(VirtualKey.Control))
             {
-                FontSize += Math.Sign(mwd);
+                //FontSize += Math.Sign(mwd);
+                int newfontsize = FontSize + Math.Sign(mwd);
+                if (newfontsize >= 6 && newfontsize <=36)
+                SetValue(FontSizeProperty, newfontsize);
             }
             e.Handled = true;
         }
@@ -594,14 +723,14 @@ namespace CodeWriter_WinUI
                     if (Selection.Start.iChar < Selection.End.iChar)
                         for (int i = Selection.Start.iChar; i < Selection.End.iChar; i++)
                         {
-                            x = (int)(Options.LeftWidth + Options.HorizontalOffset.Left + i * CharWidth);
+                            x = (int)(LeftWidth + HorizontalOffset + i * CharWidth);
                             y = (int)((CursorPlace.iLine - VisibleLines[0].LineNumber + 1) * CharHeight - 1 / 2 * CharHeight);
                             DrawSelectionCell(args.DrawingSession, x, y);
                         }
                     else
                         for (int i = Selection.End.iChar; i < Selection.Start.iChar; i++)
                         {
-                            x = (int)(Options.LeftWidth + Options.HorizontalOffset.Left + i * CharWidth);
+                            x = (int)(LeftWidth + HorizontalOffset + i * CharWidth);
                             y = (int)((CursorPlace.iLine - VisibleLines[0].LineNumber + 1) * CharHeight - 1 / 2 * CharHeight);
                             DrawSelectionCell(args.DrawingSession, x, y);
                         }
@@ -626,21 +755,21 @@ namespace CodeWriter_WinUI
                         if (lp == start.iLine)
                             for (int i = start.iChar; i < Lines[lp].Count + 1; i++)
                             {
-                                x = (int)(Options.LeftWidth + Options.HorizontalOffset.Left + i * CharWidth);
+                                x = (int)(LeftWidth + HorizontalOffset + i * CharWidth);
                                 y = (int)((lp - VisibleLines[0].LineNumber + 1) * CharHeight - 1 / 2 * CharHeight);
                                 DrawSelectionCell(args.DrawingSession, x, y);
                             }
                         else if (lp > start.iLine && lp < end.iLine)
                             for (int i = 0; i < Lines[lp].Count + 1; i++)
                             {
-                                x = (int)(Options.LeftWidth + Options.HorizontalOffset.Left + i * CharWidth);
+                                x = (int)(LeftWidth + HorizontalOffset + i * CharWidth);
                                 y = (int)((lp - VisibleLines[0].LineNumber + 1) * CharHeight - 1 / 2 * CharHeight);
                                 DrawSelectionCell(args.DrawingSession, x, y);
                             }
                         else if (lp == end.iLine)
                             for (int i = 0; i < end.iChar; i++)
                             {
-                                x = (int)(Options.LeftWidth + Options.HorizontalOffset.Left + i * CharWidth);
+                                x = (int)(LeftWidth + HorizontalOffset + i * CharWidth);
                                 y = (int)((lp - VisibleLines[0].LineNumber + 1) * CharHeight - 1 / 2 * CharHeight);
                                 DrawSelectionCell(args.DrawingSession, x, y);
                             }
@@ -656,36 +785,48 @@ namespace CodeWriter_WinUI
         private void TextCancas_Draw(CanvasControl sender, CanvasDrawEventArgs args)
         {
             if (VisibleLines.Count > 0)
-
             {
-                float LineNumberWidth = CharWidth * IntLength(Lines.Count);
-                float FoldingMarkerWidth = CharWidth;
-                float ErrorMarkerWidth = CharWidth / 2;
+
+                int foldPos = LineNumberWidth + ErrorMarkerWidth + WarningMarkerWidth;
+                int errorPos = LineNumberWidth ;
+                int warningPos = LineNumberWidth +ErrorMarkerWidth;
                 for (int iLine = VisibleLines[0].LineNumber - 1; iLine < VisibleLines.Last().LineNumber; iLine++)
                 {
                     float y = CharHeight * (iLine - VisibleLines[0].LineNumber + 1);
-                    args.DrawingSession.FillRectangle(0, y, Options.LeftWidth, CharHeight, Color.FromArgb(255, 40, 40, 40));
-                    args.DrawingSession.DrawText((iLine + 1).ToString(), CharWidth * IntLength(Lines.Count), y, Color.FromArgb(255, 40, 140, 200), new CanvasTextFormat() { FontFamily = "Consolas", FontSize = FontSize, HorizontalAlignment = CanvasHorizontalAlignment.Right });
+                    args.DrawingSession.FillRectangle(0, y, LeftWidth-TextIndent, CharHeight, Color.FromArgb(255, 40, 40, 40));
+                    args.DrawingSession.DrawText((iLine + 1).ToString(), CharWidth * IntLength(Lines.Count), y, LineNumberColor, new CanvasTextFormat() { FontFamily = "Consolas", FontSize = FontSize, HorizontalAlignment = CanvasHorizontalAlignment.Right });
 
                     if (Lines[iLine].IsFoldStart)
                     {
-                        args.DrawingSession.DrawText("⯆", LineNumberWidth + FoldingMarkerWidth, y, Color.FromArgb(255, 40, 80, 140), new CanvasTextFormat() { FontFamily = "Consolas", FontSize = FontSize, HorizontalAlignment = CanvasHorizontalAlignment.Center });
+                        args.DrawingSession.DrawRectangle(foldPos, y+CharHeight/4, CharWidth, CharWidth, FoldingMarkerColor,2);
+                        args.DrawingSession.DrawLine(foldPos + CharWidth/4, y + CharHeight / 2, foldPos + CharWidth * 3/4, y + CharHeight / 2, FoldingMarkerColor, 2);
+                    }
+
+                    else if (Lines[iLine].IsFoldInner)
+                    {
+                        args.DrawingSession.DrawLine(foldPos + CharWidth/2, y, foldPos + CharWidth / 2, y + CharHeight, FoldingMarkerColor,2);
+                        
+                    }
+                    else if (Lines[iLine].IsFoldInnerEnd)
+                    {
+                        args.DrawingSession.DrawLine(foldPos + CharWidth / 2, y, foldPos + CharWidth / 2, y + CharHeight, FoldingMarkerColor, 2);
+                        args.DrawingSession.DrawLine(foldPos + CharWidth / 2, y + CharHeight / 2, foldPos + CharWidth, y + CharHeight / 2, FoldingMarkerColor, 2);
                     }
 
                     if (Lines[iLine].IsError)
                     {
-                        args.DrawingSession.FillRectangle(LineNumberWidth + FoldingMarkerWidth * 2, y, ErrorMarkerWidth, CharHeight, Color.FromArgb(255, 200, 40, 40));
+                        args.DrawingSession.FillRectangle(errorPos, y, ErrorMarkerWidth, CharHeight, Color.FromArgb(255, 200, 40, 40));
                     }
 
                     if (Lines[iLine].IsWarning)
                     {
-                        args.DrawingSession.FillRectangle(LineNumberWidth + FoldingMarkerWidth * 2 + ErrorMarkerWidth, y, ErrorMarkerWidth, CharHeight, Color.FromArgb(255, 180, 180, 40));
+                        args.DrawingSession.FillRectangle(warningPos, y, WarningMarkerWidth, CharHeight, Color.FromArgb(255, 180, 180, 40));
                     }
 
                     int lastChar = Math.Min(iCharOffset + (int)(Scroll.ActualWidth / CharWidth), Lines[iLine].Count);
                     for (int iChar = iCharOffset; iChar < lastChar; iChar++)
                     {
-                        float x = Options.LeftWidth + CharWidth * (iChar - iCharOffset);
+                        float x = LeftWidth + CharWidth * (iChar - iCharOffset);
 
                         Char c = Lines[iLine][iChar];
                         args.DrawingSession.DrawText(c.C.ToString(), x, y, c.ForeGround, new CanvasTextFormat() { FontFamily = "Consolas", FontSize = FontSize });
@@ -712,18 +853,18 @@ namespace CodeWriter_WinUI
                 RemoveAllHighlights();
                 if (!isLineSelect)
                 {
-                    Selection = new SelectionRange(Selection.Start, PointerToPlace(currentpoint));
+                    Selection = new SelectionRange(Selection.Start, PointerToPlace(currentpoint.Position));
                 }
                 else
                 {
-                    Place end = PointerToPlace(currentpoint);
+                    Place end = PointerToPlace(currentpoint.Position);
                     end.iChar = Lines[end.iLine].Count;
                     Selection = new SelectionRange(Selection.Start, end);
                 }
             }
             else
             {
-                if (currentpoint.Position.X < Options.LeftWidth)
+                if (currentpoint.Position.X < LeftWidth)
                 {
                     Cursor = new CoreCursor(CoreCursorType.Hand, 1);
                 }
@@ -784,9 +925,23 @@ namespace CodeWriter_WinUI
             Size size = MeasureTextSize(sender.Device, "│", textFormat);
             Size sizew = MeasureTextSize(sender.Device, "–", textFormat);
 
-            CharHeight = (float)size.Height * 1.03f;
-            CharWidth = (float)sizew.Width * 1.31f;
+            CharHeight = (int)(size.Height * 1.03f);
+            CharWidth = (int)(sizew.Width * 1.31f);
             isCanvasLoaded = true;
+        }
+
+        bool invoked = false;
+        private void KeyboardAccelerator_Invoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
+        {
+            if (invoked)
+            {
+                args.Handled = true;
+                invoked = false;
+            }
+            else
+            {
+                invoked = true;
+            }
         }
     }
 }

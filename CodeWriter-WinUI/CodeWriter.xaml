@@ -7,38 +7,74 @@
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
     xmlns:xaml="using:Microsoft.Graphics.Canvas.UI.Xaml"
     mc:Ignorable="d" 
-    FontSize="{x:Bind FontSize, Mode=OneWay}" Foreground="LightGray" FontFamily="Consolas" 
+     Foreground="LightGray" FontFamily="Consolas" 
       
     >
-    <Grid x:Name="LayoutRoot" >
+    <UserControl.ContextFlyout>
+        <MenuFlyout>
+            <MenuFlyoutItem Text="Copy" Command="{x:Bind CopyCommand}" IsEnabled="{x:Bind IsSelection, Mode=OneWay}" >
+                <MenuFlyoutItem.Icon>
+                    <SymbolIcon Symbol="Copy"></SymbolIcon>
+                </MenuFlyoutItem.Icon>
+                <MenuFlyoutItem.KeyboardAccelerators>
+                    <KeyboardAccelerator Modifiers="Control" Key="C"  Invoked="KeyboardAccelerator_Invoked"/>
+                </MenuFlyoutItem.KeyboardAccelerators>
+            </MenuFlyoutItem>
+            <MenuFlyoutItem Text="Paste" Command="{x:Bind PasteCommand}" >
+                <MenuFlyoutItem.Icon>
+                    <SymbolIcon Symbol="Paste"></SymbolIcon>
+                </MenuFlyoutItem.Icon>
+                <MenuFlyoutItem.KeyboardAccelerators>
+                    <KeyboardAccelerator Modifiers="Control" Key="V" Invoked="KeyboardAccelerator_Invoked" />
+                </MenuFlyoutItem.KeyboardAccelerators>
+            </MenuFlyoutItem>
+            <MenuFlyoutItem Text="Cut" Command="{x:Bind CutCommand}" IsEnabled="{x:Bind IsSelection, Mode=OneWay}">
+                <MenuFlyoutItem.Icon>
+                    <SymbolIcon Symbol="Cut"></SymbolIcon>
+                </MenuFlyoutItem.Icon>
+                <MenuFlyoutItem.KeyboardAccelerators>
+                    <KeyboardAccelerator Modifiers="Control" Key="X"  Invoked="KeyboardAccelerator_Invoked"/>
+                </MenuFlyoutItem.KeyboardAccelerators>
+            </MenuFlyoutItem>
+            <MenuFlyoutItem Text="Delete" Command="{x:Bind DeleteCommand}" IsEnabled="{x:Bind IsSelection, Mode=OneWay}">
+                <MenuFlyoutItem.Icon>
+                    <SymbolIcon Symbol="Delete"></SymbolIcon>
+                </MenuFlyoutItem.Icon>
+                <MenuFlyoutItem.KeyboardAccelerators>
+                    <KeyboardAccelerator Key="Back" Invoked="KeyboardAccelerator_Invoked" />
+                </MenuFlyoutItem.KeyboardAccelerators>
+            </MenuFlyoutItem>
+            <MenuFlyoutSeparator />
+        </MenuFlyout>
+    </UserControl.ContextFlyout>
 
-        <ScrollViewer x:Name="Scroll"   CanBeScrollAnchor="True"  KeyDown="Scroll_KeyDown" KeyUp="Scroll_KeyUp" HorizontalScrollMode="Enabled" HorizontalScrollBarVisibility="Visible" VerticalScrollMode="Enabled" IsDeferredScrollingEnabled="True"   SizeChanged="Scroll_SizeChanged" >
-            <ScrollViewer.Template>
-                <ControlTemplate  TargetType="ScrollViewer">
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="*" />
-                            <RowDefinition Height="Auto" />
-                        </Grid.RowDefinitions>
-                        <Border Grid.Column="0" BorderThickness="{x:Bind BorderThickness}" Background="#222" PointerWheelChanged="Scroll_PointerWheelChanged">
-                            <Border.BorderBrush>
-                                <SolidColorBrush Color="Gray" />
-                            </Border.BorderBrush>
-                            <ScrollContentPresenter x:Name="ScrollContent" CanContentRenderOutsideBounds="False"  >
+    <ScrollViewer x:Name="Scroll"   CanBeScrollAnchor="True"  KeyDown="Scroll_KeyDown" KeyUp="Scroll_KeyUp" HorizontalScrollMode="Enabled" HorizontalScrollBarVisibility="Visible" VerticalScrollMode="Enabled" IsDeferredScrollingEnabled="True"   SizeChanged="Scroll_SizeChanged" >
+        <ScrollViewer.Template>
+            <ControlTemplate  TargetType="ScrollViewer">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <Border Grid.Column="0" BorderThickness="{x:Bind BorderThickness}" Background="#222" PointerWheelChanged="Scroll_PointerWheelChanged">
+                        <Border.BorderBrush>
+                            <SolidColorBrush Color="Gray" />
+                        </Border.BorderBrush>
+                        <ScrollContentPresenter x:Name="ScrollContent" CanContentRenderOutsideBounds="False"  >
 
-                            </ScrollContentPresenter>
-                        </Border>
-                        <ScrollBar  x:Name="VerticalScroll" Grid.Column="1" Loaded="VerticalScroll_Loaded" PointerEntered="VerticalScroll_PointerEntered"
+                        </ScrollContentPresenter>
+                    </Border>
+                    <ScrollBar  x:Name="VerticalScroll" Grid.Column="1" Loaded="VerticalScroll_Loaded" PointerEntered="VerticalScroll_PointerEntered"
                                     Value="0" SmallChange="10" LargeChange="100" ValueChanged="VerticalScroll_ValueChanged"
                                     Maximum="500" Width="12"
                                     ViewportSize="{TemplateBinding ViewportHeight}" 
                                     Visibility="Visible"  HorizontalAlignment="Right"/>
 
-                        <ScrollBar x:Name="HorizontalScroll" Loaded="HorizontalScroll_Loaded" PointerEntered="VerticalScroll_PointerEntered"
+                    <ScrollBar x:Name="HorizontalScroll" Loaded="HorizontalScroll_Loaded" PointerEntered="VerticalScroll_PointerEntered"
                                     Orientation="Horizontal" SmallChange="10" LargeChange="100"  ValueChanged="HorizontalScroll_ValueChanged"
                                     Grid.Row="1"
                                     Grid.Column="0"
@@ -47,18 +83,16 @@
                                     ViewportSize="{TemplateBinding ViewportWidth}"
                                     Visibility="Visible"/>
 
-                    </Grid>
-                </ControlTemplate>
-            </ScrollViewer.Template>
+                </Grid>
+            </ControlTemplate>
+        </ScrollViewer.Template>
 
-            <Grid  x:Name="TextControl" PointerMoved="TextControl_PointerMoved"  PointerPressed="OnMouseDown" PointerReleased="OnMouseUp" Loaded="Content_Loaded">
-                
-                <xaml:CanvasControl HorizontalAlignment="Stretch" VerticalAlignment="Stretch" x:Name="SelectionCanvas" Draw="SelectionCanvas_Draw"></xaml:CanvasControl>
-                <ItemsControl></ItemsControl>
-                <xaml:CanvasControl HorizontalAlignment="Stretch" VerticalAlignment="Stretch" x:Name="TextCancas" CreateResources="TextCancas_CreateResources" Draw="TextCancas_Draw" Loaded="TextCancas_Loaded"></xaml:CanvasControl>
-                <xaml:CanvasControl HorizontalAlignment="Stretch" VerticalAlignment="Stretch" x:Name="BeamCanvas" Draw="BeamCanvas_Draw"></xaml:CanvasControl>
-            </Grid>
-        </ScrollViewer>
+        <Grid  x:Name="TextControl" PointerMoved="TextControl_PointerMoved"  PointerPressed="OnMouseDown" PointerReleased="OnMouseUp" Loaded="Content_Loaded">
 
-    </Grid>
+            <xaml:CanvasControl HorizontalAlignment="Stretch" VerticalAlignment="Stretch" x:Name="SelectionCanvas" Draw="SelectionCanvas_Draw"></xaml:CanvasControl>
+            <ItemsControl></ItemsControl>
+            <xaml:CanvasControl HorizontalAlignment="Stretch" VerticalAlignment="Stretch" x:Name="TextCancas" CreateResources="TextCancas_CreateResources" Draw="TextCancas_Draw" Loaded="TextCancas_Loaded"></xaml:CanvasControl>
+            <xaml:CanvasControl HorizontalAlignment="Stretch" VerticalAlignment="Stretch" x:Name="BeamCanvas" Draw="BeamCanvas_Draw"></xaml:CanvasControl>
+        </Grid>
+    </ScrollViewer>
 </UserControl>

@@ -9,6 +9,7 @@ using System.Linq;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
+using System.Windows.Input;
 using Windows.Foundation;
 using Windows.UI;
 
@@ -78,6 +79,11 @@ namespace CodeWriter_WinUI
         }
     }
 
+    public class CharElement : Bindable
+    {
+        public char C { get => Get(' '); set => Set(value); }
+        public Color ForeGround { get => Get(Colors.White); set { Set(value); } }
+    }
 
     public class Char : CharElement
     {
@@ -87,16 +93,11 @@ namespace CodeWriter_WinUI
         }
     }
 
-    public class CharElement : Bindable
-    {
-        public char C { get => Get(' '); set => Set(value); }
-        public Color ForeGround { get => Get(Colors.White); set { Set(value); } }
-    }
-
     public class CharGroup : CharElement
     {
-        public CharGroup()
+        public CharGroup(Char[] chars) 
         {
+            C = chars;
         }
 
         public new Char[] C { get => Get(new Char[] { }); set => Set(value); }
@@ -104,17 +105,7 @@ namespace CodeWriter_WinUI
 
     public class CodeWriterOptions : Bindable
     {
-        public double CharHeight { get => Get(16d); set => Set(value); }
-        public GridLength ErrorWidth { get => Get(new GridLength(LineNumberWidth.Value, GridUnitType.Pixel)); set => Set(value); }
-        public int FoldingMarkerWidth { get => Get((int)FontSize / 2); set { Set(value); } }
-        public GridLength FoldingWidth { get => Get(new GridLength(FontSize, GridUnitType.Pixel)); set => Set(value); }
-        public int FontSize { get => Get(16); set { Set(value); FoldingWidth = new(value); FoldingMarkerWidth = (int)value / 2; } }
-        public Thickness HorizontalOffset { get => Get(new Thickness(0, 0, 0, 0)); set { Set(value); } }
-        public Thickness LeftMargin { get => Get(new Thickness(LeftWidth, 0, 0, 0)); set => Set(value); }
-        public int LeftWidth { get => (int)LineNumberWidth.Value + (int)ErrorWidth.Value + (int)FoldingWidth.Value + (int)MarkerWidth.Value; }
-        public SolidColorBrush LineNumberColor { get => Get(new SolidColorBrush(Colors.DeepSkyBlue)); set => Set(value); }
-        public GridLength LineNumberWidth { get => Get(new GridLength(12, GridUnitType.Pixel)); set => Set(value); }
-        public GridLength MarkerWidth { get => Get(new GridLength(2, GridUnitType.Pixel)); set => Set(value); }
+       
     }
 
     public class Folding : Bindable
@@ -512,5 +503,41 @@ namespace CodeWriter_WinUI
 
         public Place End { get => Get(new Place()); set => Set(value); }
         public Place Start { get => Get(new Place()); set => Set(value); }
+
+
+    }
+
+    public class RelayCommand : ICommand
+    {
+        private readonly Action _execute;
+        private readonly Func<bool> _canExecute;
+
+        public event EventHandler CanExecuteChanged;
+
+        public RelayCommand(Action execute)
+            : this(execute, null)
+        {
+        }
+
+        public RelayCommand(Action execute, Func<bool> canExecute)
+        {
+            _execute = execute ?? throw new ArgumentNullException("execute");
+            _canExecute = canExecute;
+        }
+
+        public bool CanExecute(object parameter)
+        {
+            return _canExecute == null ? true : _canExecute();
+        }
+
+        public void Execute(object parameter)
+        {
+            _execute();
+        }
+
+        public void RaiseCanExecuteChanged()
+        {
+            CanExecuteChanged?.Invoke(this, EventArgs.Empty);
+        }
     }
 }
