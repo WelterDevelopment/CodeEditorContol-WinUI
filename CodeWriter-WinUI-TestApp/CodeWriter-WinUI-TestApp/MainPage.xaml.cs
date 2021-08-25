@@ -23,14 +23,16 @@ namespace CodeWriter_WinUI_TestApp
     /// <summary>
     /// An empty window that can be used on its own or navigated to within a Frame.
     /// </summary>
-    public sealed partial class MainWindow : Window
+    public sealed partial class MainPage : Page
     {
         private ViewModel VM { get; } = new ViewModel();
 
-        public MainWindow()
+        public MainPage()
         {
             this.InitializeComponent();
         }
+
+
 
         private  void Btn_Load_Click(object sender, RoutedEventArgs e)
         {

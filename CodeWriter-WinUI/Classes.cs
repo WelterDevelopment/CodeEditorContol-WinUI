@@ -82,7 +82,8 @@ namespace CodeWriter_WinUI
     public class CharElement : Bindable
     {
         public char C { get => Get(' '); set => Set(value); }
-        public Color ForeGround { get => Get(Colors.White); set { Set(value); } }
+        //public Color ForeGround { get => Get(Colors.White); set { Set(value); } }
+        public Token T { get => Get(Token.Normal); set => Set(value); }
     }
 
     public class Char : CharElement
@@ -223,7 +224,7 @@ namespace CodeWriter_WinUI
             {
                 for (int i = match.Index; i < match.Index + match.Length; i++)
                 {
-                    groups[i].ForeGround = Color.FromArgb(255, 220, 160, 60);
+                    groups[i].T = Token.Math;
                 }
             }
 
@@ -232,7 +233,7 @@ namespace CodeWriter_WinUI
             {
                 for (int i = optionmatch.Groups[0].Captures[0].Index; i < optionmatch.Groups[0].Captures[0].Index + optionmatch.Groups[0].Captures[0].Length - 1; i++)
                 {
-                    groups[i].ForeGround = Color.FromArgb(255, 120, 120, 120);
+                    groups[i].T = Token.Key;
                 }
             }
 
@@ -241,7 +242,7 @@ namespace CodeWriter_WinUI
             {
                 for (int i = match.Index; i < match.Index + match.Length; i++)
                 {
-                    groups[i].ForeGround = Windows.UI.Color.FromArgb(255, 40, 120, 200);
+                    groups[i].T = Token.Command;
                 }
             }
 
@@ -250,7 +251,7 @@ namespace CodeWriter_WinUI
             {
                 for (int i = match.Index; i < match.Index + match.Length; i++)
                 {
-                    groups[i].ForeGround = Color.FromArgb(255, 40, 180, 140);
+                    groups[i].T = Token.Environment;
                 }
             }
 
@@ -259,7 +260,7 @@ namespace CodeWriter_WinUI
             {
                 for (int i = match.Index; i < match.Index + match.Length; i++)
                 {
-                    groups[i].ForeGround = Color.FromArgb(255, 80, 40, 180);
+                    groups[i].T = Token.Bracket;
                 }
             }
 
@@ -268,7 +269,7 @@ namespace CodeWriter_WinUI
             {
                 for (int i = match.Index; i < match.Index + match.Length; i++)
                 {
-                    groups[i].ForeGround = Color.FromArgb(255, 120, 80, 220);
+                    groups[i].T = Token.Bracket;
                 }
             }
 
@@ -277,7 +278,7 @@ namespace CodeWriter_WinUI
             {
                 for (int i = match.Index; i < match.Index + match.Length; i++)
                 {
-                    groups[i].ForeGround = Color.FromArgb(255, 180, 120, 40);
+                    groups[i].T = Token.Reference;
                 }
             }
 
@@ -286,7 +287,7 @@ namespace CodeWriter_WinUI
             {
                 for (int i = match.Index; i < match.Index + match.Length; i++)
                 {
-                    groups[i].ForeGround = Color.FromArgb(255, 40, 180, 80);
+                    groups[i].T = Token.Comment;
                 }
             }
 
@@ -539,5 +540,16 @@ namespace CodeWriter_WinUI
         {
             CanExecuteChanged?.Invoke(this, EventArgs.Empty);
         }
+    }
+
+    public static class Syntax
+    {
+        public static Color Normal(ElementTheme theme) => theme == ElementTheme.Light ? Color.FromArgb(255,20,20,20) : Color.FromArgb(255, 220, 220, 220);
+    }
+
+    public enum Token
+    {
+        Normal, Environment, Command, Primitive, Definition, Comment, Dimension, Reference, Key, Value, Number, Bracket, Style, Array, Symbol,
+        Math
     }
 }

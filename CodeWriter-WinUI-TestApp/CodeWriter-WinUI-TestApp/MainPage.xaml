@@ -1,13 +1,16 @@
-﻿<Window
-    x:Class="CodeWriter_WinUI_TestApp.MainWindow"
+﻿<Page
+    x:Class="CodeWriter_WinUI_TestApp.MainPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
     xmlns:codewriter="using:CodeWriter_WinUI"
-    mc:Ignorable="d" >
+    mc:Ignorable="d" 
+    DataContext="{x:Bind VM}" 
+    RequestedTheme="{Binding RequestedTheme, Mode=OneWay}"
+    >
 
-    <Grid DataContext="{x:Bind VM}">
+    <Grid  Background="{ThemeResource SystemControlAcrylicWindowBrush}">
         <Grid.ColumnDefinitions>
             <ColumnDefinition  />
         </Grid.ColumnDefinitions>
@@ -26,7 +29,8 @@
                 <TextBlock Text="{Binding ElementName=CW, Path=Selection.End}"></TextBlock>
             </StackPanel>
             <CheckBox  Content="Unsaved Changes" IsChecked="{Binding UnsavedChanges, Mode=OneWay}" IsHitTestVisible="False" />
+            <ComboBox VerticalAlignment="Center" ItemsSource="{Binding ThemeOption}" SelectedItem="{Binding Theme, Mode=TwoWay}"></ComboBox>
         </StackPanel>
-        <codewriter:CodeWriter x:Name="CW" Grid.Row="1" Text="{Binding Text, Mode=TwoWay}" FontSize="{Binding FontSize, Mode=TwoWay}" />
+        <codewriter:CodeWriter x:Name="CW" Grid.Row="1" Text="{Binding Text, Mode=TwoWay}" FontSize="{Binding FontSize, Mode=TwoWay}" RequestedTheme="{Binding RequestedTheme}" />
     </Grid>
-</Window>
+</Page>
