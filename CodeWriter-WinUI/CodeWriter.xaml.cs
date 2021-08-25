@@ -536,15 +536,6 @@ namespace CodeWriter_WinUI
             return new Place(ichar, iline);
         }
 
-        private void RemoveAllHighlights()
-        {
-            if (Lines != null && Lines.Count > 0)
-                foreach (Line l in Lines)
-                {
-                    l.IsSelected = new SolidColorBrush(Colors.Transparent);
-                }
-        }
-
         private void Scroll_KeyDown(object sender, KeyRoutedEventArgs e)
         {
             if (!isSelecting)
@@ -568,7 +559,6 @@ namespace CodeWriter_WinUI
                         Place newselect = CursorPlace;
                         newselect.iLine++;
                         newselect.iChar = 0;
-                        RemoveAllHighlights();
                         Selection = new SelectionRange(newselect, newselect);
                         Invalidate();
                         TextChanged();
@@ -621,7 +611,6 @@ namespace CodeWriter_WinUI
                             Place newplace = CursorPlace;
                             newplace.iLine--;
                             newplace.iChar = Math.Min(Lines[newplace.iLine].Count, newplace.iChar);
-                            RemoveAllHighlights();
                             Selection = new(newplace, newplace);
                         }
                         break;
@@ -632,7 +621,6 @@ namespace CodeWriter_WinUI
                             Place newplace = CursorPlace;
                             newplace.iLine++;
                             newplace.iChar = Math.Min(Lines[newplace.iLine].Count, newplace.iChar);
-                            RemoveAllHighlights();
                             Selection = new(newplace, newplace);
                         }
                         break;
@@ -850,7 +838,6 @@ namespace CodeWriter_WinUI
 
             if (isSelecting)
             {
-                RemoveAllHighlights();
                 if (!isLineSelect)
                 {
                     Selection = new SelectionRange(Selection.Start, PointerToPlace(currentpoint.Position));
