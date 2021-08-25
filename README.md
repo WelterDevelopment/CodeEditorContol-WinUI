@@ -11,7 +11,9 @@ I took some inspiration and created my own Win2d-based control. Feel free to con
 Stuff that works:
 - Text selection & beam placement (inputs: PointerPress & Up/Down/Left/Right keys)
 - Basic text editing (char insertion, back key, delete key)
+- Basic copy & paste logic
 - Scrolling (vertical & horizontal)
+- Text and FontSize are two-way bindable DependencyProperties
 - Proof-of-Concept syntax highlighting shown with a ConTeXt example file (only line by line Regexing for now; tokenization comes in the future)
 
 ![Screenshot 2021-08-24 215602](https://user-images.githubusercontent.com/13318246/130681314-4d2bc24f-43fb-44f3-9d59-2f4e494687b3.png)
