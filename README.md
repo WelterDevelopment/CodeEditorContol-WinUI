@@ -15,5 +15,7 @@ Stuff that works:
 - Scrolling (vertical & horizontal)
 - Text and FontSize are two-way bindable DependencyProperties
 - Proof-of-Concept syntax highlighting shown with a ConTeXt example file (only line by line Regexing for now; tokenization comes in the future)
+- Basic IntelliSense logig
+- Actions (right-click menu & KeyboardAccelerators)
 
 ![Screenshot 2021-08-25 165128](https://user-images.githubusercontent.com/13318246/130813418-299abb0c-d33d-4041-98f5-ff81b06a47b1.png)
