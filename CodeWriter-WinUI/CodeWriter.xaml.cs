@@ -2,7 +2,6 @@
 using Microsoft.Graphics.Canvas.Brushes;
 using Microsoft.Graphics.Canvas.Text;
 using Microsoft.Graphics.Canvas.UI.Xaml;
-using Microsoft.UI;
 using Microsoft.UI.Input.Experimental;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -12,6 +11,8 @@ using Microsoft.UI.Xaml.Media;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Numerics;
 using System.Runtime.CompilerServices;
@@ -28,61 +29,84 @@ namespace CodeWriter_WinUI
 {
     public partial class CodeWriter : UserControl, INotifyPropertyChanged
     {
-        public static new readonly DependencyProperty FontSizeProperty = DependencyProperty.Register("FontSize", typeof(int), typeof(CodeWriter), new PropertyMetadata(12, (d, e) => ((CodeWriter)d).OnFontSizeChanged(d, e)));
-        public static new readonly DependencyProperty RequestedThemeProperty = DependencyProperty.Register("RequestedTheme", typeof(ElementTheme), typeof(CodeWriter), new PropertyMetadata(12, (d, e) => ((CodeWriter)d).OnRequestedThemeChanged(d, e)));
+        public static new readonly DependencyProperty FontSizeProperty = DependencyProperty.Register("FontSize", typeof(int), typeof(CodeWriter), new PropertyMetadata(12, (d, e) => ((CodeWriter)d).FontSizeChanged(d, e)));
 
-        public Dictionary<Token, Color> TokensDark = new() { 
-            { Token.Normal,         Color.FromArgb(255, 220, 220, 220) },
-            { Token.Command,        Color.FromArgb(255, 40, 120, 200) },
-            { Token.Environment,    Color.FromArgb(255, 40, 180, 140) },
-            { Token.Comment,        Color.FromArgb(255, 40, 180, 80) },
-            { Token.Key,            Color.FromArgb(255, 120, 120, 120) },
-            { Token.Bracket,        Color.FromArgb(255, 80, 40, 180) },
-            { Token.Reference,      Color.FromArgb(255, 180, 120, 40) },
-            { Token.Math,           Color.FromArgb(255, 220, 160, 60) },
-        };
+        public static new readonly DependencyProperty RequestedThemeProperty = DependencyProperty.Register("RequestedTheme", typeof(ElementTheme), typeof(CodeWriter), new PropertyMetadata(12, (d, e) => ((CodeWriter)d).RequestedThemeChanged(d, e)));
 
-        public Dictionary<Token, Color> TokensLight = new()
-        {
-            { Token.Normal,         Color.FromArgb(255, 20, 20, 20) },
-            { Token.Command,        Color.FromArgb(255, 40, 120, 200) },
-            { Token.Environment,    Color.FromArgb(255, 40, 180, 140) },
-            { Token.Comment,        Color.FromArgb(255, 40, 180, 80) },
-            { Token.Key,            Color.FromArgb(255, 120, 120, 120) },
-            { Token.Bracket,        Color.FromArgb(255, 80, 40, 180) },
-            { Token.Reference,      Color.FromArgb(255, 180, 120, 40) },
-            { Token.Math,           Color.FromArgb(255, 220, 160, 60) },
-        };
-
+        public static readonly DependencyProperty ScrollPositionProperty = DependencyProperty.Register("ScrollPosition", typeof(Place), typeof(CodeWriter), new PropertyMetadata(new Place(), (d, e) => ((CodeWriter)d).OnScrollPositionChanged(d, e)));
         public static readonly DependencyProperty TextProperty = DependencyProperty.Register("Text", typeof(string), typeof(CodeWriter), new PropertyMetadata("", (d, e) => ((CodeWriter)d).OnTextChanged(d, e)));
-        public bool needsInitialize = true;
-        private Dictionary<string, object> _properties = new Dictionary<string, object>();
-        private float CharOffset = 0;
+        
+
+        public void Action_Add(MenuFlyoutItemBase item)
+        {
+            ContextMenu.Items.Add(item);
+        }
+
+        public void Action_Remove(MenuFlyoutItemBase item)
+        {
+            ContextMenu.Items.Remove(item);
+        }
+
+        public Dictionary<Token, Color> Tokens = new()
+        {
+            { Token.Normal, Color.FromArgb(255, 220, 220, 220) },
+            { Token.Command, Color.FromArgb(255, 50, 130, 210) },
+            { Token.Environment, Color.FromArgb(255, 40, 180, 140) },
+            { Token.Comment, Color.FromArgb(255, 40, 180, 80) },
+            { Token.Key, Color.FromArgb(255, 150, 120, 200) },
+            { Token.Bracket, Color.FromArgb(255, 80, 40, 180) },
+            { Token.Reference, Color.FromArgb(255, 180, 120, 40) },
+            { Token.Math, Color.FromArgb(255, 220, 160, 60) },
+            { Token.Symbol, Color.FromArgb(255, 140, 200, 240) },
+            { Token.Style, Color.FromArgb(255, 200, 140, 100) },
+            { Token.Array, Color.FromArgb(255, 220, 100, 80) },
+        };
+
         private ScrollBar HorizontalScroll;
+
         private int iCharOffset = 0;
+
         private bool invoked = false;
+
         private bool isCanvasLoaded = false;
+
         private bool IsSettingValue = false;
-        private DateTime lastScroll = DateTime.Now;
-        private bool middleClickScrollingActivated = false;
+
+        private int maxchars = 0;
+
+        private int MaxFontSize = 64;
+
+        private int MinFontSize = 6;
+
         private List<VirtualKey> Modifiers = new List<VirtualKey>();
-        private bool pasting = false;
+
         private Point pos = new Point() { };
+
         private int startFontsize = 16;
+
         private ScrollBar VerticalScroll;
 
         public CodeWriter()
         {
             InitializeComponent();
             CharacterReceived += CodeWriter_CharacterReceived;
-            CopyCommand = new RelayCommand(() => TextAction_Copy());
-            PasteCommand = new RelayCommand(() => { Paste(); });
-            DeleteCommand = new RelayCommand(() => TextAction_Delete());
-            CutCommand = new RelayCommand(() => TextAction_Delete(true));
+            Command_Copy = new RelayCommand(() => TextAction_Copy());
+            Command_Paste = new RelayCommand(() => { TextAction_Paste(); });
+            Command_Delete = new RelayCommand(() => TextAction_Delete());
+            Command_Cut = new RelayCommand(() => TextAction_Delete(true));
+            Command_SelectAll = new RelayCommand(() => TextAction_SelectText());
             Invalidate();
         }
 
-        public event PropertyChangedEventHandler PropertyChanged;
+        public void TextAction_SelectText(SelectionRange range = null)
+        {
+            if (range == null && Lines.Count>0)
+            {
+                Selection = new SelectionRange(new(0, 0), new(Lines.Last().Count, Lines.Count-1));
+            }
+        }
+
+        public event ErrorEventHandler ErrorOccured;
 
         public enum ScrollOrientation
         {
@@ -90,9 +114,28 @@ namespace CodeWriter_WinUI
             HorizontalScroll
         }
 
+        public new SolidColorBrush Background { get => Get(new SolidColorBrush(Color.FromArgb(255, 10, 10, 10))); set => Set(value); }
+
         public int CharHeight { get => Get(16); set { Set(value); } }
+
         public int CharWidth { get => Get(8); set { Set(value); } }
-        public ICommand CopyCommand { get; set; }
+
+        public Color Color_FoldingMarker { get => Get(Color.FromArgb(255, 140, 140, 140)); set => Set(value); }
+        public Color Color_LeftBackground { get => Get(Color.FromArgb(255, 40, 40, 40)); set => Set(value); }
+        public Color Color_LineNumber { get => Get(Color.FromArgb(255, 40, 140, 160)); set => Set(value); }
+        public Color Color_Selection { get => Get(Color.FromArgb(255, 25, 50, 80)); set => Set(value); }
+        public Color Color_Beam { get => Get(Color.FromArgb(255, 200, 200, 200)); set => Set(value); }
+
+        public ICommand Command_Copy { get; set; }
+
+        public ICommand Command_Cut { get; set; }
+
+        public ICommand Command_Delete { get; set; }
+
+        public ICommand Command_SelectAll { get; set; }
+
+        public ICommand Command_Paste { get; set; }
+
         public CoreCursor Cursor
         {
             get { return base.ProtectedCursor; }
@@ -101,18 +144,33 @@ namespace CodeWriter_WinUI
 
         public Place CursorPlace
         {
-            get => Get(new Place()); set
+            get => Get(new Place());
+            set
             {
                 Set(value);
+
+                var width = Scroll.ActualWidth - Width_Left;
+                if (value.iChar * CharWidth < HorizontalScroll.Value)
+                    HorizontalScroll.Value = value.iChar * CharWidth;
+                else if ((value.iChar + 3) * CharWidth - width - HorizontalScroll.Value > 0)
+                    HorizontalScroll.Value = Math.Max((value.iChar + 3) * CharWidth - width, 0);
+
+                if (value.iLine * CharHeight < VerticalScroll.Value)
+                    VerticalScroll.Value = value.iLine * CharHeight;
+                else if (value.iLine * CharHeight - Scroll.ActualHeight > VerticalScroll.Value)
+                    VerticalScroll.Value = Math.Min(value.iLine * CharHeight - Scroll.ActualHeight, VerticalScroll.Maximum);
+
+                int x = CharWidth * (value.iChar - iCharOffset) + Width_Left;
+                int y = CharHeight * (value.iLine - VisibleLines[0].LineNumber + 1);
+                CursorPoint = new Point(x, y + CharHeight);
+                IntellisensePoint = new Point(x, y - 2 * CharHeight);
+
                 CanvasBeam.Invalidate();
             }
         }
 
-        public ICommand CutCommand { get; set; }
-        public ICommand DeleteCommand { get; set; }
-        public Color FoldingMarkerColor { get => Get(Color.FromArgb(255, 140, 140, 140)); set => Set(value); }
-        public Color LeftColor { get => Get(Color.FromArgb(255, 40, 40, 40)); set => Set(value); }
-        public Color PrimaryTextColor { get => Get(Color.FromArgb(255, 220, 220, 220)); set => Set(value); }
+        public Point CursorPoint { get => Get(new Point()); set => Set(value); }
+
         public new int FontSize
         {
             get => (int)GetValue(FontSizeProperty);
@@ -120,39 +178,91 @@ namespace CodeWriter_WinUI
         }
 
         public int HorizontalOffset { get => Get(0); set { Set(value); } }
-        public bool isLineSelect { get; private set; } = false;
-        public bool isSelecting { get; private set; } = false;
+
+        public Point IntellisensePoint { get => Get(new Point()); set => Set(value); }
+
+        public bool IsIntellisensing
+        {
+            get => Get(false);
+            set
+            {
+                Set(value);
+                if (value)
+                {
+                    SuggestionIndex = 0;
+                }
+            }
+        }
+
         public bool IsSelection { get => Get(false); set => Set(value); }
-        public int LeftIndent { get; private set; } = 0;
-        public double LeftIndentLine { get; private set; } = 44;
-        public int LeftWidth { get => (int)LineNumberWidth + (int)ErrorMarkerWidth + (int)WarningMarkerWidth + (int)FoldingMarkerWidth + TextIndent; }
-        public Color LineNumberColor { get => Get(Color.FromArgb(255, 40, 140, 160)); set => Set(value); }
-        public int LineNumberWidth { get => Get(12); set => Set(value); }
+
+        private Place SuggestionStart = new Place();
+
+        public bool IsSuggesting
+        {
+            get => Get(false);
+            set
+            {
+                Set(value);
+                if (value)
+                {
+                    SuggestionIndex = 0;
+                }
+            }
+        }
+
         public List<Line> Lines { get => Get(new List<Line>()); set => Set(value); }
-        public int lineSelectFrom { get; private set; } = 0;
-        public int MarkerWidth { get => Get(2); set => Set(value); }
-        public bool mouseIsDrag { get; private set; } = false;
-        public bool mouseIsDragDrop { get; private set; } = false;
-        public ICommand PasteCommand { get; set; }
+
+        public new ElementTheme RequestedTheme
+        {
+            get => (ElementTheme)GetValue(RequestedThemeProperty);
+            set => SetValue(RequestedThemeProperty, value);
+        }
+
+        public new Place ScrollPosition
+        {
+            get => (Place)GetValue(ScrollPositionProperty);
+            set { SetValue(ScrollPositionProperty, value); }
+        }
+
         public string SelectedText
         {
             get
             {
                 string text = "";
+                if (Selection.Start == Selection.End)
+                    return "";
                 if (Selection.Start.iLine == Selection.End.iLine)
                 {
                     text = Lines[Selection.Start.iLine].LineText.Substring(Selection.Start.iChar, Selection.End.iChar - Selection.Start.iChar);
                 }
                 else
-                    for (int iLine = Selection.Start.iLine; iLine < Selection.End.iLine; iLine++)
+                {
+                    Place start ;
+                    Place end ;
+
+                    if (Selection.Start.iLine < Selection.End.iLine)
                     {
-                        if (iLine == Selection.Start.iLine)
-                            text += Lines[iLine].LineText.Substring(Selection.Start.iChar) + "\n";
-                        else if (iLine == Selection.End.iLine)
-                            text += Lines[iLine].LineText.Substring(0, Selection.End.iChar);
+                        start = new(Selection.Start);
+                        end = new(Selection.End);
+                    }
+                    else
+                    {
+                        start = new(Selection.End);
+                        end = new(Selection.Start);
+                    }
+
+                    for (int iLine = start.iLine; iLine < end.iLine; iLine++)
+                    {
+                        if (iLine == start.iLine)
+                            text += Lines[iLine].LineText.Substring(start.iChar) + "\n";
+                        else if (iLine == end.iLine)
+                            text += Lines[iLine].LineText.Substring(0, end.iChar);
                         else
                             text += Lines[iLine].LineText + "\n";
                     }
+                }
+                   
                 return text;
             }
         }
@@ -163,20 +273,6 @@ namespace CodeWriter_WinUI
             set
             {
                 Set(value);
-                if (value.Start == value.End)
-                    Lines[value.Start.iLine].IsSelected = new SolidColorBrush(Colors.DarkGray);
-
-                var width = Scroll.ActualWidth - LeftWidth;
-                if (value.End.iChar * CharWidth < HorizontalScroll.Value)
-                    HorizontalScroll.Value = value.End.iChar * CharWidth;
-                else if ((value.End.iChar) * CharWidth - width - HorizontalScroll.Value > 0)
-                    HorizontalScroll.Value = Math.Max(value.End.iChar * CharWidth - width, 0);
-
-                if (value.End.iLine * CharHeight < VerticalScroll.Value)
-                    VerticalScroll.Value = value.End.iLine * CharHeight;
-                else if (value.End.iLine * CharHeight - Scroll.ActualHeight > VerticalScroll.Value)
-                    VerticalScroll.Value = Math.Min(value.End.iLine * CharHeight - Scroll.ActualHeight, VerticalScroll.Maximum);
-
                 CursorPlace = new Place(value.End.iChar, value.End.iLine);
                 IsSelection = Selection.Start.iChar != Selection.End.iChar | Selection.Start.iLine != Selection.End.iLine;
                 CanvasSelection.Invalidate();
@@ -189,23 +285,38 @@ namespace CodeWriter_WinUI
             set => SetValue(TextProperty, value);
         }
 
-        public new ElementTheme RequestedTheme
+        public List<Line> VisibleLines { get; set; } = new List<Line>();
+        public int Width_Left { get => (int)Width_LineNumber + (int)Width_ErrorMarker + (int)Width_WarningMarker + (int)Width_FoldingMarker + Width_TextIndent; }
+        public int Width_LineNumber { get => Get(12); set => Set(value); }
+        public bool WordWrap { get; private set; } = true;
+
+        private List<IntelliSense> Commands
         {
-            get => (ElementTheme)GetValue(RequestedThemeProperty);
-            set => SetValue(RequestedThemeProperty, value);
+            get => Get(new List<IntelliSense>() {
+            new IntelliSense(){ Text = @"\foo", IntelliSenseType = IntelliSenseType.Command, Token = Token.Command, Description = ""},
+            new IntelliSense(){ Text = @"\bar", IntelliSenseType = IntelliSenseType.Command, Token = Token.Command, Description = ""},
+            new IntelliSense(){ Text = @"\foobar", IntelliSenseType = IntelliSenseType.Command, Token = Token.Command, Description = ""},
+        }); set => Set(value);
         }
 
-        public List<Line> VisibleLines { get; set; } = new List<Line>();
+        private List<IntelliSense> Options
+        {
+            get => Get(new List<IntelliSense>() {
+            new IntelliSense(){ Text = @"foofoo", IntelliSenseType = IntelliSenseType.Argument, Token = Token.Dimension, Description = ""},
+            new IntelliSense(){ Text = @"barbar", IntelliSenseType = IntelliSenseType.Argument, Token = Token.Reference, Description = ""},
+            new IntelliSense(){ Text = @"foofoobarbar", IntelliSenseType = IntelliSenseType.Argument, Token = Token.Text, Description = ""},
+        }); set => Set(value);
+        }
 
-        public new SolidColorBrush Background { get => Get(new SolidColorBrush(Color.FromArgb(255,10,10,10))); set => Set(value); }
+        private bool isLineSelect { get; set; } = false;
+        private bool isSelecting { get; set; } = false;
+        private int SuggestionIndex { get => Get(0); set => Set(value); }
+        private List<IntelliSense> Suggestions { get => Get(Commands); set => Set(value); }
+        private int Width_ErrorMarker { get => CharWidth / 2; }
+        private int Width_FoldingMarker { get => CharWidth; }
+        private int Width_TextIndent { get => CharWidth; }
+        private int Width_WarningMarker { get => CharWidth / 2; }
 
-
-        public bool WordWrap { get; private set; } = true;
-        private int ErrorMarkerWidth { get => CharWidth / 2; }
-        private int FoldingMarkerWidth { get => CharWidth; }
-        private VirtualKeyModifiers lastModifiers { get; set; }
-        private int TextIndent { get => CharWidth; }
-        private int WarningMarkerWidth { get => CharWidth / 2; }
         public Char this[Place place]
         {
             get => Lines[place.iLine][place.iChar];
@@ -228,8 +339,21 @@ namespace CodeWriter_WinUI
 
         public void Invalidate()
         {
-            DrawText();
+            try
+            {
+                DrawText();
+            }
+            catch (Exception ex)
+            {
+                ErrorOccured?.Invoke(this, new ErrorEventArgs(ex));
+            }
         }
+
+        #region Bindable
+
+        private Dictionary<string, object> _properties = new Dictionary<string, object>();
+
+        public event PropertyChangedEventHandler PropertyChanged;
 
         protected T Get<T>(T defaultVal = default, [CallerMemberName] string name = null)
         {
@@ -253,77 +377,743 @@ namespace CodeWriter_WinUI
             OnPropertyChanged(name);
         }
 
+        #endregion Bindable
+
         private void CanvasBeam_Draw(CanvasControl sender, CanvasDrawEventArgs args)
         {
-            if (VisibleLines.Count > 0)
+            try
             {
-                int x = (int)(LeftWidth + HorizontalOffset + CursorPlace.iChar * CharWidth);
-                int y = (int)((CursorPlace.iLine - VisibleLines[0].LineNumber + 1) * CharHeight - 1 / 2 * CharHeight);
-
-                if (y <= TextControl.ActualHeight && y >= 0 && x <= TextControl.ActualWidth && x >= LeftWidth)
-                    args.DrawingSession.DrawLine(new Vector2(x, y), new Vector2(x, y + CharHeight), new CanvasSolidColorBrush(sender, Color.FromArgb(255, 200, 200, 200)), 2f);
-
-                int xms = (int)(LeftWidth);
-                int iCharStart = iCharOffset;
-                int xme = (int)TextControl.ActualWidth;
-                int iCharEnd = iCharStart + (int)((xme - xms) / CharWidth);
-
-                for (int iChar = iCharStart; iChar < iCharEnd; iChar++)
+                if (VisibleLines.Count > 0)
                 {
-                    int xs = (int)((iChar - iCharStart) * CharWidth) + xms;
-                    if (iChar % 10 == 0)
-                        args.DrawingSession.DrawLine(xs, 0, xs, CharHeight / 8, new CanvasSolidColorBrush(sender, LineNumberColor), 2f);
-                }
+                    int x = (int)(Width_Left + HorizontalOffset + CursorPlace.iChar * CharWidth);
+                    int y = (int)((CursorPlace.iLine - VisibleLines[0].LineNumber + 1) * CharHeight - 1 / 2 * CharHeight);
 
-                if (Selection.Start == CursorPlace)
-                {
-                    args.DrawingSession.DrawRoundedRectangle(LeftWidth, y, (int)TextControl.ActualWidth - LeftIndent, CharHeight, 2, 2, FoldingMarkerColor, 1);
+                    if (y <= TextControl.ActualHeight && y >= 0 && x <= TextControl.ActualWidth && x >= Width_Left)
+                        args.DrawingSession.DrawLine(new Vector2(x, y), new Vector2(x, y + CharHeight), RequestedTheme == ElementTheme.Light ? Color_Beam.InvertColorBrightness() : Color_Beam, 2f);
+
+                    int xms = (int)(Width_Left);
+                    int iCharStart = iCharOffset;
+                    int xme = (int)TextControl.ActualWidth;
+                    int iCharEnd = iCharStart + (int)((xme - xms) / CharWidth);
+
+                    for (int iChar = iCharStart; iChar < iCharEnd; iChar++)
+                    {
+                        int xs = (int)((iChar - iCharStart) * CharWidth) + xms;
+                        if (iChar % 10 == 0)
+                            args.DrawingSession.DrawLine(xs, 0, xs, CharHeight / 8, new CanvasSolidColorBrush(sender, Color_LineNumber), 2f);
+                    }
+
+                    if (Selection.Start == CursorPlace)
+                    {
+                        args.DrawingSession.DrawRoundedRectangle(Width_Left, y, (int)TextControl.ActualWidth - Width_Left, CharHeight, 2, 2, RequestedTheme == ElementTheme.Light ? Color_FoldingMarker.InvertColorBrightness() : Color_FoldingMarker, 2);
+                    }
                 }
+            }
+            catch (Exception ex)
+            {
+                ErrorOccured?.Invoke(this, new ErrorEventArgs(ex));
+            }
+        }
+
+        private void CanvasSelection_Draw(CanvasControl sender, CanvasDrawEventArgs args)
+        {
+            try
+            {
+                if (VisibleLines.Count > 0)
+                {
+                    int x = 0;
+                    int y = 0;
+                    if (Selection.Start.iLine == Selection.End.iLine)
+                    {
+                        if (Selection.Start.iChar < Selection.End.iChar)
+                            for (int i = Selection.Start.iChar; i < Selection.End.iChar; i++)
+                            {
+                                x = (int)(Width_Left + HorizontalOffset + i * CharWidth);
+                                y = (int)((CursorPlace.iLine - VisibleLines[0].LineNumber + 1) * CharHeight - 1 / 2 * CharHeight);
+                                DrawSelectionCell(args.DrawingSession, x, y);
+                            }
+                        else
+                            for (int i = Selection.End.iChar; i < Selection.Start.iChar; i++)
+                            {
+                                x = (int)(Width_Left + HorizontalOffset + i * CharWidth);
+                                y = (int)((CursorPlace.iLine - VisibleLines[0].LineNumber + 1) * CharHeight - 1 / 2 * CharHeight);
+                                DrawSelectionCell(args.DrawingSession, x, y);
+                            }
+                    }
+                    else
+                    {
+                        Place start = new Place();
+                        Place end = new Place();
+
+                        if (Selection.Start.iLine < Selection.End.iLine)
+                        {
+                            start = new(Selection.Start);
+                            end = new(Selection.End);
+                        }
+                        else
+                        {
+                            start = new(Selection.End);
+                            end = new(Selection.Start);
+                        }
+
+                        if (start.iLine < VisibleLines[0].LineNumber - 1) 
+                        {
+                            start.iLine = VisibleLines[0].LineNumber - 1;
+                            start.iChar = 0;
+                        }
+
+                        if (end.iLine > VisibleLines.Last().LineNumber - 1)
+                        {
+                            end.iLine = VisibleLines.Last().LineNumber - 1;
+                            end.iChar = VisibleLines.Last().Count;
+                        }
+
+                        for (int lp = start.iLine; lp <= end.iLine; lp++)
+                            if (lp == start.iLine)
+                                for (int i = start.iChar; i < Lines[lp].Count + 1; i++)
+                                {
+                                    x = (int)(Width_Left + HorizontalOffset + i * CharWidth);
+                                    y = (int)((lp - VisibleLines[0].LineNumber + 1) * CharHeight - 1 / 2 * CharHeight);
+                                    DrawSelectionCell(args.DrawingSession, x, y);
+                                }
+                            else if (lp > start.iLine && lp < end.iLine)
+                                for (int i = 0; i < Lines[lp].Count + 1; i++)
+                                {
+                                    x = (int)(Width_Left + HorizontalOffset + i * CharWidth);
+                                    y = (int)((lp - VisibleLines[0].LineNumber + 1) * CharHeight - 1 / 2 * CharHeight);
+                                    DrawSelectionCell(args.DrawingSession, x, y);
+                                }
+                            else if (lp == end.iLine)
+                                for (int i = 0; i < end.iChar; i++)
+                                {
+                                    x = (int)(Width_Left + HorizontalOffset + i * CharWidth);
+                                    y = (int)((lp - VisibleLines[0].LineNumber + 1) * CharHeight - 1 / 2 * CharHeight);
+                                    DrawSelectionCell(args.DrawingSession, x, y);
+                                }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                ErrorOccured?.Invoke(this, new ErrorEventArgs(ex));
+            }
+        }
+
+        private void CanvasText_CreateResources(CanvasControl sender, Microsoft.Graphics.Canvas.UI.CanvasCreateResourcesEventArgs args)
+        {
+            try
+            {
+                CanvasTextFormat textFormat = new CanvasTextFormat
+                {
+                    FontFamily = "Consolas",
+                    FontSize = FontSize
+                };
+
+                Size size = MeasureTextSize(sender.Device, "│", textFormat);
+                Size sizew = MeasureTextSize(sender.Device, "–", textFormat);
+
+                CharHeight = (int)(size.Height * 1.03f);
+                CharWidth = (int)(sizew.Width * 1.31f);
+                isCanvasLoaded = true;
+
+                Invalidate();
+            }
+            catch (Exception ex)
+            {
+                ErrorOccured?.Invoke(this, new ErrorEventArgs(ex));
+            }
+        }
+
+        private void CanvasText_Draw(CanvasControl sender, CanvasDrawEventArgs args)
+        {
+            try
+            {
+                if (VisibleLines.Count > 0)
+                {
+                    int foldPos = Width_LineNumber + Width_ErrorMarker + Width_WarningMarker;
+                    int errorPos = Width_LineNumber;
+                    int warningPos = Width_LineNumber + Width_ErrorMarker;
+                    for (int iLine = VisibleLines[0].LineNumber - 1; iLine < VisibleLines.Last().LineNumber; iLine++)
+                    {
+                        float y = CharHeight * (iLine - VisibleLines[0].LineNumber + 1);
+                        args.DrawingSession.FillRectangle(0, y, Width_Left - Width_TextIndent, CharHeight, Color_LeftBackground);
+                        args.DrawingSession.DrawText((iLine + 1).ToString(), CharWidth * IntLength(Lines.Count), y, Color_LineNumber, new CanvasTextFormat() { FontFamily = "Consolas", FontSize = FontSize, HorizontalAlignment = CanvasHorizontalAlignment.Right });
+
+                        if (Lines[iLine].IsFoldStart)
+                        {
+                            args.DrawingSession.DrawRectangle(foldPos, y + CharHeight / 4, CharWidth, CharWidth, RequestedTheme == ElementTheme.Light ? Color_FoldingMarker.InvertColorBrightness() : Color_FoldingMarker, 2);
+                            args.DrawingSession.DrawLine(foldPos + CharWidth / 4, y + CharHeight / 2, foldPos + CharWidth * 3 / 4, y + CharHeight / 2, RequestedTheme == ElementTheme.Light ? Color_FoldingMarker.InvertColorBrightness() : Color_FoldingMarker, 2);
+                        }
+                        else if (Lines[iLine].IsFoldInner)
+                        {
+                            args.DrawingSession.DrawLine(foldPos + CharWidth / 2, y, foldPos + CharWidth / 2, y + CharHeight, RequestedTheme == ElementTheme.Light ? Color_FoldingMarker.InvertColorBrightness() : Color_FoldingMarker, 2);
+                        }
+                        else if (Lines[iLine].IsFoldInnerEnd)
+                        {
+                            args.DrawingSession.DrawLine(foldPos + CharWidth / 2, y, foldPos + CharWidth / 2, y + CharHeight, RequestedTheme == ElementTheme.Light ? Color_FoldingMarker.InvertColorBrightness() : Color_FoldingMarker, 2);
+                            args.DrawingSession.DrawLine(foldPos + CharWidth / 2, y + CharHeight / 2, foldPos + CharWidth, y + CharHeight / 2, RequestedTheme == ElementTheme.Light ? Color_FoldingMarker.InvertColorBrightness() : Color_FoldingMarker, 2);
+                        }
+
+                        if (Lines[iLine].IsError)
+                        {
+                            args.DrawingSession.FillRectangle(errorPos, y, Width_ErrorMarker, CharHeight, Color.FromArgb(255, 200, 40, 40));
+                        }
+
+                        if (Lines[iLine].IsWarning)
+                        {
+                            args.DrawingSession.FillRectangle(warningPos, y, Width_WarningMarker, CharHeight, Color.FromArgb(255, 180, 180, 40));
+                        }
+
+                        int lastChar = Math.Min(iCharOffset + (int)(Scroll.ActualWidth / CharWidth), Lines[iLine].Count);
+                        for (int iChar = iCharOffset; iChar < lastChar; iChar++)
+                        {
+                            float x = Width_Left + CharWidth * (iChar - iCharOffset);
+
+                            Char c = Lines[iLine][iChar];
+
+                            args.DrawingSession.DrawText(c.C.ToString(), x, y, RequestedTheme == ElementTheme.Light ? Tokens[c.T].InvertColorBrightness() : Tokens[c.T], new CanvasTextFormat() { FontFamily = "Consolas", FontSize = FontSize });
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                ErrorOccured?.Invoke(this, new ErrorEventArgs(ex));
             }
         }
 
         private void CodeWriter_CharacterReceived(UIElement sender, CharacterReceivedRoutedEventArgs args)
         {
-            if (isSelecting) return;
-            if (char.IsLetterOrDigit(args.Character) | char.IsSymbol(args.Character) | char.IsPunctuation(args.Character) | char.IsSeparator(args.Character) | char.IsSurrogate(args.Character))
+            try
             {
-                if (IsSelection)
+                if (isSelecting) return;
+                if (char.IsLetterOrDigit(args.Character) | char.IsSymbol(args.Character) | char.IsPunctuation(args.Character) | char.IsSeparator(args.Character) | char.IsSurrogate(args.Character))
                 {
-                    if (Selection.Start.iChar < Selection.End.iChar)
+                    if (IsSelection)
                     {
-                        Lines[CursorPlace.iLine].LineText = Lines[CursorPlace.iLine].LineText.Remove(Selection.Start.iChar, Selection.End.iChar - Selection.Start.iChar);
-                        Selection = new SelectionRange(Selection.Start, Selection.Start);
+                        if (Selection.Start.iChar < Selection.End.iChar)
+                        {
+                            Lines[CursorPlace.iLine].LineText = Lines[CursorPlace.iLine].LineText.Remove(Selection.Start.iChar, Selection.End.iChar - Selection.Start.iChar);
+                            Selection = new SelectionRange(Selection.Start, Selection.Start);
+                        }
+                        else
+                        {
+                            Lines[CursorPlace.iLine].LineText = Lines[CursorPlace.iLine].LineText.Remove(Selection.End.iChar, Selection.Start.iChar - Selection.End.iChar);
+                            Selection = new SelectionRange(Selection.End, Selection.End);
+                        }
                     }
-                    else
-                    {
-                        Lines[CursorPlace.iLine].LineText = Lines[CursorPlace.iLine].LineText.Remove(Selection.End.iChar, Selection.Start.iChar - Selection.End.iChar);
-                        Selection = new SelectionRange(Selection.End, Selection.End);
-                    }
-                }
 
-                Lines[CursorPlace.iLine].LineText = Lines[CursorPlace.iLine].LineText.Insert(CursorPlace.iChar, args.Character.ToString());
-                CursorPlace = new(CursorPlace.iChar + 1, CursorPlace.iLine);
-                TextChanged();
+                    if (args.Character == ',' && !IsSuggesting && IsInsideBrackets(CursorPlace))
+                    {
+                        SuggestionStart = CursorPlace;
+                        Suggestions = Options;
+                        IsSuggesting = true;
+                    }
+
+                    if (args.Character == '\\')
+                    {
+                        SuggestionStart = CursorPlace;
+                        Suggestions = Commands;
+                        IsSuggesting = true;
+                    }
+
+                    if (args.Character == '[')
+                    {
+                        SuggestionStart = CursorPlace;
+                        Suggestions = Options;
+                        IsSuggesting = true;
+                    }
+
+                    Lines[CursorPlace.iLine].LineText = Lines[CursorPlace.iLine].LineText.Insert(CursorPlace.iChar, args.Character.ToString());
+                    if (args.Character == '[')
+                    {
+                        Lines[CursorPlace.iLine].LineText = Lines[CursorPlace.iLine].LineText.Insert(CursorPlace.iChar + 1, "]");
+                    }
+                    CursorPlace = new(CursorPlace.iChar + 1, CursorPlace.iLine);
+                    TextChanged();
+                }
+            }
+            catch (Exception ex)
+            {
+                ErrorOccured?.Invoke(this, new ErrorEventArgs(ex));
             }
         }
 
-        private void OnRequestedThemeChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+        private bool IsInsideBrackets(Place place)
+        {
+            List<BracketPair> pairs = new();
+
+            for (int i = 0; i < Lines[place.iLine].LineText.Length; i++)
+            {
+                if (Lines[place.iLine].LineText[i] == '[')
+                {
+                    int open = i;
+                    int close = findClosingParen(Lines[place.iLine].LineText.ToCharArray(), i);
+                    pairs.Add(new BracketPair(new Place(open, place.iLine), new Place(close, place.iLine)));
+                }
+            }
+            Debug.WriteLine(string.Join("\n", pairs.Select(x => x.iOpen.ToString())));
+
+            return pairs.Any(x => x.iClose >= place && x.iOpen < place);
+        }
+
+        private int findClosingParen(char[] text, int openPos)
+        {
+            int closePos = openPos;
+            int counter = 1;
+            while (counter > 0)
+            {
+                if (closePos == text.Length - 1)
+                {
+                    return ++closePos;
+                }
+                char c = text[++closePos];
+                if (c == '[')
+                {
+                    counter++;
+                }
+                else if (c == ']')
+                {
+                    counter--;
+                }
+            }
+            return closePos;
+        }
+
+        private void DrawSelectionCell(CanvasDrawingSession session, int x, int y)
+        {
+            session.FillRectangle(x, y, CharWidth, CharHeight, RequestedTheme == ElementTheme.Light ? Color_Selection.InvertColorBrightness() : Color_Selection);
+        }
+
+        private void DrawText()
+        {
+            if (isCanvasLoaded)
+            {
+                CanvasTextFormat textFormat = new CanvasTextFormat
+                {
+                    FontFamily = "Consolas",
+                    FontSize = FontSize
+                };
+
+                Size size = MeasureTextSize(CanvasText.Device, "│", textFormat);
+                Size sizew = MeasureTextSize(CanvasText.Device, "–", textFormat);
+
+                CharHeight = (int)(size.Height * 1.03f);
+                CharWidth = (int)(sizew.Width * 1.31f);
+            }
+
+            if (VerticalScroll != null && HorizontalScroll != null && Lines != null)
+            {
+                VerticalScroll.Maximum = (Lines.Count + 2) * CharHeight - Scroll.ActualHeight;
+                VerticalScroll.SmallChange = CharHeight;
+                VerticalScroll.LargeChange = 3 * CharHeight;
+
+                maxchars = 0;
+                foreach (Line l in Lines)
+                {
+                    maxchars = l.Count > maxchars ? l.Count : maxchars;
+                }
+
+                HorizontalScroll.Maximum = (maxchars + 1) * CharWidth - Scroll.ActualWidth + Width_Left;
+                HorizontalScroll.SmallChange = CharWidth;
+                HorizontalScroll.LargeChange = 3 * CharWidth;
+
+                int StartLine = (int)(VerticalScroll.Value / CharHeight) + 1;
+                int EndLine = Math.Min((int)((VerticalScroll.Value + Scroll.ActualHeight) / CharHeight) + 1, Lines.Count);
+                VisibleLines.Clear();
+                foreach (Line l in Lines)
+                {
+                    if (l.LineNumber <= EndLine && l.LineNumber >= StartLine)
+                    {
+                        VisibleLines.Add(l);
+                    }
+                }
+
+                Width_LineNumber = CharWidth * IntLength(Lines.Count);
+
+                CanvasBeam.Invalidate();
+                CanvasSelection.Invalidate();
+                CanvasText.Invalidate();
+            }
+        }
+
+        private void HorizontalScroll_Loaded(object sender, RoutedEventArgs e)
+        {
+            HorizontalScroll = sender as ScrollBar;
+        }
+
+        private void HorizontalScroll_ValueChanged(object sender, RangeBaseValueChangedEventArgs e)
+        {
+            if (e.NewValue == e.OldValue)
+            {
+                return;
+            }
+
+            int n = Math.Max((int)(e.NewValue / CharWidth) * CharWidth, 0);
+
+            iCharOffset = (int)(n / CharWidth);
+            HorizontalOffset = -n;
+            CanvasBeam.Invalidate();
+            CanvasSelection.Invalidate();
+            CanvasText.Invalidate();
+        }
+
+        private void InitializeLines(string text)
+        {
+            Lines.Clear();
+            string[] lines = text.Contains("\r\n") ? text.Split("\r\n", StringSplitOptions.None) : text.Split("\n", StringSplitOptions.None);
+            int lineNumber = 1;
+            foreach (string line in lines)
+            {
+                Line l = new Line() { LineNumber = lineNumber, LineText = line };
+                Lines.Add(l);
+                lineNumber++;
+            }
+            Invalidate();
+        }
+
+        private void KeyboardAccelerator_Invoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
+        {
+            if (invoked)
+            {
+                args.Handled = true;
+                invoked = false;
+            }
+            else
+            {
+                invoked = true;
+            }
+        }
+
+        private Size MeasureTextSize(CanvasDevice device, string text, CanvasTextFormat textFormat, float limitedToWidth = 0.0f, float limitedToHeight = 0.0f)
+        {
+            CanvasTextLayout layout = new(device, text, textFormat, limitedToWidth, limitedToHeight);
+
+            double width = layout.DrawBounds.Width;
+            double height = layout.DrawBounds.Height;
+
+            return new(width, height);
+        }
+
+        private void FontSizeChanged(DependencyObject d, DependencyPropertyChangedEventArgs e) => Invalidate();
+
+        private void RequestedThemeChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {
             ElementTheme theme = (ElementTheme)e.NewValue;
             if (theme == ElementTheme.Light)
             {
                 Background = new SolidColorBrush(Color.FromArgb(255, 240, 240, 240));
-                LeftColor = Color.FromArgb(255, 220, 220, 220);
-
+                Color_LeftBackground = Color.FromArgb(255, 220, 220, 220);
             }
             else
             {
-                Background = new SolidColorBrush(Color.FromArgb(255, 35, 35, 35));
-                LeftColor = Color.FromArgb(255, 25, 25, 25);
-
+                Background = new SolidColorBrush(Color.FromArgb(255, 30, 30, 30));
+                Color_LeftBackground = Color.FromArgb(255, 25, 25, 25);
             }
             Invalidate();
-           
+        }
+
+        private void OnScrollPositionChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+        {
+        }
+
+        private void OnTextChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+        {
+            if (!(d as CodeWriter).IsSettingValue)
+            {
+                InitializeLines((string)e.NewValue);
+            }
+        }
+
+        private Place PointerToPlace(Point currentpoint)
+        {
+            int iline = Math.Min((int)(currentpoint.Y / CharHeight) + VisibleLines[0].LineNumber - 1, Lines.Count - 1);
+            int ichar = 0;
+            if ((int)currentpoint.X - Width_Left - HorizontalOffset > 0)
+                ichar = Math.Min((int)((currentpoint.X - Width_Left - HorizontalOffset + CharWidth * 2 / 3) / CharWidth), Lines[iline].Count);
+
+            return new Place(ichar, iline);
+        }
+
+        private void Scroll_KeyDown(object sender, KeyRoutedEventArgs e)
+        {
+            try
+            {
+                if (!isSelecting)
+                {
+                    if (e.Key == VirtualKey.Control)
+                    {
+                        Modifiers.Add(VirtualKey.Control);
+                    }
+                    string storetext = "";
+                    switch (e.Key)
+                    {
+                        case VirtualKey.Escape:
+                            IsSuggesting = false;
+                            break;
+
+                        case VirtualKey.Enter:
+                            if (IsSuggesting)
+                            {
+                                if (Suggestions[SuggestionIndex].IntelliSenseType == IntelliSenseType.Command)
+                                {
+                                    Lines[CursorPlace.iLine].LineText = Lines[CursorPlace.iLine].LineText.Remove(SuggestionStart.iChar, CursorPlace.iChar - SuggestionStart.iChar);
+                                    Lines[CursorPlace.iLine].LineText = Lines[CursorPlace.iLine].LineText.Insert(SuggestionStart.iChar, Suggestions[SuggestionIndex].Text);
+                                    Selection = new(new(SuggestionStart.iChar + Suggestions[SuggestionIndex].Text.Length, CursorPlace.iLine));
+                                }
+                                else
+                                {
+                                    Lines[CursorPlace.iLine].LineText = Lines[CursorPlace.iLine].LineText.Remove(SuggestionStart.iChar + 1, CursorPlace.iChar - (SuggestionStart.iChar + 1));
+                                    Lines[CursorPlace.iLine].LineText = Lines[CursorPlace.iLine].LineText.Insert(SuggestionStart.iChar + 1, Suggestions[SuggestionIndex].Text);
+                                    Selection = new(new(SuggestionStart.iChar + 1 + Suggestions[SuggestionIndex].Text.Length, CursorPlace.iLine));
+                                }
+                                IsSuggesting = false;
+
+                                TextChanged();
+                                break;
+                            }
+                            if (IsSelection)
+                            {
+                                TextAction_Delete();
+                            }
+                            if (CursorPlace.iChar < Lines[CursorPlace.iLine].Count - 1)
+                            {
+                                storetext = Lines[CursorPlace.iLine].LineText.Substring(CursorPlace.iChar);
+                                Lines[CursorPlace.iLine].LineText = Lines[CursorPlace.iLine].LineText.Remove(CursorPlace.iChar);
+                            }
+                            Lines.Insert(CursorPlace.iLine + 1, new Line() { LineNumber = CursorPlace.iLine, LineText = storetext });
+                            for (int i = CursorPlace.iLine + 1; i < Lines.Count; i++)
+                                Lines[i].LineNumber = i + 1;
+                            Place newselect = CursorPlace;
+                            newselect.iLine++;
+                            newselect.iChar = 0;
+                            Selection = new SelectionRange(newselect, newselect);
+                            Invalidate();
+                            TextChanged();
+                            break;
+
+                        case VirtualKey.Delete:
+                            if (CursorPlace.iChar == Lines[CursorPlace.iLine].Count && CursorPlace.iLine < Lines.Count - 1)
+                            {
+                                storetext = Lines[CursorPlace.iLine + 1].LineText;
+                                Lines.RemoveAt(CursorPlace.iLine + 1);
+                                Lines[CursorPlace.iLine].LineText += storetext;
+                                Invalidate();
+                            }
+                            else
+                            {
+                                Lines[CursorPlace.iLine].LineText = Lines[CursorPlace.iLine].LineText.Remove(CursorPlace.iChar, 1);
+                            }
+                            TextChanged();
+
+                            break;
+
+                        case VirtualKey.Back:
+                            if (!IsSelection)
+                            {
+                                if (CursorPlace.iChar == 0 && CursorPlace.iLine > 0)
+                                {
+                                    storetext = Lines[CursorPlace.iLine].LineText;
+                                    Lines.RemoveAt(CursorPlace.iLine);
+                                    Place newplace = new(Lines[CursorPlace.iLine - 1].Count, CursorPlace.iLine - 1);
+                                    Lines[newplace.iLine].LineText += storetext;
+                                    for (int i = newplace.iLine; i < Lines.Count; i++)
+                                        Lines[i].LineNumber = i + 1;
+                                    Selection = new SelectionRange(newplace);
+                                }
+                                else
+                                {
+                                    if (Lines[CursorPlace.iLine].LineText[CursorPlace.iChar - 1] == '\\')
+                                    {
+                                        IsSuggesting = false;
+                                    }
+                                    if (Lines[CursorPlace.iLine].LineText[CursorPlace.iChar - 1] == '[')
+                                    {
+                                        IsIntellisensing = false;
+                                    }
+                                    Lines[CursorPlace.iLine].LineText = Lines[CursorPlace.iLine].LineText.Remove(CursorPlace.iChar - 1, 1);
+                                    Place newplace = CursorPlace;
+                                    newplace.iChar--;
+                                    Selection = new SelectionRange(newplace);
+                                }
+                            }
+                            else
+                            {
+                                Place start;
+                                Place end;
+
+                                if (Selection.Start.iLine < Selection.End.iLine)
+                                {
+                                    start = new(Selection.Start);
+                                    end = new(Selection.End);
+                                }
+                                else
+                                {
+                                    start = new(Selection.End);
+                                    end = new(Selection.Start);
+                                }
+                                
+                                storetext = "";
+                                for (int iLine = start.iLine; iLine <= end.iLine; iLine++)
+                                {
+                                   
+                                    if (iLine == start.iLine && start.iChar < Lines[iLine].Count - 1)
+                                        Lines[iLine].LineText = Lines[iLine].LineText.Remove(start.iChar);
+                                    else if (iLine == end.iLine)
+                                    {
+                                        if (end.iChar == Lines[iLine].Count - 1)
+                                            Lines.RemoveAt(iLine);
+                                        else
+                                        {
+                                            storetext = Lines[iLine].LineText.Substring(end.iChar);
+                                            Lines[iLine].LineText = Lines[iLine].LineText.Remove(0, end.iChar);
+                                        }
+                                    }
+                                    else
+                                        Lines.RemoveAt(iLine);
+                                }
+
+                                Lines[start.iLine].LineText += storetext;
+
+                                Selection = new(start);
+                            }
+
+                            TextChanged();
+                            break;
+
+                        case VirtualKey.Up:
+                            if (IsSuggesting)
+                            {
+                                if (SuggestionIndex > 0)
+                                    SuggestionIndex--;
+                                else
+                                    SuggestionIndex = Suggestions.Count - 1;
+                                break;
+                            }
+                            if (CursorPlace.iLine > 0)
+                            {
+                                Place newplace = CursorPlace;
+                                newplace.iLine--;
+                                newplace.iChar = Math.Min(Lines[newplace.iLine].Count, newplace.iChar);
+                                Selection = new(newplace, newplace);
+                            }
+                            break;
+
+                        case VirtualKey.Down:
+                            if (IsSuggesting)
+                            {
+                                if (SuggestionIndex < Suggestions.Count - 1)
+                                    SuggestionIndex++;
+                                else
+                                    SuggestionIndex = 0;
+                                break;
+                            }
+                            if (CursorPlace.iLine < Lines.Count - 1)
+                            {
+                                Place newplace = CursorPlace;
+                                newplace.iLine++;
+                                newplace.iChar = Math.Min(Lines[newplace.iLine].Count, newplace.iChar);
+                                Selection = new(newplace, newplace);
+                            }
+                            break;
+
+                        case VirtualKey.Left:
+                            IsSuggesting = false;
+                            if (CursorPlace.iChar > 0)
+                            {
+                                Place newplace = CursorPlace;
+                                newplace.iChar--;
+                                Selection = new(newplace);
+                            }
+                            else if (CursorPlace.iLine > 0)
+                            {
+                                Place newplace = CursorPlace;
+                                newplace.iLine--;
+                                newplace.iChar = Lines[CursorPlace.iLine].Count;
+                                Selection = new(newplace);
+                            }
+                            break;
+
+                        case VirtualKey.Right:
+                            IsSuggesting = false;
+                            if (CursorPlace.iChar < Lines[CursorPlace.iLine].Count)
+                            {
+                                Place newplace = new(CursorPlace.iChar, CursorPlace.iLine);
+                                newplace.iChar++;
+                                Selection = new(newplace);
+                            }
+                            else if (CursorPlace.iLine < Lines.Count - 1)
+                            {
+                                Place newplace = CursorPlace;
+                                newplace.iLine++;
+                                newplace.iChar = 0;
+                                Selection = new(newplace);
+                            }
+                            break;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                ErrorOccured?.Invoke(this, new ErrorEventArgs(ex));
+            }
+        }
+
+        private void Scroll_KeyUp(object sender, KeyRoutedEventArgs e)
+        {
+            if (e.Key == VirtualKey.Control)
+            {
+                Modifiers.Clear();
+            }
+        }
+
+        private void Scroll_PointerWheelChanged(object sender, PointerRoutedEventArgs e)
+        {
+            ExpPointerPoint bla = e.GetCurrentPoint(Scroll);
+            int mwd = bla.Properties.MouseWheelDelta;
+            if (!Modifiers.Contains(VirtualKey.Control))
+            {
+                mwd = Math.Sign(mwd) * (int)CharHeight;
+                if (!bla.Properties.IsHorizontalMouseWheel)
+                {
+                    VerticalScroll.Value -= mwd * 3;
+                }
+                else
+                {
+                    HorizontalScroll.Value = Math.Max(HorizontalScroll.Value + mwd * 3, 0);
+                }
+            }
+            else if (Modifiers.Contains(VirtualKey.Control))
+            {
+                //FontSize += Math.Sign(mwd);
+                int newfontsize = FontSize + Math.Sign(mwd);
+                if (newfontsize >= MinFontSize && newfontsize <= MaxFontSize)
+                    SetValue(FontSizeProperty, newfontsize);
+            }
+            e.Handled = true;
+        }
+
+        private void Scroll_SizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            if (isCanvasLoaded)
+                Invalidate();
+        }
+
+        private void ScrollContent_ManipulationDelta(object sender, ManipulationDeltaRoutedEventArgs e)
+        {
+            if (e.PointerDeviceType == PointerDeviceType.Touch)
+            {
+                int scalesign = Math.Sign(e.Delta.Scale - 1);
+
+                FontSize = Math.Min(Math.Max((int)(startFontsize * e.Cumulative.Scale), MinFontSize), MaxFontSize);
+                HorizontalScroll.Value -= e.Delta.Translation.X;
+                VerticalScroll.Value -= e.Delta.Translation.Y;
+            }
+        }
+
+        private void ScrollContent_ManipulationStarted(object sender, ManipulationStartedRoutedEventArgs e)
+        {
+            startFontsize = FontSize;
         }
 
         private void TextAction_Copy()
@@ -368,484 +1158,43 @@ namespace CodeWriter_WinUI
             }
         }
 
-        private void DrawSelectionCell(CanvasDrawingSession session, int x, int y)
+        private async void TextAction_Paste()
         {
-            session.FillRectangle(x, y, CharWidth, CharHeight, Color.FromArgb(120, 40, 40, 180));
-        }
-
-        private void DrawText()
-        {
-            if (isCanvasLoaded)
+            if (IsSelection)
             {
-                CanvasTextFormat textFormat = new CanvasTextFormat
-                {
-                    FontFamily = "Consolas",
-                    FontSize = FontSize
-                };
-
-                Size size = MeasureTextSize(CanvasText.Device, "│", textFormat);
-                Size sizew = MeasureTextSize(CanvasText.Device, "–", textFormat);
-
-                CharHeight = (int)(size.Height * 1.03f);
-                CharWidth = (int)(sizew.Width * 1.31f);
+                TextAction_Delete();
             }
-
-            if (VerticalScroll != null && HorizontalScroll != null && Lines != null)
+            string text = "";
+            DataPackageView dataPackageView = Clipboard.GetContent();
+            if (dataPackageView.Contains(StandardDataFormats.Text))
             {
-                VerticalScroll.Maximum = (Lines.Count + 1) * CharHeight - Scroll.ActualHeight;
-                VerticalScroll.SmallChange = CharHeight;
-                VerticalScroll.LargeChange = 3 * CharHeight;
-
-                int maxchars = 0;
-                foreach (Line l in Lines)
-                {
-                    maxchars = l.Count > maxchars ? l.Count : maxchars;
-                }
-
-                HorizontalScroll.Maximum = (maxchars + 1) * CharWidth - Scroll.ActualWidth + LeftWidth;
-                HorizontalScroll.SmallChange = CharWidth;
-                HorizontalScroll.LargeChange = 3 * CharWidth;
-
-                int StartLine = (int)(VerticalScroll.Value / CharHeight) + 1;
-                int EndLine = Math.Min((int)((VerticalScroll.Value + Scroll.ActualHeight) / CharHeight), Lines.Count);
-                VisibleLines.Clear();
-                var vis = new List<Line>();
-                foreach (Line l in Lines)
-                {
-                    if (l.LineNumber <= EndLine && l.LineNumber >= StartLine)
-                    {
-                        vis.Add(l);
-                    }
-                }
-                VisibleLines = vis;
-
-                LineNumberWidth = CharWidth * IntLength(Lines.Count);
-
-                CanvasBeam.Invalidate();
-                CanvasSelection.Invalidate();
-                CanvasText.Invalidate();
+                text += await dataPackageView.GetTextAsync();
             }
-        }
-
-        private void HorizontalScroll_Loaded(object sender, RoutedEventArgs e)
-        {
-            HorizontalScroll = sender as ScrollBar;
-        }
-
-        private void HorizontalScroll_ValueChanged(object sender, RangeBaseValueChangedEventArgs e)
-        {
-            if (e.NewValue == e.OldValue)
-            {
-                return;
-            }
-
-            int n = Math.Max((int)(e.NewValue / CharWidth) * CharWidth, 0);
-
-            CharOffset = n;
-            iCharOffset = (int)(n / CharWidth);
-            HorizontalOffset = -n;
-            CanvasBeam.Invalidate();
-            CanvasSelection.Invalidate();
-            CanvasText.Invalidate();
-            // Invalidate();
-        }
-
-        private void InitializeLines(string text)
-        {
-            Lines.Clear();
-            string[] lines = text.Contains("\r\n") ? text.Split("\r\n", StringSplitOptions.None) : text.Split("\n", StringSplitOptions.None);
-            int lineNumber = 1;
-            foreach (string line in lines)
-            {
-                Line l = new Line() { LineNumber = lineNumber, LineText = line };
-                Lines.Add(l);
-                lineNumber++;
-            }
+            Lines[CursorPlace.iLine].LineText = Lines[CursorPlace.iLine].LineText.Insert(CursorPlace.iChar, text);
+            Place end = new(CursorPlace.iChar + text.Length, CursorPlace.iLine);
+            Selection = new(Selection.Start, end);
+            TextChanged();
             Invalidate();
-        }
-
-        private void KeyboardAccelerator_Invoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
-        {
-            if (invoked)
-            {
-                args.Handled = true;
-                invoked = false;
-            }
-            else
-            {
-                invoked = true;
-            }
-        }
-
-        private Size MeasureTextSize(CanvasDevice device, string text, CanvasTextFormat textFormat, float limitedToWidth = 0.0f, float limitedToHeight = 0.0f)
-        {
-            CanvasTextLayout layout = new(device, text, textFormat, limitedToWidth, limitedToHeight);
-
-            double width = layout.DrawBounds.Width;
-            double height = layout.DrawBounds.Height;
-
-            return new(width, height);
-        }
-
-        private void OnFontSizeChanged(DependencyObject d, DependencyPropertyChangedEventArgs e) => Invalidate();
-
-        private void OnTextChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
-        {
-            if (!(d as CodeWriter).IsSettingValue)
-            {
-                InitializeLines((string)e.NewValue);
-            }
-        }
-
-        private async void Paste()
-        {
-            if (!IsSelection)
-            {
-                string text = "";
-                DataPackageView dataPackageView = Clipboard.GetContent();
-                if (dataPackageView.Contains(StandardDataFormats.Text))
-                {
-                    text += await dataPackageView.GetTextAsync();
-                }
-                Lines[CursorPlace.iLine].LineText = Lines[CursorPlace.iLine].LineText.Insert(CursorPlace.iChar, text);
-                Place end = new(CursorPlace.iChar + text.Length, CursorPlace.iLine);
-                Selection = new(Selection.Start, end);
-                TextChanged();
-                Invalidate();
-            }
-        }
-        private Place PointerToPlace(Point currentpoint)
-        {
-            int iline = Math.Min((int)(currentpoint.Y / CharHeight) + VisibleLines[0].LineNumber - 1, Lines.Count - 1);
-            int ichar = 0;
-            if ((int)currentpoint.X - LeftWidth - HorizontalOffset > 0)
-                ichar = Math.Min((int)((currentpoint.X - LeftWidth - HorizontalOffset + CharWidth * 2 / 3) / CharWidth), Lines[iline].Count);
-
-            return new Place(ichar, iline);
-        }
-
-        private void Scroll_KeyDown(object sender, KeyRoutedEventArgs e)
-        {
-            if (!isSelecting)
-            {
-                if (e.Key == VirtualKey.Control)
-                {
-                    Modifiers.Add(VirtualKey.Control);
-                }
-                string storetext = "";
-                switch (e.Key)
-                {
-                    case VirtualKey.Enter:
-                        if (CursorPlace.iChar < Lines[CursorPlace.iLine].Count)
-                        {
-                            storetext = Lines[CursorPlace.iLine].LineText.Substring(CursorPlace.iChar);
-                            Lines[CursorPlace.iLine].LineText = Lines[CursorPlace.iLine].LineText.Remove(CursorPlace.iChar);
-                        }
-                        Lines.Insert(CursorPlace.iLine + 1, new Line() { LineNumber = CursorPlace.iLine, LineText = storetext });
-                        for (int i = CursorPlace.iLine + 1; i < Lines.Count; i++)
-                            Lines[i].LineNumber = i + 1;
-                        Place newselect = CursorPlace;
-                        newselect.iLine++;
-                        newselect.iChar = 0;
-                        Selection = new SelectionRange(newselect, newselect);
-                        Invalidate();
-                        TextChanged();
-                        break;
-
-                    case VirtualKey.Delete:
-                        if (CursorPlace.iChar == Lines[CursorPlace.iLine].Count && CursorPlace.iLine < Lines.Count)
-                        {
-                            storetext = Lines[CursorPlace.iLine + 1].LineText;
-                            Lines.RemoveAt(CursorPlace.iLine + 1);
-                            Lines[CursorPlace.iLine].LineText += storetext;
-                            Invalidate();
-                        }
-                        else
-                        {
-                            Lines[CursorPlace.iLine].LineText = Lines[CursorPlace.iLine].LineText.Remove(CursorPlace.iChar, 1);
-                        }
-                        TextChanged();
-
-                        break;
-
-                    case VirtualKey.Back:
-                        if (!IsSelection)
-                        {
-                            if (CursorPlace.iChar == 0)
-                            {
-                                storetext = Lines[CursorPlace.iLine].LineText;
-                                Lines.RemoveAt(CursorPlace.iLine);
-                                Place newplace = CursorPlace;
-                                newplace.iLine--;
-                                newplace.iChar = Lines[newplace.iLine].Count;
-                                Lines[newplace.iLine].LineText += storetext;
-                                Selection = new SelectionRange(newplace);
-                            }
-                            else
-                            {
-                                Lines[CursorPlace.iLine].LineText = Lines[CursorPlace.iLine].LineText.Remove(CursorPlace.iChar - 1, 1);
-                                Place newplace = CursorPlace;
-                                newplace.iChar--;
-                                Selection = new SelectionRange(newplace);
-                            }
-                        }
-
-                        TextChanged();
-                        break;
-
-                    case VirtualKey.Up:
-                        if (CursorPlace.iLine > 0)
-                        {
-                            Place newplace = CursorPlace;
-                            newplace.iLine--;
-                            newplace.iChar = Math.Min(Lines[newplace.iLine].Count, newplace.iChar);
-                            Selection = new(newplace, newplace);
-                        }
-                        break;
-
-                    case VirtualKey.Down:
-                        if (CursorPlace.iLine < Lines.Count - 1)
-                        {
-                            Place newplace = CursorPlace;
-                            newplace.iLine++;
-                            newplace.iChar = Math.Min(Lines[newplace.iLine].Count, newplace.iChar);
-                            Selection = new(newplace, newplace);
-                        }
-                        break;
-
-                    case VirtualKey.Left:
-                        if (CursorPlace.iChar > 0)
-                        {
-                            Place newplace = CursorPlace;
-                            newplace.iChar--;
-                            Selection = new(newplace);
-                        }
-                        else if (CursorPlace.iLine > 0)
-                        {
-                            Place newplace = CursorPlace;
-                            newplace.iLine--;
-                            newplace.iChar = Lines[CursorPlace.iLine].Count;
-                            Selection = new(newplace);
-                        }
-                        break;
-
-                    case VirtualKey.Right:
-                        if (CursorPlace.iChar < Lines[CursorPlace.iLine].Count)
-                        {
-                            Place newplace = CursorPlace;
-                            newplace.iChar++;
-                            Selection = new(newplace);
-                        }
-                        else if (CursorPlace.iLine < Lines.Count)
-                        {
-                            Place newplace = CursorPlace;
-                            newplace.iLine++;
-                            newplace.iChar = 0;
-                            Selection = new(newplace);
-                        }
-                        break;
-                }
-            }
-        }
-
-        private void Scroll_KeyUp(object sender, KeyRoutedEventArgs e)
-        {
-            if (e.Key == VirtualKey.Control)
-            {
-                Modifiers.Clear();
-            }
-        }
-
-        private void Scroll_PointerWheelChanged(object sender, PointerRoutedEventArgs e)
-        {
-            ExpPointerPoint bla = e.GetCurrentPoint(Scroll);
-            int mwd = bla.Properties.MouseWheelDelta;
-            if (!Modifiers.Contains(VirtualKey.Control))
-            {
-                mwd = Math.Sign(mwd) * (int)CharHeight;
-                if (!bla.Properties.IsHorizontalMouseWheel)
-                {
-                    VerticalScroll.Value -= mwd * 3;
-                }
-                else
-                {
-                    HorizontalScroll.Value = Math.Max(HorizontalScroll.Value + mwd * 3, 0);
-                }
-            }
-            else if (Modifiers.Contains(VirtualKey.Control))
-            {
-                //FontSize += Math.Sign(mwd);
-                int newfontsize = FontSize + Math.Sign(mwd);
-                if (newfontsize >= 6 && newfontsize <= 36)
-                    SetValue(FontSizeProperty, newfontsize);
-            }
-            e.Handled = true;
-        }
-
-        private void Scroll_SizeChanged(object sender, SizeChangedEventArgs e)
-        {
-            if (isCanvasLoaded)
-                Invalidate();
-        }
-
-        private void ScrollContent_ManipulationDelta(object sender, ManipulationDeltaRoutedEventArgs e)
-        {
-            if (e.PointerDeviceType == PointerDeviceType.Touch)
-            {
-                int scalesign = Math.Sign(e.Delta.Scale - 1);
-
-                FontSize = Math.Min(Math.Max((int)(startFontsize * e.Cumulative.Scale), 6), 36);
-                HorizontalScroll.Value -= e.Delta.Translation.X;
-                VerticalScroll.Value -= e.Delta.Translation.Y;
-            }
-        }
-
-        private void ScrollContent_ManipulationStarted(object sender, ManipulationStartedRoutedEventArgs e)
-        {
-            startFontsize = FontSize;
-        }
-
-        private void CanvasSelection_Draw(CanvasControl sender, CanvasDrawEventArgs args)
-        {
-            if (VisibleLines.Count > 0)
-            {
-                int x = 0;
-                int y = 0;
-                if (Selection.Start.iLine == Selection.End.iLine)
-                {
-                    if (Selection.Start.iChar < Selection.End.iChar)
-                        for (int i = Selection.Start.iChar; i < Selection.End.iChar; i++)
-                        {
-                            x = (int)(LeftWidth + HorizontalOffset + i * CharWidth);
-                            y = (int)((CursorPlace.iLine - VisibleLines[0].LineNumber + 1) * CharHeight - 1 / 2 * CharHeight);
-                            DrawSelectionCell(args.DrawingSession, x, y);
-                        }
-                    else
-                        for (int i = Selection.End.iChar; i < Selection.Start.iChar; i++)
-                        {
-                            x = (int)(LeftWidth + HorizontalOffset + i * CharWidth);
-                            y = (int)((CursorPlace.iLine - VisibleLines[0].LineNumber + 1) * CharHeight - 1 / 2 * CharHeight);
-                            DrawSelectionCell(args.DrawingSession, x, y);
-                        }
-                }
-                else
-                {
-                    Place start = new Place();
-                    Place end = new Place();
-
-                    if (Selection.Start.iLine < Selection.End.iLine)
-                    {
-                        start = Selection.Start;
-                        end = Selection.End;
-                    }
-                    else
-                    {
-                        start = Selection.End;
-                        end = Selection.Start;
-                    }
-
-                    for (int lp = start.iLine; lp <= end.iLine; lp++)
-                        if (lp == start.iLine)
-                            for (int i = start.iChar; i < Lines[lp].Count + 1; i++)
-                            {
-                                x = (int)(LeftWidth + HorizontalOffset + i * CharWidth);
-                                y = (int)((lp - VisibleLines[0].LineNumber + 1) * CharHeight - 1 / 2 * CharHeight);
-                                DrawSelectionCell(args.DrawingSession, x, y);
-                            }
-                        else if (lp > start.iLine && lp < end.iLine)
-                            for (int i = 0; i < Lines[lp].Count + 1; i++)
-                            {
-                                x = (int)(LeftWidth + HorizontalOffset + i * CharWidth);
-                                y = (int)((lp - VisibleLines[0].LineNumber + 1) * CharHeight - 1 / 2 * CharHeight);
-                                DrawSelectionCell(args.DrawingSession, x, y);
-                            }
-                        else if (lp == end.iLine)
-                            for (int i = 0; i < end.iChar; i++)
-                            {
-                                x = (int)(LeftWidth + HorizontalOffset + i * CharWidth);
-                                y = (int)((lp - VisibleLines[0].LineNumber + 1) * CharHeight - 1 / 2 * CharHeight);
-                                DrawSelectionCell(args.DrawingSession, x, y);
-                            }
-                }
-            }
-        }
-
-        private void CanvasText_CreateResources(CanvasControl sender, Microsoft.Graphics.Canvas.UI.CanvasCreateResourcesEventArgs args)
-        {
-            CanvasTextFormat textFormat = new CanvasTextFormat
-            {
-                FontFamily = "Consolas",
-                FontSize = FontSize
-            };
-
-            Size size = MeasureTextSize(sender.Device, "│", textFormat);
-            Size sizew = MeasureTextSize(sender.Device, "–", textFormat);
-
-            CharHeight = (int)(size.Height * 1.03f);
-            CharWidth = (int)(sizew.Width * 1.31f);
-            isCanvasLoaded = true;
-
-            Invalidate();
-        }
-
-        private void CanvasText_Draw(CanvasControl sender, CanvasDrawEventArgs args)
-        {
-            if (VisibleLines.Count > 0)
-            {
-                int foldPos = LineNumberWidth + ErrorMarkerWidth + WarningMarkerWidth;
-                int errorPos = LineNumberWidth;
-                int warningPos = LineNumberWidth + ErrorMarkerWidth;
-                for (int iLine = VisibleLines[0].LineNumber - 1; iLine < VisibleLines.Last().LineNumber; iLine++)
-                {
-                    float y = CharHeight * (iLine - VisibleLines[0].LineNumber + 1);
-                    args.DrawingSession.FillRectangle(0, y, LeftWidth - TextIndent, CharHeight, LeftColor);
-                    args.DrawingSession.DrawText((iLine + 1).ToString(), CharWidth * IntLength(Lines.Count), y, LineNumberColor, new CanvasTextFormat() { FontFamily = "Consolas", FontSize = FontSize, HorizontalAlignment = CanvasHorizontalAlignment.Right });
-
-                    if (Lines[iLine].IsFoldStart)
-                    {
-                        args.DrawingSession.DrawRectangle(foldPos, y + CharHeight / 4, CharWidth, CharWidth, FoldingMarkerColor, 2);
-                        args.DrawingSession.DrawLine(foldPos + CharWidth / 4, y + CharHeight / 2, foldPos + CharWidth * 3 / 4, y + CharHeight / 2, FoldingMarkerColor, 2);
-                    }
-                    else if (Lines[iLine].IsFoldInner)
-                    {
-                        args.DrawingSession.DrawLine(foldPos + CharWidth / 2, y, foldPos + CharWidth / 2, y + CharHeight, FoldingMarkerColor, 2);
-                    }
-                    else if (Lines[iLine].IsFoldInnerEnd)
-                    {
-                        args.DrawingSession.DrawLine(foldPos + CharWidth / 2, y, foldPos + CharWidth / 2, y + CharHeight, FoldingMarkerColor, 2);
-                        args.DrawingSession.DrawLine(foldPos + CharWidth / 2, y + CharHeight / 2, foldPos + CharWidth, y + CharHeight / 2, FoldingMarkerColor, 2);
-                    }
-
-                    if (Lines[iLine].IsError)
-                    {
-                        args.DrawingSession.FillRectangle(errorPos, y, ErrorMarkerWidth, CharHeight, Color.FromArgb(255, 200, 40, 40));
-                    }
-
-                    if (Lines[iLine].IsWarning)
-                    {
-                        args.DrawingSession.FillRectangle(warningPos, y, WarningMarkerWidth, CharHeight, Color.FromArgb(255, 180, 180, 40));
-                    }
-
-                    int lastChar = Math.Min(iCharOffset + (int)(Scroll.ActualWidth / CharWidth), Lines[iLine].Count);
-                    for (int iChar = iCharOffset; iChar < lastChar; iChar++)
-                    {
-                        float x = LeftWidth + CharWidth * (iChar - iCharOffset);
-
-                        Char c = Lines[iLine][iChar];
-                        args.DrawingSession.DrawText(c.C.ToString(), x, y, RequestedTheme == ElementTheme.Light ? TokensLight[c.T] : TokensDark[c.T], new CanvasTextFormat() { FontFamily = "Consolas", FontSize = FontSize });
-                        
-                    }
-                }
-            }
         }
 
         private void TextChanged()
         {
-            CanvasText.Invalidate();
-            IsSettingValue = true;
-            string t = string.Join("\n", Lines.Select(x => x.LineText));
-            Text = t;
-            IsSettingValue = false;
+            try
+            {
+                CanvasText.Invalidate();
+                IsSettingValue = true;
+                string t = string.Join("\n", Lines.Select(x => x.LineText));
+                Text = t;
+                if (Lines[CursorPlace.iLine].LineText.Length > maxchars)
+                {
+                    HorizontalScroll.Maximum = (Lines[CursorPlace.iLine].LineText.Length + 3) * CharWidth - Scroll.ActualWidth + Width_Left;
+                }
+                IsSettingValue = false;
+            }
+            catch (Exception ex)
+            {
+                ErrorOccured?.Invoke(this, new ErrorEventArgs(ex));
+            }
         }
 
         private void TextControl_PointerMoved(object sender, PointerRoutedEventArgs e)
@@ -869,7 +1218,7 @@ namespace CodeWriter_WinUI
                 }
                 else
                 {
-                    if (currentpoint.Position.X < LeftWidth)
+                    if (currentpoint.Position.X < Width_Left)
                     {
                         Cursor = new CoreCursor(CoreCursorType.Hand, 1);
                     }
@@ -883,6 +1232,7 @@ namespace CodeWriter_WinUI
 
         private void TextControl_PointerPressed(object sender, PointerRoutedEventArgs e)
         {
+            IsSuggesting = IsIntellisensing = false;
             ExpPointerPoint currentpoint = e.GetCurrentPoint(TextControl);
 
             if (e.Pointer.PointerDeviceType == PointerDeviceType.Touch)
@@ -892,7 +1242,7 @@ namespace CodeWriter_WinUI
             {
                 if (currentpoint.Properties.IsLeftButtonPressed)
                 {
-                    isLineSelect = currentpoint.Position.X < LeftWidth;
+                    isLineSelect = currentpoint.Position.X < Width_Left;
                     try
                     {
                         isSelecting = true;
@@ -944,6 +1294,7 @@ namespace CodeWriter_WinUI
             isSelecting = false;
             isLineSelect = false;
         }
+
         private void VerticalScroll_Loaded(object sender, RoutedEventArgs e)
         {
             VerticalScroll = sender as ScrollBar;

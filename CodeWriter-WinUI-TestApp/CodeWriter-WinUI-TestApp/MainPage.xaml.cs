@@ -1,28 +1,12 @@
 ﻿using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
-using Microsoft.UI.Xaml.Controls.Primitives;
-using Microsoft.UI.Xaml.Data;
-using Microsoft.UI.Xaml.Input;
-using Microsoft.UI.Xaml.Media;
-using Microsoft.UI.Xaml.Navigation;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Runtime.InteropServices.WindowsRuntime;
-using Windows.Foundation;
-using Windows.Foundation.Collections;
-using Windows.Storage;
-
-// To learn more about WinUI, the WinUI project structure,
-// and more about our project templates, see: http://aka.ms/winui-project-info.
 
 namespace CodeWriter_WinUI_TestApp
 {
-    /// <summary>
-    /// An empty window that can be used on its own or navigated to within a Frame.
-    /// </summary>
     public sealed partial class MainPage : Page
     {
         private ViewModel VM { get; } = new ViewModel();
@@ -31,8 +15,6 @@ namespace CodeWriter_WinUI_TestApp
         {
             this.InitializeComponent();
         }
-
-
 
         private  void Btn_Load_Click(object sender, RoutedEventArgs e)
         {
@@ -45,6 +27,24 @@ namespace CodeWriter_WinUI_TestApp
         {
             File.WriteAllText(Path.Combine(Windows.ApplicationModel.Package.Current.InstalledLocation.Path, "ExampleText.tex"),VM.Text);
             VM.LastSavedText = VM.Text;
+        }
+
+        private void CW_ErrorOccured(object sender, ErrorEventArgs e)
+        {
+            Exception ex = e.GetException();
+            VM.Log += $"Error {ex.StackTrace.Replace("\r", "").Replace("\n"," -> ")}: {ex.Message}\n";
+            LogScroll.ScrollToVerticalOffset(LogScroll.ScrollableHeight);
+        }
+
+        int actioncount = 0;
+        private void Btn_Add_Click(object sender, RoutedEventArgs e)
+        {
+            actioncount++;
+            var item = new MenuFlyoutItem() { XamlRoot = CW.XamlRoot, Text = $"Induced Action {actioncount}: Selection Info", Icon = new SymbolIcon(Symbol.Help) };
+            item.Click += async (a,b) => { 
+                await new ContentDialog() { XamlRoot = CW.XamlRoot, Content = "You Selected the following text:\n"+CW.SelectedText, PrimaryButtonText = "Close", DefaultButton = ContentDialogButton.Primary }.ShowAsync(); 
+            };
+            CW.Action_Add(item);
         }
     }
 }

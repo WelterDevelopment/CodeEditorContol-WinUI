@@ -1,5 +1,6 @@
 ﻿using Microsoft.UI;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using System;
 using System.Collections.Generic;
@@ -76,6 +77,44 @@ namespace CodeWriter_WinUI
         public static Vector2 ToVector2(this System.Drawing.Point point)
         {
             return new Vector2((float)point.X, (float)point.Y);
+        }
+
+        public static Color ChangeColorBrightness(this Color color, float correctionFactor)
+        {
+            float red = color.R;
+            float green = color.G;
+            float blue = color.B;
+
+            if (correctionFactor < 0)
+            {
+                correctionFactor = 1 + correctionFactor;
+                red *= correctionFactor;
+                green *= correctionFactor;
+                blue *= correctionFactor;
+            }
+            else
+            {
+                red = (255 - red) * correctionFactor + red;
+                green = (255 - green) * correctionFactor + green;
+                blue = (255 - blue) * correctionFactor + blue;
+            }
+
+            return Color.FromArgb(color.A, (byte)red, (byte)green, (byte)blue);
+        }
+
+        public static Color InvertColorBrightness(this Color color)
+        {
+            float red = color.R;
+            float green = color.G;
+            float blue = color.B;
+
+            float lumi = (0.33f * red) + (0.33f * green) + (0.33f * blue);
+
+            red = 255 - lumi + 0.6f * (red - lumi);
+            green = 255 - lumi + 0.3f * (green - lumi);
+            blue = 255 - lumi + 0.5f * (blue - lumi);
+
+            return Color.FromArgb(color.A, (byte)red, (byte)green, (byte)blue);
         }
     }
 
@@ -219,75 +258,15 @@ namespace CodeWriter_WinUI
 
             groups = text.Select(x => new Char(x)).ToList();
 
-            MatchCollection math = Regex.Matches(text, @"\$.*?\$");
-            foreach (Match match in math)
+            foreach (var token in Languages.ConTeXt)
             {
-                for (int i = match.Index; i < match.Index + match.Length; i++)
+                MatchCollection mc = Regex.Matches(text, token.Value);
+                foreach (Match match in mc)
                 {
-                    groups[i].T = Token.Math;
-                }
-            }
-
-            MatchCollection options = Regex.Matches(text, @"(\w+?\s*?)(=)");
-            foreach (Match optionmatch in options)
-            {
-                for (int i = optionmatch.Groups[0].Captures[0].Index; i < optionmatch.Groups[0].Captures[0].Index + optionmatch.Groups[0].Captures[0].Length - 1; i++)
-                {
-                    groups[i].T = Token.Key;
-                }
-            }
-
-            MatchCollection commands = Regex.Matches(text, @"\\.+?\b");
-            foreach (Match match in commands)
-            {
-                for (int i = match.Index; i < match.Index + match.Length; i++)
-                {
-                    groups[i].T = Token.Command;
-                }
-            }
-
-            MatchCollection startstops = Regex.Matches(text, @"\\(start|stop).+?\b");
-            foreach (Match match in startstops)
-            {
-                for (int i = match.Index; i < match.Index + match.Length; i++)
-                {
-                    groups[i].T = Token.Environment;
-                }
-            }
-
-            MatchCollection brackets = Regex.Matches(text, @"(?<!\\)\[|(?<!\\)\]");
-            foreach (Match match in brackets)
-            {
-                for (int i = match.Index; i < match.Index + match.Length; i++)
-                {
-                    groups[i].T = Token.Bracket;
-                }
-            }
-
-            MatchCollection braces = Regex.Matches(text, @"(?<!\\)\{|(?<!\\)\}");
-            foreach (Match match in braces)
-            {
-                for (int i = match.Index; i < match.Index + match.Length; i++)
-                {
-                    groups[i].T = Token.Bracket;
-                }
-            }
-
-            MatchCollection refs = Regex.Matches(text, @"(sec|eq|tab|fig):\w+");
-            foreach (Match match in refs)
-            {
-                for (int i = match.Index; i < match.Index + match.Length; i++)
-                {
-                    groups[i].T = Token.Reference;
-                }
-            }
-
-            MatchCollection linecomment = Regex.Matches(text, @"\%.*");
-            foreach (Match match in linecomment)
-            {
-                for (int i = match.Index; i < match.Index + match.Length; i++)
-                {
-                    groups[i].T = Token.Comment;
+                    for (int i = match.Index; i < match.Index + match.Length; i++)
+                    {
+                        groups[i].T = token.Key;
+                    }
                 }
             }
 
@@ -397,6 +376,12 @@ namespace CodeWriter_WinUI
         {
         }
 
+        public Place(Place oldplace)
+        {
+            this.iChar = oldplace.iChar;
+            this.iLine = oldplace.iLine;
+        }
+
         public Place(int iChar, int iLine)
         {
             this.iChar = iChar;
@@ -482,6 +467,21 @@ namespace CodeWriter_WinUI
         {
             return "(" + (iLine + 1) + "," + (iChar + 1) + ")";
         }
+
+       
+    }
+
+    public class BracketPair
+    {
+        public Place iOpen { get; set; } = new Place();
+        public Place iClose { get; set; } = new Place();
+
+        public BracketPair() { }
+        public BracketPair(Place open, Place close) 
+        {
+            iOpen = open;
+            iClose = close;
+        }
     }
 
     public class SelectionRange : Bindable
@@ -549,7 +549,36 @@ namespace CodeWriter_WinUI
 
     public enum Token
     {
-        Normal, Environment, Command, Primitive, Definition, Comment, Dimension, Reference, Key, Value, Number, Bracket, Style, Array, Symbol,
+        Normal, Environment, Command, Primitive, Definition, Comment, Dimension, Text, Reference, Key, Value, Number, Bracket, Style, Array, Symbol,
         Math
+    }
+
+    public static class Languages
+    {
+        public static Dictionary<Token, string> ConTeXt = new() {
+            { Token.Math, @"\$.*?\$" },
+            { Token.Key, @"(\w+?\s*?)(=)" },
+            { Token.Symbol, @"[:=,.!?&+\-*\/\^~#;]" },
+            { Token.Command, @"\\.+?\b" },
+            { Token.Style, @"\\(tf|bf|it|sl|bi|bs|sc)(x|xx|[a-e])?\b|(\\tt|\\ss|\\rm)\b" },
+            { Token.Array, @"\\(b|e)(T)(C|Ds?|H|N|Rs?|X|Y)\b|(\\\\|\\AR|\\DR|\\DC|\\DL|\\NI|\\NR|\\NC|\\HL|\\VL|\\FR|\\MR|\\LR|\\SR|\\TB|\\NB|\\NN|\\FL|\\ML|\\LL|\\TL|\\BL)\b" },
+            { Token.Environment, @"\\(start|stop).+?\b" },
+            { Token.Reference, @"\b(sec|eq|tab|fig):\w+\b" },
+            { Token.Comment, @"\%.*" },
+            { Token.Bracket, @"(?<!\\)(\[|\]|\(|\)|\{|\})" },
+        };
+    }
+
+    public enum IntelliSenseType
+    {
+        Command, Argument,
+    }
+
+    public class IntelliSense
+    {
+        public string Text { get; set; }
+        public string Description { get; set; }
+        public IntelliSenseType IntelliSenseType { get; set; }
+        public Token Token { get; set; }
     }
 }

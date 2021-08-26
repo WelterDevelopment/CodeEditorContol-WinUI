@@ -7,21 +7,23 @@
     xmlns:codewriter="using:CodeWriter_WinUI"
     mc:Ignorable="d" 
     DataContext="{x:Bind VM}" 
-    RequestedTheme="{Binding RequestedTheme, Mode=OneWay}"
+    RequestedTheme="{Binding RequestedTheme, Mode=OneWay}" 
+    Background="{ThemeResource SystemControlAcrylicWindowBrush}" 
     >
 
-    <Grid  Background="{ThemeResource SystemControlAcrylicWindowBrush}">
+    <Grid Padding="0,12,12,0" RowSpacing="12">
         <Grid.ColumnDefinitions>
             <ColumnDefinition  />
         </Grid.ColumnDefinitions>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"  />
             <RowDefinition Height="*"  />
+            <RowDefinition Height="Auto"  />
         </Grid.RowDefinitions>
         <StackPanel Orientation="Horizontal" Spacing="6" >
             <Button x:Name="Btn_Load" Content="Load Textfile" Click="Btn_Load_Click"/>
             <Button x:Name="Btn_Save" Visibility="Collapsed" Content="Save Text" Click="Btn_Save_Click"/>
-            <Slider Width="150" Header="Font Size"  Value="{Binding FontSize, Mode=TwoWay}" Minimum="6" Maximum="36"/>
+            <Slider Width="150" Header="Font Size"  Value="{Binding FontSize, Mode=TwoWay}" Minimum="6" Maximum="64"/>
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                 <TextBlock Text="Selection: "></TextBlock>
                 <TextBlock Text="{Binding ElementName=CW, Path=Selection.Start}"></TextBlock>
@@ -30,7 +32,18 @@
             </StackPanel>
             <CheckBox  Content="Unsaved Changes" IsChecked="{Binding UnsavedChanges, Mode=OneWay}" IsHitTestVisible="False" />
             <ComboBox VerticalAlignment="Center" ItemsSource="{Binding ThemeOption}" SelectedItem="{Binding Theme, Mode=TwoWay}"></ComboBox>
+            <Button Content="Add Action" Click="Btn_Add_Click"></Button>
         </StackPanel>
-        <codewriter:CodeWriter x:Name="CW" Grid.Row="1" Text="{Binding Text, Mode=TwoWay}" FontSize="{Binding FontSize, Mode=TwoWay}" RequestedTheme="{Binding RequestedTheme}" />
+        <codewriter:CodeWriter x:Name="CW" Grid.Row="1" Text="{Binding Text, Mode=TwoWay}" ErrorOccured="CW_ErrorOccured" FontSize="{Binding FontSize, Mode=TwoWay}" RequestedTheme="{Binding RequestedTheme}" />
+        <Grid Grid.Row="2">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"  />
+                <RowDefinition Height="*"  />
+            </Grid.RowDefinitions>
+            <TextBlock Grid.Row="0" FontSize="16" Text="Error Log:"></TextBlock>
+            <ScrollViewer Grid.Row="1" MaxHeight="200" x:Name="LogScroll" VerticalScrollMode="Enabled" HorizontalScrollMode="Enabled" HorizontalScrollBarVisibility="Visible" >
+                <TextBlock  IsTextSelectionEnabled="True" TextWrapping="NoWrap" Text="{Binding Log}"></TextBlock>
+            </ScrollViewer>
+        </Grid>
     </Grid>
 </Page>

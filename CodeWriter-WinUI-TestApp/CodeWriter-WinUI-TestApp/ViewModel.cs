@@ -1,10 +1,6 @@
 ﻿using CodeWriter_WinUI;
 using Microsoft.UI.Xaml;
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace CodeWriter_WinUI_TestApp
 {
@@ -16,8 +12,9 @@ namespace CodeWriter_WinUI_TestApp
         public bool UnsavedChanges { get => Get(false); set => Set(value); }
 
         public ElementTheme RequestedTheme { get => Get(ElementTheme.Default); set => Set(value); }
-
         public string Theme { get => Get("Default"); set { Set(value); RequestedTheme = (ElementTheme)Enum.Parse(typeof(ElementTheme), value); } }
         public string[] ThemeOption => Enum.GetNames<ElementTheme>();
+
+        public string Log { get => Get(""); set => Set(value); }
     }
 }

@@ -6,13 +6,13 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
     xmlns:xaml="using:Microsoft.Graphics.Canvas.UI.Xaml"
-    mc:Ignorable="d" 
-     Foreground="LightGray" FontFamily="Consolas" 
-      
+    mc:Ignorable="d"
+    FontFamily="Consolas" Background="{ThemeResource SystemControlAcrylicWindowBrush}" IsTextScaleFactorEnabled="False" TabIndex="0" AllowFocusOnInteraction="True"  IsFocusEngagementEnabled="True"
+    x:DefaultBindMode="OneWay"
     >
     <UserControl.ContextFlyout>
-        <MenuFlyout>
-            <MenuFlyoutItem Text="Copy" Command="{x:Bind CopyCommand}" IsEnabled="{x:Bind IsSelection, Mode=OneWay}" >
+        <MenuFlyout x:Name="ContextMenu" >
+            <MenuFlyoutItem Text="Copy" Command="{x:Bind Command_Copy}" IsEnabled="{x:Bind IsSelection}" >
                 <MenuFlyoutItem.Icon>
                     <SymbolIcon Symbol="Copy"></SymbolIcon>
                 </MenuFlyoutItem.Icon>
@@ -20,7 +20,7 @@
                     <KeyboardAccelerator Modifiers="Control" Key="C"  Invoked="KeyboardAccelerator_Invoked"/>
                 </MenuFlyoutItem.KeyboardAccelerators>
             </MenuFlyoutItem>
-            <MenuFlyoutItem Text="Paste" Command="{x:Bind PasteCommand}" >
+            <MenuFlyoutItem Text="Paste" Command="{x:Bind Command_Paste}" >
                 <MenuFlyoutItem.Icon>
                     <SymbolIcon Symbol="Paste"></SymbolIcon>
                 </MenuFlyoutItem.Icon>
@@ -28,7 +28,7 @@
                     <KeyboardAccelerator Modifiers="Control" Key="V" Invoked="KeyboardAccelerator_Invoked" />
                 </MenuFlyoutItem.KeyboardAccelerators>
             </MenuFlyoutItem>
-            <MenuFlyoutItem Text="Cut" Command="{x:Bind CutCommand}" IsEnabled="{x:Bind IsSelection, Mode=OneWay}">
+            <MenuFlyoutItem Text="Cut" Command="{x:Bind Command_Cut}" IsEnabled="{x:Bind IsSelection}">
                 <MenuFlyoutItem.Icon>
                     <SymbolIcon Symbol="Cut"></SymbolIcon>
                 </MenuFlyoutItem.Icon>
@@ -36,7 +36,7 @@
                     <KeyboardAccelerator Modifiers="Control" Key="X"  Invoked="KeyboardAccelerator_Invoked"/>
                 </MenuFlyoutItem.KeyboardAccelerators>
             </MenuFlyoutItem>
-            <MenuFlyoutItem Text="Delete" Command="{x:Bind DeleteCommand}" IsEnabled="{x:Bind IsSelection, Mode=OneWay}">
+            <MenuFlyoutItem Text="Delete" Command="{x:Bind Command_Delete}" IsEnabled="{x:Bind IsSelection}">
                 <MenuFlyoutItem.Icon>
                     <SymbolIcon Symbol="Delete"></SymbolIcon>
                 </MenuFlyoutItem.Icon>
@@ -44,11 +44,19 @@
                     <KeyboardAccelerator Key="Back" Invoked="KeyboardAccelerator_Invoked" />
                 </MenuFlyoutItem.KeyboardAccelerators>
             </MenuFlyoutItem>
+            <MenuFlyoutItem Text="Select all" Command="{x:Bind Command_SelectAll}">
+                <MenuFlyoutItem.Icon>
+                    <SymbolIcon Symbol="SelectAll"></SymbolIcon>
+                </MenuFlyoutItem.Icon>
+                <MenuFlyoutItem.KeyboardAccelerators>
+                    <KeyboardAccelerator Key="A" Modifiers="Control" Invoked="KeyboardAccelerator_Invoked" />
+                </MenuFlyoutItem.KeyboardAccelerators>
+            </MenuFlyoutItem>
+            
             <MenuFlyoutSeparator />
         </MenuFlyout>
     </UserControl.ContextFlyout>
-
-    <ScrollViewer x:Name="Scroll" IsScrollInertiaEnabled="True"  CanBeScrollAnchor="True" PointerWheelChanged="Scroll_PointerWheelChanged" KeyDown="Scroll_KeyDown" KeyUp="Scroll_KeyUp" HorizontalScrollMode="Enabled" HorizontalScrollBarVisibility="Visible" VerticalScrollMode="Enabled" IsDeferredScrollingEnabled="True"   SizeChanged="Scroll_SizeChanged" >
+    <ScrollViewer x:Name="Scroll" IsScrollInertiaEnabled="True" KeyDown="Scroll_KeyDown" KeyUp="Scroll_KeyUp"  CanBeScrollAnchor="True" PointerWheelChanged="Scroll_PointerWheelChanged"  HorizontalScrollMode="Enabled" HorizontalScrollBarVisibility="Visible" VerticalScrollMode="Enabled" IsDeferredScrollingEnabled="True"   SizeChanged="Scroll_SizeChanged" >
         <ScrollViewer.Template>
             <ControlTemplate  TargetType="ScrollViewer">
                 <Grid>
@@ -60,8 +68,7 @@
                         <RowDefinition Height="*" />
                         <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
-                    <ScrollContentPresenter Grid.Column="0" x:Name="ScrollContent"  CanContentRenderOutsideBounds="False"  ManipulationMode="TranslateX,TranslateY,TranslateInertia,Scale" ManipulationStarted="ScrollContent_ManipulationStarted"  ManipulationDelta="ScrollContent_ManipulationDelta"  />
-
+                    <ScrollContentPresenter Grid.Column="0" x:Name="ScrollContent" CanContentRenderOutsideBounds="False"  ManipulationMode="TranslateX,TranslateY,TranslateInertia,Scale" ManipulationStarted="ScrollContent_ManipulationStarted"  ManipulationDelta="ScrollContent_ManipulationDelta"  />
                     <ScrollBar  x:Name="VerticalScroll" Grid.Column="1" Loaded="VerticalScroll_Loaded" PointerEntered="VerticalScroll_PointerEntered"
                                     Value="0" SmallChange="10" LargeChange="100" ValueChanged="VerticalScroll_ValueChanged"
                                     Maximum="500" Width="12"
@@ -76,16 +83,35 @@
                                     Maximum="500"
                                     ViewportSize="{TemplateBinding ViewportWidth}"
                                     Visibility="Visible"/>
-
                 </Grid>
             </ControlTemplate>
         </ScrollViewer.Template>
 
-        <Grid  x:Name="TextControl" Background="{x:Bind Background, Mode=OneWay}" PointerMoved="TextControl_PointerMoved" PointerPressed="TextControl_PointerPressed" PointerReleased="TextControl_PointerReleased" PointerCaptureLost="TextControl_PointerReleased" PointerCanceled="TextControl_PointerReleased" PointerExited="TextControl_PointerReleased">
+        <Grid  Background="{x:Bind Background}" >
+            <Grid x:Name="TextControl" PointerMoved="TextControl_PointerMoved" PointerPressed="TextControl_PointerPressed" PointerReleased="TextControl_PointerReleased" PointerCaptureLost="TextControl_PointerReleased" PointerCanceled="TextControl_PointerReleased" PointerExited="TextControl_PointerReleased">
             <xaml:CanvasControl HorizontalAlignment="Stretch" VerticalAlignment="Stretch" x:Name="CanvasSelection" Draw="CanvasSelection_Draw"></xaml:CanvasControl>
-            <ItemsControl></ItemsControl>
-            <xaml:CanvasControl HorizontalAlignment="Stretch" VerticalAlignment="Stretch" x:Name="CanvasText" CreateResources="CanvasText_CreateResources" Draw="CanvasText_Draw" ></xaml:CanvasControl>
+            <xaml:CanvasControl HorizontalAlignment="Stretch" VerticalAlignment="Stretch"  x:Name="CanvasText" CreateResources="CanvasText_CreateResources" Draw="CanvasText_Draw" ></xaml:CanvasControl>
             <xaml:CanvasControl HorizontalAlignment="Stretch" VerticalAlignment="Stretch" x:Name="CanvasBeam" Draw="CanvasBeam_Draw"></xaml:CanvasControl>
+                <ItemsControl></ItemsControl>
+            </Grid>
+            <ListBox Background="{ThemeResource SystemControlAcrylicElementBrush}" MaxWidth="200" MaxHeight="140" HorizontalAlignment="Left" VerticalAlignment="Top" Visibility="{x:Bind IsSuggesting}" ItemsSource="{x:Bind Suggestions}" SelectedIndex="{x:Bind SuggestionIndex, Mode=TwoWay}" >
+                <ListBox.RenderTransform>
+                    <TranslateTransform X="{x:Bind CursorPoint.X}" Y="{x:Bind CursorPoint.Y}"></TranslateTransform>
+                </ListBox.RenderTransform>
+                <ListBox.ItemContainerStyle>
+                    <Style TargetType="ListBoxItem">
+                        <Setter Property="Margin" Value="0"></Setter>
+                    </Style>
+                </ListBox.ItemContainerStyle>
+                <ListBox.ItemTemplate>
+                    <DataTemplate>
+                        <Grid>
+                            <TextBlock Text="{Binding Text}"></TextBlock>
+                        </Grid>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
         </Grid>
+
     </ScrollViewer>
 </UserControl>
