@@ -86,6 +86,9 @@ namespace CodeWriter_WinUI
 
         private ScrollBar VerticalScroll;
 
+        private List<EditAction> EditActionHistory = new();
+        private List<Place> CursorPlaceHistory = new();
+
         public CodeWriter()
         {
             InitializeComponent();
@@ -822,6 +825,7 @@ namespace CodeWriter_WinUI
             if (!(d as CodeWriter).IsSettingValue)
             {
                 InitializeLines((string)e.NewValue);
+                Selection = new(new(0, 0));
             }
         }
 
@@ -1234,17 +1238,18 @@ namespace CodeWriter_WinUI
         {
             IsSuggesting = IsIntellisensing = false;
             ExpPointerPoint currentpoint = e.GetCurrentPoint(TextControl);
-
-            if (e.Pointer.PointerDeviceType == PointerDeviceType.Touch)
+            try
             {
-            }
-            else if (e.Pointer.PointerDeviceType == PointerDeviceType.Mouse | e.Pointer.PointerDeviceType == PointerDeviceType.Pen)
-            {
-                if (currentpoint.Properties.IsLeftButtonPressed)
+                if (e.Pointer.PointerDeviceType == PointerDeviceType.Touch)
                 {
-                    isLineSelect = currentpoint.Position.X < Width_Left;
-                    try
+                }
+                else if (e.Pointer.PointerDeviceType == PointerDeviceType.Mouse | e.Pointer.PointerDeviceType == PointerDeviceType.Pen)
+                {
+                    if (currentpoint.Properties.IsLeftButtonPressed)
                     {
+                        isLineSelect = currentpoint.Position.X < Width_Left;
+
+
                         isSelecting = true;
                         if (!isLineSelect)
                         {
@@ -1253,6 +1258,16 @@ namespace CodeWriter_WinUI
                                 Place start = PointerToPlace(currentpoint.Position);
                                 Place end = PointerToPlace(currentpoint.Position);
                                 Selection = new(start, end);
+                                if (CursorPlaceHistory.Count > 0)
+                                {
+                                    if (end.iLine != CursorPlaceHistory.Last().iLine)
+                                        CursorPlaceHistory.Add(end);
+                                }
+                                else
+                                {
+                                    CursorPlaceHistory.Add(end);
+                                }
+
                             }
                             else
                             {
@@ -1280,11 +1295,24 @@ namespace CodeWriter_WinUI
                             Selection = new(start, end);
                         }
                     }
-                    catch (Exception ex) { }
+
+                    else if (currentpoint.Properties.IsXButton1Pressed)
+                    {
+                        if (CursorPlaceHistory.Count > 1)
+                        {
+                            Selection = new SelectionRange(CursorPlaceHistory[CursorPlaceHistory.Count - 2]);
+                            CursorPlaceHistory.Remove(CursorPlaceHistory.Last());
+                        }
+                    }
+
+                    else if (currentpoint.Properties.IsMiddleButtonPressed)
+                    {
+                    }
                 }
-                else if (currentpoint.Properties.IsMiddleButtonPressed)
-                {
-                }
+            }
+            catch (Exception ex)
+            {
+                ErrorOccured?.Invoke(this, new ErrorEventArgs(ex));
             }
         }
 

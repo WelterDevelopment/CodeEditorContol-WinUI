@@ -488,8 +488,8 @@ namespace CodeWriter_WinUI
     {
         public SelectionRange(Place place)
         {
-            Start = place;
-            End = place;
+            Start = place ?? new Place();
+            End = place ?? new Place();
         }
 
         public SelectionRange(Place start, Place end)
@@ -581,4 +581,18 @@ namespace CodeWriter_WinUI
         public IntelliSenseType IntelliSenseType { get; set; }
         public Token Token { get; set; }
     }
+
+    public class EditAction
+    {
+        public SelectionRange Selection { get; set; }
+        public string InvolvedText { get; set; }
+        public EditActionType EditActionType { get; set; }
+    }
+
+    public enum EditActionType
+    {
+        Remove, Add,
+    }
+
+
 }
