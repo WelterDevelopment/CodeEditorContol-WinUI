@@ -56,7 +56,8 @@
             <MenuFlyoutSeparator />
         </MenuFlyout>
     </UserControl.ContextFlyout>
-    <ScrollViewer x:Name="Scroll" IsScrollInertiaEnabled="True" KeyDown="Scroll_KeyDown" KeyUp="Scroll_KeyUp"  CanBeScrollAnchor="True" PointerWheelChanged="Scroll_PointerWheelChanged"  HorizontalScrollMode="Enabled" HorizontalScrollBarVisibility="Visible" VerticalScrollMode="Enabled" IsDeferredScrollingEnabled="True"   SizeChanged="Scroll_SizeChanged" >
+    
+    <ScrollViewer x:Name="Scroll" IsScrollInertiaEnabled="True" KeyDown="Scroll_KeyDown" KeyUp="Scroll_KeyUp" CanBeScrollAnchor="True" PointerWheelChanged="Scroll_PointerWheelChanged"  HorizontalScrollMode="Enabled" HorizontalScrollBarVisibility="Visible" VerticalScrollBarVisibility="Visible" VerticalScrollMode="Enabled" SizeChanged="Scroll_SizeChanged" >
         <ScrollViewer.Template>
             <ControlTemplate  TargetType="ScrollViewer">
                 <Grid>
@@ -70,8 +71,8 @@
                     </Grid.RowDefinitions>
                     <ScrollContentPresenter Grid.Column="0" x:Name="ScrollContent" CanContentRenderOutsideBounds="False"  ManipulationMode="TranslateX,TranslateY,TranslateInertia,Scale" ManipulationStarted="ScrollContent_ManipulationStarted"  ManipulationDelta="ScrollContent_ManipulationDelta"  />
                     <ScrollBar  x:Name="VerticalScroll" Grid.Column="1" Loaded="VerticalScroll_Loaded" PointerEntered="VerticalScroll_PointerEntered"
-                                    Value="0" SmallChange="10" LargeChange="100" ValueChanged="VerticalScroll_ValueChanged"
-                                    Maximum="500" Width="12"
+                                    Value="0" SmallChange="10" LargeChange="100" ValueChanged="VerticalScroll_ValueChanged" 
+                                    Maximum="500"  Orientation="Vertical" 
                                     ViewportSize="{TemplateBinding ViewportHeight}" 
                                     Visibility="Visible"  HorizontalAlignment="Right"/>
 
@@ -94,7 +95,7 @@
             <xaml:CanvasControl HorizontalAlignment="Stretch" VerticalAlignment="Stretch" x:Name="CanvasBeam" Draw="CanvasBeam_Draw"></xaml:CanvasControl>
                 <ItemsControl></ItemsControl>
             </Grid>
-            <ListBox Background="{ThemeResource SystemControlAcrylicElementBrush}" MaxWidth="200" MaxHeight="140" HorizontalAlignment="Left" VerticalAlignment="Top" Visibility="{x:Bind IsSuggesting}" ItemsSource="{x:Bind Suggestions}" SelectedIndex="{x:Bind SuggestionIndex, Mode=TwoWay}" >
+            <ListBox Background="{ThemeResource SystemControlAcrylicElementBrush}"  BorderThickness="1" BorderBrush="{ThemeResource ListBoxBorderThemeBrush}" CornerRadius="4" MaxWidth="200" MaxHeight="140" HorizontalAlignment="Left" VerticalAlignment="Top" Visibility="{x:Bind IsSuggesting}" ItemsSource="{x:Bind Suggestions}" SelectedIndex="{x:Bind SuggestionIndex, Mode=TwoWay}" >
                 <ListBox.RenderTransform>
                     <TranslateTransform X="{x:Bind CursorPoint.X}" Y="{x:Bind CursorPoint.Y}"></TranslateTransform>
                 </ListBox.RenderTransform>

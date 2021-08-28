@@ -9,6 +9,8 @@ namespace CodeWriter_WinUI_TestApp
         public string LastSavedText { get => Get("Hello\nWorld!"); set { Set(value); UnsavedChanges = value != Text; } }
         public string Text { get => Get("Hello\nWorld!"); set { Set(value); UnsavedChanges = value != LastSavedText; } }
         public int FontSize { get => Get(20); set => Set(value); }
+        public int TabLength { get => Get(2); set => Set(value); }
+        public bool ShowMarkers { get => Get(true); set => Set(value); }
         public bool UnsavedChanges { get => Get(false); set => Set(value); }
 
         public ElementTheme RequestedTheme { get => Get(ElementTheme.Default); set => Set(value); }

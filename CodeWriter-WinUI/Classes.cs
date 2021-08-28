@@ -172,6 +172,11 @@ namespace CodeWriter_WinUI
             get { return Chars.Count; }
         }
 
+        public int Indents
+        {
+            get { return LineText.Count(x=>x == '\r'); }
+        }
+
         public string ErrorText { get => Get(""); set => Set(value); }
         public Folding Folding { get => Get(new Folding()); set => Set(value); }
         public string FoldingEndMarker { get; set; }

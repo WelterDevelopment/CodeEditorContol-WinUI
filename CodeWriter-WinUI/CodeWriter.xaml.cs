@@ -1,7 +1,9 @@
 ﻿using Microsoft.Graphics.Canvas;
 using Microsoft.Graphics.Canvas.Brushes;
+using Microsoft.Graphics.Canvas.Geometry;
 using Microsoft.Graphics.Canvas.Text;
 using Microsoft.Graphics.Canvas.UI.Xaml;
+using Microsoft.UI;
 using Microsoft.UI.Input.Experimental;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -29,13 +31,26 @@ namespace CodeWriter_WinUI
 {
     public partial class CodeWriter : UserControl, INotifyPropertyChanged
     {
+        public static readonly DependencyProperty ShowControlCharactersProperty = DependencyProperty.Register("ShowControlCharacters", typeof(bool), typeof(CodeWriter), new PropertyMetadata(true, (d, e) => ((CodeWriter)d).OnShowControlCharactersChanged(d, e)));
+
+       
         public static new readonly DependencyProperty FontSizeProperty = DependencyProperty.Register("FontSize", typeof(int), typeof(CodeWriter), new PropertyMetadata(12, (d, e) => ((CodeWriter)d).FontSizeChanged(d, e)));
 
         public static new readonly DependencyProperty RequestedThemeProperty = DependencyProperty.Register("RequestedTheme", typeof(ElementTheme), typeof(CodeWriter), new PropertyMetadata(12, (d, e) => ((CodeWriter)d).RequestedThemeChanged(d, e)));
 
         public static readonly DependencyProperty ScrollPositionProperty = DependencyProperty.Register("ScrollPosition", typeof(Place), typeof(CodeWriter), new PropertyMetadata(new Place(), (d, e) => ((CodeWriter)d).OnScrollPositionChanged(d, e)));
         public static readonly DependencyProperty TextProperty = DependencyProperty.Register("Text", typeof(string), typeof(CodeWriter), new PropertyMetadata("", (d, e) => ((CodeWriter)d).OnTextChanged(d, e)));
-        
+        public static readonly DependencyProperty TabLengthProperty = DependencyProperty.Register("TabLength", typeof(int), typeof(CodeWriter), new PropertyMetadata(2, (d, e) => ((CodeWriter)d).OnTabLengthChanged(d, e)));
+
+        private void OnTabLengthChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+        {
+            Invalidate();
+        }
+        private void OnShowControlCharactersChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+        {
+            CanvasText.Invalidate();
+        }
+
 
         public void Action_Add(MenuFlyoutItemBase item)
         {
@@ -59,7 +74,7 @@ namespace CodeWriter_WinUI
             { Token.Math, Color.FromArgb(255, 220, 160, 60) },
             { Token.Symbol, Color.FromArgb(255, 140, 200, 240) },
             { Token.Style, Color.FromArgb(255, 200, 140, 100) },
-            { Token.Array, Color.FromArgb(255, 220, 100, 80) },
+            { Token.Array, Color.FromArgb(255, 200, 100, 80) },
         };
 
         private ScrollBar HorizontalScroll;
@@ -123,6 +138,7 @@ namespace CodeWriter_WinUI
 
         public int CharWidth { get => Get(8); set { Set(value); } }
 
+        public Color Color_WeakMarker { get => Get(Color.FromArgb(255, 40, 40, 40)); set => Set(value); }
         public Color Color_FoldingMarker { get => Get(Color.FromArgb(255, 140, 140, 140)); set => Set(value); }
         public Color Color_LeftBackground { get => Get(Color.FromArgb(255, 40, 40, 40)); set => Set(value); }
         public Color Color_LineNumber { get => Get(Color.FromArgb(255, 40, 140, 160)); set => Set(value); }
@@ -151,22 +167,23 @@ namespace CodeWriter_WinUI
             set
             {
                 Set(value);
+                if (isCanvasLoaded)
+                {
+                    var width = Scroll.ActualWidth - Width_Left;
+                    if (value.iChar * CharWidth < HorizontalScroll.Value)
+                        HorizontalScroll.Value = value.iChar * CharWidth;
+                    else if ((value.iChar + 3) * CharWidth - width - HorizontalScroll.Value > 0)
+                        HorizontalScroll.Value = Math.Max((value.iChar + 3) * CharWidth - width, 0);
 
-                var width = Scroll.ActualWidth - Width_Left;
-                if (value.iChar * CharWidth < HorizontalScroll.Value)
-                    HorizontalScroll.Value = value.iChar * CharWidth;
-                else if ((value.iChar + 3) * CharWidth - width - HorizontalScroll.Value > 0)
-                    HorizontalScroll.Value = Math.Max((value.iChar + 3) * CharWidth - width, 0);
-
-                if (value.iLine * CharHeight < VerticalScroll.Value)
-                    VerticalScroll.Value = value.iLine * CharHeight;
-                else if (value.iLine * CharHeight - Scroll.ActualHeight > VerticalScroll.Value)
-                    VerticalScroll.Value = Math.Min(value.iLine * CharHeight - Scroll.ActualHeight, VerticalScroll.Maximum);
+                    if (value.iLine * CharHeight < VerticalScroll.Value)
+                        VerticalScroll.Value = value.iLine * CharHeight;
+                    else if (value.iLine * CharHeight - Scroll.ActualHeight > VerticalScroll.Value)
+                        VerticalScroll.Value = Math.Min(value.iLine * CharHeight - Scroll.ActualHeight, VerticalScroll.Maximum);
+                }
 
                 int x = CharWidth * (value.iChar - iCharOffset) + Width_Left;
                 int y = CharHeight * (value.iLine - VisibleLines[0].LineNumber + 1);
                 CursorPoint = new Point(x, y + CharHeight);
-                IntellisensePoint = new Point(x, y - 2 * CharHeight);
 
                 CanvasBeam.Invalidate();
             }
@@ -181,21 +198,6 @@ namespace CodeWriter_WinUI
         }
 
         public int HorizontalOffset { get => Get(0); set { Set(value); } }
-
-        public Point IntellisensePoint { get => Get(new Point()); set => Set(value); }
-
-        public bool IsIntellisensing
-        {
-            get => Get(false);
-            set
-            {
-                Set(value);
-                if (value)
-                {
-                    SuggestionIndex = 0;
-                }
-            }
-        }
 
         public bool IsSelection { get => Get(false); set => Set(value); }
 
@@ -216,16 +218,28 @@ namespace CodeWriter_WinUI
 
         public List<Line> Lines { get => Get(new List<Line>()); set => Set(value); }
 
+        public int TabLength
+        {
+            get => (int)GetValue(TabLengthProperty);
+            set => SetValue(TabLengthProperty, value);
+        }
+
+        public bool ShowControlCharacters
+        {
+            get => (bool)GetValue(ShowControlCharactersProperty);
+            set => SetValue(ShowControlCharactersProperty, value);
+        }
+
         public new ElementTheme RequestedTheme
         {
             get => (ElementTheme)GetValue(RequestedThemeProperty);
             set => SetValue(RequestedThemeProperty, value);
         }
 
-        public new Place ScrollPosition
+        public Place ScrollPosition
         {
             get => (Place)GetValue(ScrollPositionProperty);
-            set { SetValue(ScrollPositionProperty, value); }
+            set => SetValue(ScrollPositionProperty, value);
         }
 
         public string SelectedText
@@ -255,7 +269,7 @@ namespace CodeWriter_WinUI
                         end = new(Selection.Start);
                     }
 
-                    for (int iLine = start.iLine; iLine < end.iLine; iLine++)
+                    for (int iLine = start.iLine; iLine <= end.iLine; iLine++)
                     {
                         if (iLine == start.iLine)
                             text += Lines[iLine].LineText.Substring(start.iChar) + "\n";
@@ -317,7 +331,7 @@ namespace CodeWriter_WinUI
         private List<IntelliSense> Suggestions { get => Get(Commands); set => Set(value); }
         private int Width_ErrorMarker { get => CharWidth / 2; }
         private int Width_FoldingMarker { get => CharWidth; }
-        private int Width_TextIndent { get => CharWidth; }
+        private int Width_TextIndent { get => CharWidth/2; }
         private int Width_WarningMarker { get => CharWidth / 2; }
 
         public Char this[Place place]
@@ -391,8 +405,16 @@ namespace CodeWriter_WinUI
                     int x = (int)(Width_Left + HorizontalOffset + CursorPlace.iChar * CharWidth);
                     int y = (int)((CursorPlace.iLine - VisibleLines[0].LineNumber + 1) * CharHeight - 1 / 2 * CharHeight);
 
+                    for (int i = 0; i< CursorPlace.iChar; i++)
+                    {
+                        if (Lines[CursorPlace.iLine][i].C == '\t')
+                        {
+                            x += CharWidth * (TabLength -1);
+                        }
+                    }
+
                     if (y <= TextControl.ActualHeight && y >= 0 && x <= TextControl.ActualWidth && x >= Width_Left)
-                        args.DrawingSession.DrawLine(new Vector2(x, y), new Vector2(x, y + CharHeight), RequestedTheme == ElementTheme.Light ? Color_Beam.InvertColorBrightness() : Color_Beam, 2f);
+                        args.DrawingSession.DrawLine(new Vector2(x, y), new Vector2(x, y + CharHeight), ActualTheme == ElementTheme.Light ? Color_Beam.InvertColorBrightness() : Color_Beam, 2f);
 
                     int xms = (int)(Width_Left);
                     int iCharStart = iCharOffset;
@@ -408,13 +430,37 @@ namespace CodeWriter_WinUI
 
                     if (Selection.Start == CursorPlace)
                     {
-                        args.DrawingSession.DrawRoundedRectangle(Width_Left, y, (int)TextControl.ActualWidth - Width_Left, CharHeight, 2, 2, RequestedTheme == ElementTheme.Light ? Color_FoldingMarker.InvertColorBrightness() : Color_FoldingMarker, 2);
+                        args.DrawingSession.DrawRoundedRectangle(Width_Left, y, (int)TextControl.ActualWidth - Width_Left, CharHeight, 2, 2, ActualTheme == ElementTheme.Light ? Color_FoldingMarker.InvertColorBrightness() : Color_FoldingMarker, 2);
                     }
                 }
             }
             catch (Exception ex)
             {
                 ErrorOccured?.Invoke(this, new ErrorEventArgs(ex));
+            }
+        }
+
+        private void DrawSelection(CanvasDrawingSession session, int Line, int StartChar, int EndChar )
+        {
+            int xtaboffset = 0;
+            for (int i = 0; i < EndChar; i++)
+            {
+                if (i < Lines[Line].Count - 1 && Lines[Line][i].C == '\t' && i < StartChar)
+                {
+                    xtaboffset += CharWidth * (TabLength - 1);
+                }
+                if (i >= StartChar)
+                {
+                    int x = (int)(Width_Left + HorizontalOffset + i * CharWidth) + xtaboffset;
+                    int y = (int)((Line - VisibleLines[0].LineNumber + 1) * CharHeight - 1 / 2 * CharHeight);
+                    if (i < Lines[Line].Count - 1 && Lines[Line][i].C == '\t')
+                    {
+                        xtaboffset += CharWidth * (TabLength - 1);
+                        DrawSelectionCell(session, x, y, TabLength);
+                    }
+                    else
+                        DrawSelectionCell(session, x, y);
+                }
             }
         }
 
@@ -426,74 +472,42 @@ namespace CodeWriter_WinUI
                 {
                     int x = 0;
                     int y = 0;
-                    if (Selection.Start.iLine == Selection.End.iLine)
+                    Place start = new Place();
+                    Place end = new Place();
+
+                    if (Selection.Start < Selection.End)
                     {
-                        if (Selection.Start.iChar < Selection.End.iChar)
-                            for (int i = Selection.Start.iChar; i < Selection.End.iChar; i++)
-                            {
-                                x = (int)(Width_Left + HorizontalOffset + i * CharWidth);
-                                y = (int)((CursorPlace.iLine - VisibleLines[0].LineNumber + 1) * CharHeight - 1 / 2 * CharHeight);
-                                DrawSelectionCell(args.DrawingSession, x, y);
-                            }
-                        else
-                            for (int i = Selection.End.iChar; i < Selection.Start.iChar; i++)
-                            {
-                                x = (int)(Width_Left + HorizontalOffset + i * CharWidth);
-                                y = (int)((CursorPlace.iLine - VisibleLines[0].LineNumber + 1) * CharHeight - 1 / 2 * CharHeight);
-                                DrawSelectionCell(args.DrawingSession, x, y);
-                            }
+                        start = new(Selection.Start);
+                        end = new(Selection.End);
                     }
                     else
                     {
-                        Place start = new Place();
-                        Place end = new Place();
-
-                        if (Selection.Start.iLine < Selection.End.iLine)
-                        {
-                            start = new(Selection.Start);
-                            end = new(Selection.End);
-                        }
-                        else
-                        {
-                            start = new(Selection.End);
-                            end = new(Selection.Start);
-                        }
-
-                        if (start.iLine < VisibleLines[0].LineNumber - 1) 
-                        {
-                            start.iLine = VisibleLines[0].LineNumber - 1;
-                            start.iChar = 0;
-                        }
-
-                        if (end.iLine > VisibleLines.Last().LineNumber - 1)
-                        {
-                            end.iLine = VisibleLines.Last().LineNumber - 1;
-                            end.iChar = VisibleLines.Last().Count;
-                        }
-
-                        for (int lp = start.iLine; lp <= end.iLine; lp++)
-                            if (lp == start.iLine)
-                                for (int i = start.iChar; i < Lines[lp].Count + 1; i++)
-                                {
-                                    x = (int)(Width_Left + HorizontalOffset + i * CharWidth);
-                                    y = (int)((lp - VisibleLines[0].LineNumber + 1) * CharHeight - 1 / 2 * CharHeight);
-                                    DrawSelectionCell(args.DrawingSession, x, y);
-                                }
-                            else if (lp > start.iLine && lp < end.iLine)
-                                for (int i = 0; i < Lines[lp].Count + 1; i++)
-                                {
-                                    x = (int)(Width_Left + HorizontalOffset + i * CharWidth);
-                                    y = (int)((lp - VisibleLines[0].LineNumber + 1) * CharHeight - 1 / 2 * CharHeight);
-                                    DrawSelectionCell(args.DrawingSession, x, y);
-                                }
-                            else if (lp == end.iLine)
-                                for (int i = 0; i < end.iChar; i++)
-                                {
-                                    x = (int)(Width_Left + HorizontalOffset + i * CharWidth);
-                                    y = (int)((lp - VisibleLines[0].LineNumber + 1) * CharHeight - 1 / 2 * CharHeight);
-                                    DrawSelectionCell(args.DrawingSession, x, y);
-                                }
+                        start = new(Selection.End);
+                        end = new(Selection.Start);
                     }
+
+                    if (start.iLine < VisibleLines[0].LineNumber - 1)
+                    {
+                        start.iLine = VisibleLines[0].LineNumber - 1;
+                        start.iChar = 0;
+                    }
+
+                    if (end.iLine > VisibleLines.Last().LineNumber - 1)
+                    {
+                        end.iLine = VisibleLines.Last().LineNumber - 1;
+                        end.iChar = VisibleLines.Last().Count;
+                    }
+
+                    for (int lp = start.iLine; lp <= end.iLine; lp++)
+                        if (start.iLine == end.iLine)
+                            DrawSelection(args.DrawingSession, start.iLine, start.iChar, end.iChar);
+                        else if (lp == start.iLine)
+                            DrawSelection(args.DrawingSession, lp, start.iChar, Lines[lp].Count + 1);
+                        else if (lp > start.iLine && lp < end.iLine)
+                            DrawSelection(args.DrawingSession, lp, 0, Lines[lp].Count + 1);
+                        else if (lp == end.iLine)
+                            DrawSelection(args.DrawingSession, lp, 0, end.iChar);
+
                 }
             }
             catch (Exception ex)
@@ -502,6 +516,7 @@ namespace CodeWriter_WinUI
             }
         }
 
+       
         private void CanvasText_CreateResources(CanvasControl sender, Microsoft.Graphics.Canvas.UI.CanvasCreateResourcesEventArgs args)
         {
             try
@@ -520,6 +535,7 @@ namespace CodeWriter_WinUI
                 isCanvasLoaded = true;
 
                 Invalidate();
+                Selection = new(new(0, 0));
             }
             catch (Exception ex)
             {
@@ -539,22 +555,23 @@ namespace CodeWriter_WinUI
                     for (int iLine = VisibleLines[0].LineNumber - 1; iLine < VisibleLines.Last().LineNumber; iLine++)
                     {
                         float y = CharHeight * (iLine - VisibleLines[0].LineNumber + 1);
+                        float x = 0;
                         args.DrawingSession.FillRectangle(0, y, Width_Left - Width_TextIndent, CharHeight, Color_LeftBackground);
                         args.DrawingSession.DrawText((iLine + 1).ToString(), CharWidth * IntLength(Lines.Count), y, Color_LineNumber, new CanvasTextFormat() { FontFamily = "Consolas", FontSize = FontSize, HorizontalAlignment = CanvasHorizontalAlignment.Right });
 
                         if (Lines[iLine].IsFoldStart)
                         {
-                            args.DrawingSession.DrawRectangle(foldPos, y + CharHeight / 4, CharWidth, CharWidth, RequestedTheme == ElementTheme.Light ? Color_FoldingMarker.InvertColorBrightness() : Color_FoldingMarker, 2);
-                            args.DrawingSession.DrawLine(foldPos + CharWidth / 4, y + CharHeight / 2, foldPos + CharWidth * 3 / 4, y + CharHeight / 2, RequestedTheme == ElementTheme.Light ? Color_FoldingMarker.InvertColorBrightness() : Color_FoldingMarker, 2);
+                            args.DrawingSession.DrawRectangle(foldPos, y + CharHeight / 4, CharWidth, CharWidth, ActualTheme == ElementTheme.Light ? Color_FoldingMarker.InvertColorBrightness() : Color_FoldingMarker, 2);
+                            args.DrawingSession.DrawLine(foldPos + CharWidth / 4, y + CharHeight / 2, foldPos + CharWidth * 3 / 4, y + CharHeight / 2, ActualTheme == ElementTheme.Light ? Color_FoldingMarker.InvertColorBrightness() : Color_FoldingMarker, 2);
                         }
                         else if (Lines[iLine].IsFoldInner)
                         {
-                            args.DrawingSession.DrawLine(foldPos + CharWidth / 2, y, foldPos + CharWidth / 2, y + CharHeight, RequestedTheme == ElementTheme.Light ? Color_FoldingMarker.InvertColorBrightness() : Color_FoldingMarker, 2);
+                            args.DrawingSession.DrawLine(foldPos + CharWidth / 2, y, foldPos + CharWidth / 2, y + CharHeight, ActualTheme == ElementTheme.Light ? Color_FoldingMarker.InvertColorBrightness() : Color_FoldingMarker, 2);
                         }
                         else if (Lines[iLine].IsFoldInnerEnd)
                         {
-                            args.DrawingSession.DrawLine(foldPos + CharWidth / 2, y, foldPos + CharWidth / 2, y + CharHeight, RequestedTheme == ElementTheme.Light ? Color_FoldingMarker.InvertColorBrightness() : Color_FoldingMarker, 2);
-                            args.DrawingSession.DrawLine(foldPos + CharWidth / 2, y + CharHeight / 2, foldPos + CharWidth, y + CharHeight / 2, RequestedTheme == ElementTheme.Light ? Color_FoldingMarker.InvertColorBrightness() : Color_FoldingMarker, 2);
+                            args.DrawingSession.DrawLine(foldPos + CharWidth / 2, y, foldPos + CharWidth / 2, y + CharHeight, ActualTheme == ElementTheme.Light ? Color_FoldingMarker.InvertColorBrightness() : Color_FoldingMarker, 2);
+                            args.DrawingSession.DrawLine(foldPos + CharWidth / 2, y + CharHeight / 2, foldPos + CharWidth, y + CharHeight / 2, ActualTheme == ElementTheme.Light ? Color_FoldingMarker.InvertColorBrightness() : Color_FoldingMarker, 2);
                         }
 
                         if (Lines[iLine].IsError)
@@ -568,13 +585,60 @@ namespace CodeWriter_WinUI
                         }
 
                         int lastChar = Math.Min(iCharOffset + (int)(Scroll.ActualWidth / CharWidth), Lines[iLine].Count);
-                        for (int iChar = iCharOffset; iChar < lastChar; iChar++)
-                        {
-                            float x = Width_Left + CharWidth * (iChar - iCharOffset);
+                        int indents = 0;
+                        
 
+                        for (int iChar = 0; iChar < lastChar; iChar++)
+                        {
                             Char c = Lines[iLine][iChar];
 
-                            args.DrawingSession.DrawText(c.C.ToString(), x, y, RequestedTheme == ElementTheme.Light ? Tokens[c.T].InvertColorBrightness() : Tokens[c.T], new CanvasTextFormat() { FontFamily = "Consolas", FontSize = FontSize });
+                            if (c.C == '\t')
+                            {
+                                x = Width_Left + CharWidth * (iChar + indents * (TabLength - 1) - iCharOffset);
+                                indents += 1;
+                                if (ShowControlCharacters)
+                                if (iChar >= iCharOffset - indents * (TabLength-1)) // Draw indent arrows
+                                {
+                                    CanvasPathBuilder pathBuilder = new CanvasPathBuilder(sender);
+
+                                    pathBuilder.BeginFigure(CharWidth * 0.2f, CharHeight / 2);
+                                    pathBuilder.AddLine(CharWidth * (TabLength - 0.2f), CharHeight / 2);
+                                    pathBuilder.EndFigure(CanvasFigureLoop.Open);
+
+                                    pathBuilder.BeginFigure(CharWidth * (TabLength - 0.5f), CharHeight * 1 / 4);
+                                    pathBuilder.AddLine(CharWidth * (TabLength - 0.2f), CharHeight / 2);
+                                    pathBuilder.AddLine(CharWidth * (TabLength - 0.5f), CharHeight * 3 / 4);
+                                    pathBuilder.EndFigure(CanvasFigureLoop.Open);
+
+                                    CanvasGeometry arrow = CanvasGeometry.CreatePath(pathBuilder);
+
+                                    args.DrawingSession.DrawGeometry(arrow, x, y, ActualTheme == ElementTheme.Light ? Color_WeakMarker.InvertColorBrightness() : Color_WeakMarker, 2);
+                                }
+                            }
+                            else if (iChar >= iCharOffset-indents*(TabLength-1))
+                            {
+                                x = Width_Left + CharWidth * (iChar + indents*(TabLength-1) - iCharOffset);
+                                args.DrawingSession.DrawText(c.C.ToString(), x, y, ActualTheme == ElementTheme.Light ? Tokens[c.T].InvertColorBrightness() : Tokens[c.T], new CanvasTextFormat() { FontFamily = "Consolas", FontSize = FontSize });
+                            }
+                        }
+                        if (ShowControlCharacters)
+                        {
+                            x = Width_Left + CharWidth * (lastChar + indents * (TabLength - 1) - iCharOffset);
+                            CanvasPathBuilder enterpath = new CanvasPathBuilder(sender);
+
+                            enterpath.BeginFigure(CharWidth * 0.2f, CharHeight * 2 / 4);
+                            enterpath.AddLine(CharWidth * 0.5f, CharHeight * 2 / 4);
+                            enterpath.AddLine(CharWidth * 0.5f, CharHeight * 4 / 4);
+                            enterpath.EndFigure(CanvasFigureLoop.Open);
+
+                            enterpath.BeginFigure(CharWidth * 0.2f, CharHeight * 3 / 4);
+                            enterpath.AddLine(CharWidth * 0.5f, CharHeight * 4 / 4);
+                            enterpath.AddLine(CharWidth * 0.8f, CharHeight * 3 / 4);
+                            enterpath.EndFigure(CanvasFigureLoop.Open);
+
+                            CanvasGeometry enter = CanvasGeometry.CreatePath(enterpath);
+
+                            args.DrawingSession.DrawGeometry(enter, x, y, ActualTheme == ElementTheme.Light ? Color_WeakMarker.InvertColorBrightness() : Color_WeakMarker, 2);
                         }
                     }
                 }
@@ -683,9 +747,9 @@ namespace CodeWriter_WinUI
             return closePos;
         }
 
-        private void DrawSelectionCell(CanvasDrawingSession session, int x, int y)
+        private void DrawSelectionCell(CanvasDrawingSession session, int x, int y, int w = 1)
         {
-            session.FillRectangle(x, y, CharWidth, CharHeight, RequestedTheme == ElementTheme.Light ? Color_Selection.InvertColorBrightness() : Color_Selection);
+            session.FillRectangle(x, y, CharWidth*w, CharHeight, ActualTheme == ElementTheme.Light ? Color_Selection.InvertColorBrightness() : Color_Selection);
         }
 
         private void DrawText()
@@ -772,7 +836,11 @@ namespace CodeWriter_WinUI
                 Lines.Add(l);
                 lineNumber++;
             }
-            Invalidate();
+            if (isCanvasLoaded)
+            {
+                Invalidate();
+                Selection = new(new(0, 0));
+            }
         }
 
         private void KeyboardAccelerator_Invoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
@@ -800,19 +868,30 @@ namespace CodeWriter_WinUI
 
         private void FontSizeChanged(DependencyObject d, DependencyPropertyChangedEventArgs e) => Invalidate();
 
+        private ElementTheme ActualTheme = ElementTheme.Dark;
+
         private void RequestedThemeChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {
-            ElementTheme theme = (ElementTheme)e.NewValue;
-            if (theme == ElementTheme.Light)
+            ActualTheme = (ElementTheme)e.NewValue;
+
+            if ((ElementTheme)e.NewValue == ElementTheme.Default)
+            {
+                var backcolor = new Windows.UI.ViewManagement.UISettings().GetColorValue(Windows.UI.ViewManagement.UIColorType.Background);
+                ActualTheme = backcolor.Equals(Colors.White) ? ElementTheme.Light : ElementTheme.Dark;
+            }
+
+            if (ActualTheme == ElementTheme.Light)
             {
                 Background = new SolidColorBrush(Color.FromArgb(255, 240, 240, 240));
                 Color_LeftBackground = Color.FromArgb(255, 220, 220, 220);
             }
+
             else
             {
                 Background = new SolidColorBrush(Color.FromArgb(255, 30, 30, 30));
                 Color_LeftBackground = Color.FromArgb(255, 25, 25, 25);
             }
+
             Invalidate();
         }
 
@@ -825,7 +904,7 @@ namespace CodeWriter_WinUI
             if (!(d as CodeWriter).IsSettingValue)
             {
                 InitializeLines((string)e.NewValue);
-                Selection = new(new(0, 0));
+                
             }
         }
 
@@ -834,7 +913,26 @@ namespace CodeWriter_WinUI
             int iline = Math.Min((int)(currentpoint.Y / CharHeight) + VisibleLines[0].LineNumber - 1, Lines.Count - 1);
             int ichar = 0;
             if ((int)currentpoint.X - Width_Left - HorizontalOffset > 0)
-                ichar = Math.Min((int)((currentpoint.X - Width_Left - HorizontalOffset + CharWidth * 2 / 3) / CharWidth), Lines[iline].Count);
+            {
+                int visualcharplace = (int)((currentpoint.X - Width_Left - HorizontalOffset + CharWidth * 2 / 3) / CharWidth);
+                int currentvisibleplace = 0;
+                int actualcharplace = visualcharplace;
+                for (int i = 0; i < Math.Min(Lines[iline].Count, visualcharplace); i++)
+                {
+                    if (currentvisibleplace < visualcharplace)
+                        if (Lines[iline][i].C == '\t')
+                        {
+                            actualcharplace -= TabLength - 1;
+                            currentvisibleplace += TabLength;
+                        }
+                        else
+                        {
+                            currentvisibleplace += 1;
+                        }
+                }
+
+                ichar = Math.Min(actualcharplace, Lines[iline].Count);
+            }
 
             return new Place(ichar, iline);
         }
@@ -854,6 +952,12 @@ namespace CodeWriter_WinUI
                     {
                         case VirtualKey.Escape:
                             IsSuggesting = false;
+                            break;
+
+                        case VirtualKey.Tab:
+                            Lines[CursorPlace.iLine].LineText = '\t' + Lines[CursorPlace.iLine].LineText;
+                            TextChanged();
+                            e.Handled = true;
                             break;
 
                         case VirtualKey.Enter:
@@ -927,13 +1031,9 @@ namespace CodeWriter_WinUI
                                 }
                                 else
                                 {
-                                    if (Lines[CursorPlace.iLine].LineText[CursorPlace.iChar - 1] == '\\')
+                                    if (Lines[CursorPlace.iLine].LineText[CursorPlace.iChar - 1] == '\\' | Lines[CursorPlace.iLine].LineText[CursorPlace.iChar - 1] == '[')
                                     {
                                         IsSuggesting = false;
-                                    }
-                                    if (Lines[CursorPlace.iLine].LineText[CursorPlace.iChar - 1] == '[')
-                                    {
-                                        IsIntellisensing = false;
                                     }
                                     Lines[CursorPlace.iLine].LineText = Lines[CursorPlace.iLine].LineText.Remove(CursorPlace.iChar - 1, 1);
                                     Place newplace = CursorPlace;
@@ -1236,7 +1336,7 @@ namespace CodeWriter_WinUI
 
         private void TextControl_PointerPressed(object sender, PointerRoutedEventArgs e)
         {
-            IsSuggesting = IsIntellisensing = false;
+            IsSuggesting = false;
             ExpPointerPoint currentpoint = e.GetCurrentPoint(TextControl);
             try
             {
@@ -1248,7 +1348,6 @@ namespace CodeWriter_WinUI
                     if (currentpoint.Properties.IsLeftButtonPressed)
                     {
                         isLineSelect = currentpoint.Position.X < Width_Left;
-
 
                         isSelecting = true;
                         if (!isLineSelect)
@@ -1325,6 +1424,7 @@ namespace CodeWriter_WinUI
 
         private void VerticalScroll_Loaded(object sender, RoutedEventArgs e)
         {
+            Debug.WriteLine("VerticalScroll_Loaded");
             VerticalScroll = sender as ScrollBar;
         }
 
