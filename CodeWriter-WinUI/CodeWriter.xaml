@@ -36,14 +36,6 @@
                     <KeyboardAccelerator Modifiers="Control" Key="X"  Invoked="KeyboardAccelerator_Invoked"/>
                 </MenuFlyoutItem.KeyboardAccelerators>
             </MenuFlyoutItem>
-            <MenuFlyoutItem Text="Delete" Command="{x:Bind Command_Delete}" IsEnabled="{x:Bind IsSelection}">
-                <MenuFlyoutItem.Icon>
-                    <SymbolIcon Symbol="Delete"></SymbolIcon>
-                </MenuFlyoutItem.Icon>
-                <MenuFlyoutItem.KeyboardAccelerators>
-                    <KeyboardAccelerator Key="Back" Invoked="KeyboardAccelerator_Invoked" />
-                </MenuFlyoutItem.KeyboardAccelerators>
-            </MenuFlyoutItem>
             <MenuFlyoutItem Text="Select all" Command="{x:Bind Command_SelectAll}">
                 <MenuFlyoutItem.Icon>
                     <SymbolIcon Symbol="SelectAll"></SymbolIcon>

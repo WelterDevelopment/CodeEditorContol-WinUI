@@ -249,26 +249,27 @@ namespace CodeWriter_WinUI
                 string text = "";
                 if (Selection.Start == Selection.End)
                     return "";
-                if (Selection.Start.iLine == Selection.End.iLine)
+
+                Place start;
+                Place end;
+
+                if (Selection.Start < Selection.End)
                 {
-                    text = Lines[Selection.Start.iLine].LineText.Substring(Selection.Start.iChar, Selection.End.iChar - Selection.Start.iChar);
+                    start = new(Selection.Start);
+                    end = new(Selection.End);
                 }
                 else
                 {
-                    Place start ;
-                    Place end ;
+                    start = new(Selection.End);
+                    end = new(Selection.Start);
+                }
 
-                    if (Selection.Start.iLine < Selection.End.iLine)
-                    {
-                        start = new(Selection.Start);
-                        end = new(Selection.End);
-                    }
-                    else
-                    {
-                        start = new(Selection.End);
-                        end = new(Selection.Start);
-                    }
-
+                if (start.iLine == end.iLine)
+                {
+                    text = Lines[start.iLine].LineText.Substring(start.iChar, end.iChar - start.iChar);
+                }
+                else
+                {
                     for (int iLine = start.iLine; iLine <= end.iLine; iLine++)
                     {
                         if (iLine == start.iLine)
@@ -621,7 +622,7 @@ namespace CodeWriter_WinUI
                                 args.DrawingSession.DrawText(c.C.ToString(), x, y, ActualTheme == ElementTheme.Light ? Tokens[c.T].InvertColorBrightness() : Tokens[c.T], new CanvasTextFormat() { FontFamily = "Consolas", FontSize = FontSize });
                             }
                         }
-                        if (ShowControlCharacters)
+                        if (ShowControlCharacters && iLine < Lines.Count-1 && lastChar >= iCharOffset - indents * (TabLength - 1))
                         {
                             x = Width_Left + CharWidth * (lastChar + indents * (TabLength - 1) - iCharOffset);
                             CanvasPathBuilder enterpath = new CanvasPathBuilder(sender);
@@ -752,6 +753,8 @@ namespace CodeWriter_WinUI
             session.FillRectangle(x, y, CharWidth*w, CharHeight, ActualTheme == ElementTheme.Light ? Color_Selection.InvertColorBrightness() : Color_Selection);
         }
 
+        public int CurrentLine = 0;
+
         private void DrawText()
         {
             if (isCanvasLoaded)
@@ -785,7 +788,7 @@ namespace CodeWriter_WinUI
                 HorizontalScroll.SmallChange = CharWidth;
                 HorizontalScroll.LargeChange = 3 * CharWidth;
 
-                int StartLine = (int)(VerticalScroll.Value / CharHeight) + 1;
+                int StartLine = (int)(VerticalScroll.Value / CharHeight) + 1;                
                 int EndLine = Math.Min((int)((VerticalScroll.Value + Scroll.ActualHeight) / CharHeight) + 1, Lines.Count);
                 VisibleLines.Clear();
                 foreach (Line l in Lines)
@@ -866,7 +869,19 @@ namespace CodeWriter_WinUI
             return new(width, height);
         }
 
-        private void FontSizeChanged(DependencyObject d, DependencyPropertyChangedEventArgs e) => Invalidate();
+        private void FontSizeChanged(DependencyObject d, DependencyPropertyChangedEventArgs e) 
+        {
+            int currline = 0;
+            if (VerticalScroll != null)
+            {
+                currline = (int)VerticalScroll.Value / CharHeight;
+            }
+            Invalidate(); 
+            if (VerticalScroll != null)
+            {
+                VerticalScroll.Value = currline * CharHeight;
+            }
+        }
 
         private ElementTheme ActualTheme = ElementTheme.Dark;
 
@@ -1001,19 +1016,26 @@ namespace CodeWriter_WinUI
                             break;
 
                         case VirtualKey.Delete:
-                            if (CursorPlace.iChar == Lines[CursorPlace.iLine].Count && CursorPlace.iLine < Lines.Count - 1)
+                            if (!IsSelection)
                             {
-                                storetext = Lines[CursorPlace.iLine + 1].LineText;
-                                Lines.RemoveAt(CursorPlace.iLine + 1);
-                                Lines[CursorPlace.iLine].LineText += storetext;
-                                Invalidate();
+                                if (CursorPlace.iChar == Lines[CursorPlace.iLine].Count && CursorPlace.iLine < Lines.Count - 1)
+                                {
+                                    storetext = Lines[CursorPlace.iLine + 1].LineText;
+                                    Lines.RemoveAt(CursorPlace.iLine + 1);
+                                    Lines[CursorPlace.iLine].LineText += storetext;
+                                    TextChanged();
+                                    Invalidate();
+                                }
+                                else if (CursorPlace.iChar < Lines[CursorPlace.iLine].Count)
+                                {
+                                    Lines[CursorPlace.iLine].LineText = Lines[CursorPlace.iLine].LineText.Remove(CursorPlace.iChar, 1);
+                                    TextChanged();
+                                }
                             }
                             else
                             {
-                                Lines[CursorPlace.iLine].LineText = Lines[CursorPlace.iLine].LineText.Remove(CursorPlace.iChar, 1);
+                                TextAction_Delete();
                             }
-                            TextChanged();
-
                             break;
 
                         case VirtualKey.Back:
@@ -1040,49 +1062,12 @@ namespace CodeWriter_WinUI
                                     newplace.iChar--;
                                     Selection = new SelectionRange(newplace);
                                 }
+                                TextChanged();
                             }
                             else
                             {
-                                Place start;
-                                Place end;
-
-                                if (Selection.Start.iLine < Selection.End.iLine)
-                                {
-                                    start = new(Selection.Start);
-                                    end = new(Selection.End);
-                                }
-                                else
-                                {
-                                    start = new(Selection.End);
-                                    end = new(Selection.Start);
-                                }
-                                
-                                storetext = "";
-                                for (int iLine = start.iLine; iLine <= end.iLine; iLine++)
-                                {
-                                   
-                                    if (iLine == start.iLine && start.iChar < Lines[iLine].Count - 1)
-                                        Lines[iLine].LineText = Lines[iLine].LineText.Remove(start.iChar);
-                                    else if (iLine == end.iLine)
-                                    {
-                                        if (end.iChar == Lines[iLine].Count - 1)
-                                            Lines.RemoveAt(iLine);
-                                        else
-                                        {
-                                            storetext = Lines[iLine].LineText.Substring(end.iChar);
-                                            Lines[iLine].LineText = Lines[iLine].LineText.Remove(0, end.iChar);
-                                        }
-                                    }
-                                    else
-                                        Lines.RemoveAt(iLine);
-                                }
-
-                                Lines[start.iLine].LineText += storetext;
-
-                                Selection = new(start);
+                                TextAction_Delete();
                             }
-
-                            TextChanged();
                             break;
 
                         case VirtualKey.Up:
@@ -1240,22 +1225,53 @@ namespace CodeWriter_WinUI
                     TextAction_Copy();
                 }
 
-                if (Selection.Start.iLine == Selection.End.iLine)
+                Place start;
+                Place end;
+
+                if (Selection.Start < Selection.End)
                 {
-                    if (Selection.Start.iChar < Selection.End.iChar)
-                    {
-                        Lines[CursorPlace.iLine].LineText = Lines[CursorPlace.iLine].LineText.Remove(Selection.Start.iChar, Selection.End.iChar - Selection.Start.iChar);
-                        Selection = new SelectionRange(Selection.Start, Selection.Start);
-                    }
-                    else
-                    {
-                        Lines[CursorPlace.iLine].LineText = Lines[CursorPlace.iLine].LineText.Remove(Selection.End.iChar, Selection.Start.iChar - Selection.End.iChar);
-                        Selection = new SelectionRange(Selection.End, Selection.End);
-                    }
+                    start = new(Selection.Start);
+                    end = new(Selection.End);
                 }
                 else
                 {
+                    start = new(Selection.End);
+                    end = new(Selection.Start);
                 }
+
+                string storetext = "";
+                int removedlines = 0;
+                for (int iLine = start.iLine; iLine <= end.iLine; iLine++)
+                {
+                    if (end.iLine == start.iLine)
+                    {
+                        Lines[iLine].LineText = Lines[iLine].LineText.Remove(start.iChar, end.iChar - start.iChar);
+                    }
+                    else if (iLine == start.iLine)
+                    {
+                        if (start.iChar < Lines[iLine].Count)
+                            Lines[iLine].LineText = Lines[iLine].LineText.Remove(start.iChar);
+                    }
+                    else if (iLine == end.iLine)
+                    {
+                        if (end.iChar == Lines[iLine - removedlines].Count - 1)
+                            Lines.RemoveAt(iLine - removedlines);
+                        else
+                        {
+                            storetext = Lines[iLine - removedlines].LineText.Substring(end.iChar);
+                            Lines.RemoveAt(iLine - removedlines);
+                        }
+                    }
+                    else
+                    {
+                        Lines.RemoveAt(iLine - removedlines);
+                        removedlines += 1;
+                    }
+                }
+
+                Lines[start.iLine].LineText += storetext;
+
+                Selection = new(start);
 
                 TextChanged();
                 Invalidate();
@@ -1274,9 +1290,22 @@ namespace CodeWriter_WinUI
             {
                 text += await dataPackageView.GetTextAsync();
             }
-            Lines[CursorPlace.iLine].LineText = Lines[CursorPlace.iLine].LineText.Insert(CursorPlace.iChar, text);
-            Place end = new(CursorPlace.iChar + text.Length, CursorPlace.iLine);
-            Selection = new(Selection.Start, end);
+            int i = 0;
+            foreach (string line in text.Split('\n', StringSplitOptions.None))
+            {
+                if (i == 0)
+                {
+                    Lines[CursorPlace.iLine].LineText = Lines[CursorPlace.iLine].LineText.Insert(CursorPlace.iChar, line);
+                }
+                else
+                {
+                    Lines.Insert(CursorPlace.iLine + i, new Line() { LineText = line });
+                }
+                i++;
+            }
+            
+            Place end = new(i == 1 ? CursorPlace.iChar + text.Length : Lines[CursorPlace.iLine+i-1].Count, CursorPlace.iLine + i-1);
+            Selection = new(end);
             TextChanged();
             Invalidate();
         }
@@ -1392,6 +1421,32 @@ namespace CodeWriter_WinUI
                             Place start = PointerToPlace(currentpoint.Position);
                             Place end = new(Lines[start.iLine].Count, start.iLine);
                             Selection = new(start, end);
+                        }
+                    }
+
+                    else if (currentpoint.Properties.IsRightButtonPressed)
+                    {
+                        Place rightpress = PointerToPlace(currentpoint.Position);
+
+                        Place start;
+                        Place end;
+                        if (Selection.Start < Selection.End)
+                        {
+                            start = new(Selection.Start);
+                            end = new(Selection.End);
+                        }
+                        else
+                        {
+                            start = new(Selection.End);
+                            end = new(Selection.Start);
+                        }
+
+                        if (IsSelection)
+                        {
+                            if (rightpress <= start || rightpress >= end)
+                            {
+                                Selection = new SelectionRange(rightpress);
+                            }
                         }
                     }
 
