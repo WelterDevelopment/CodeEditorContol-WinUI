@@ -13,9 +13,24 @@ Stuff that works:
 - Basic text editing (char insertion, back key, delete key)
 - Basic copy & paste logic
 - Scrolling (vertical & horizontal)
-- Text and FontSize are two-way bindable DependencyProperties
+- Text, FontSize, Theme and TabLength are two-way bindable DependencyProperties
 - Proof-of-Concept syntax highlighting shown with a ConTeXt example file (only line by line Regexing for now; tokenization comes in the future)
-- Basic IntelliSense logig
+- Basic IntelliSense logic
 - Actions (right-click menu & KeyboardAccelerators)
 
-![Screenshot 2021-08-25 165128](https://user-images.githubusercontent.com/13318246/130813418-299abb0c-d33d-4041-98f5-ff81b06a47b1.png)
+![Screenshot 2021-08-29 003212](https://user-images.githubusercontent.com/13318246/131232558-c26f3c68-769e-4cf4-8304-fe11cf8d8489.jpg)
+
+## ToDo
+- Middle-click scrolling
+- Line wrapping
+- Text folding
+- Text-wide instead of line-wise regexing
+- IntelliSense for commands and arguments
+- Find and highlight matching bracket/parenthesis/braces pairs, auto-close pairs
+- Generalize the syntax highlighting and IntelliSense for more (user-definable) languages
+- Minimap
+- Markers for errors and warnings
+- Breakpoints and breakpoint line highlighting
+- Word/Keyword/Variable highlighting
+- Visual-Studio-like redundant markers for errors/warnings/breakpoints/cursorposition in the VerticelScrollbar
+- Multi-cursor selection and editing
