@@ -134,6 +134,8 @@ namespace CodeWriter_WinUI
 
         public event ErrorEventHandler ErrorOccured;
 
+        public event PropertyChangedEventHandler TextChanged;
+
         public enum ScrollOrientation
         {
             VerticalScroll,
@@ -192,10 +194,10 @@ namespace CodeWriter_WinUI
                             HorizontalScroll.Value = Math.Max((value.iChar + 3) * CharWidth - width, 0);
                     }
 
-                    if (value.iLine * CharHeight < VerticalScroll.Value)
+                    if ((value.iLine+1) * CharHeight <= VerticalScroll.Value)
                         VerticalScroll.Value = value.iLine * CharHeight;
-                    else if (value.iLine * CharHeight - Scroll.ActualHeight > VerticalScroll.Value)
-                        VerticalScroll.Value = Math.Min(value.iLine * CharHeight - Scroll.ActualHeight, VerticalScroll.Maximum);
+                    else if ((value.iLine+2) * CharHeight  > VerticalScroll.Value + Scroll.ActualHeight)
+                        VerticalScroll.Value = Math.Min((value.iLine+2) * CharHeight - Scroll.ActualHeight, VerticalScroll.Maximum);
                 }
 
                 int x = CharWidth * (value.iChar - iCharOffset) + Width_Left;
@@ -620,14 +622,14 @@ namespace CodeWriter_WinUI
                                 args.DrawingSession.DrawLine(foldPos + CharWidth / 2, y + CharHeight / 2, foldPos + CharWidth, y + CharHeight / 2, ActualTheme == ElementTheme.Light ? Color_FoldingMarker.InvertColorBrightness() : Color_FoldingMarker, 2);
                             }
 
-                        if (ShowLineMarkers)
+                        if (ShowLineMarkers && SyntaxErrors.Any(x=>x.iLine == iLine))
                         {
-                            if (Lines[iLine].IsError)
+                            SyntaxError lineError = SyntaxErrors.First(x => x.iLine == iLine);
+                            if (lineError.SyntaxErrorType == SyntaxErrorType.Error)
                             {
                                 args.DrawingSession.FillRectangle(errorPos, y, Width_ErrorMarker, CharHeight, Color.FromArgb(255, 200, 40, 40));
                             }
-
-                            if (Lines[iLine].IsWarning)
+                            if (lineError.SyntaxErrorType == SyntaxErrorType.Warning)
                             {
                                 args.DrawingSession.FillRectangle(warningPos, y, Width_WarningMarker, CharHeight, Color.FromArgb(255, 180, 180, 40));
                             }
@@ -746,7 +748,8 @@ namespace CodeWriter_WinUI
                         Lines[CursorPlace.iLine].LineText = Lines[CursorPlace.iLine].LineText.Insert(CursorPlace.iChar + 1, "]");
                     }
                     CursorPlace = new(CursorPlace.iChar + 1, CursorPlace.iLine);
-                    TextChanged();
+                    textChanged();
+                    CanvasText.Invalidate();
                 }
             }
             catch (Exception ex)
@@ -905,6 +908,7 @@ namespace CodeWriter_WinUI
 
         private void KeyboardAccelerator_Invoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
         {
+            Modifiers.Clear();
             if (invoked)
             {
                 args.Handled = true;
@@ -976,8 +980,8 @@ namespace CodeWriter_WinUI
             if (!(d as CodeWriter).IsSettingValue)
             {
                 InitializeLines((string)e.NewValue);
-                
             }
+            TextChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Text)));
         }
 
         private Place PointerToPlace(Point currentpoint)
@@ -1027,8 +1031,10 @@ namespace CodeWriter_WinUI
                             break;
 
                         case VirtualKey.Tab:
-                            Lines[CursorPlace.iLine].LineText = '\t' + Lines[CursorPlace.iLine].LineText;
-                            TextChanged();
+                            Lines[CursorPlace.iLine].LineText = Lines[CursorPlace.iLine].LineText.Insert(CursorPlace.iChar, "\t");
+                            CursorPlace = new(CursorPlace.iChar + 1, CursorPlace.iLine);
+                            textChanged();
+                            CanvasText.Invalidate();
                             e.Handled = true;
                             break;
 
@@ -1049,7 +1055,8 @@ namespace CodeWriter_WinUI
                                 }
                                 IsSuggesting = false;
 
-                                TextChanged();
+                                textChanged();
+                                CanvasText.Invalidate();
                                 break;
                             }
                             if (IsSelection)
@@ -1068,8 +1075,8 @@ namespace CodeWriter_WinUI
                             newselect.iLine++;
                             newselect.iChar = 0;
                             Selection = new SelectionRange(newselect, newselect);
+                            textChanged();
                             Invalidate();
-                            TextChanged();
                             e.Handled = true;
                             break;
 
@@ -1081,13 +1088,14 @@ namespace CodeWriter_WinUI
                                     storetext = Lines[CursorPlace.iLine + 1].LineText;
                                     Lines.RemoveAt(CursorPlace.iLine + 1);
                                     Lines[CursorPlace.iLine].LineText += storetext;
-                                    TextChanged();
+                                    textChanged();
                                     Invalidate();
                                 }
                                 else if (CursorPlace.iChar < Lines[CursorPlace.iLine].Count)
                                 {
                                     Lines[CursorPlace.iLine].LineText = Lines[CursorPlace.iLine].LineText.Remove(CursorPlace.iChar, 1);
-                                    TextChanged();
+                                    textChanged();
+                                    CanvasText.Invalidate();
                                 }
                             }
                             else
@@ -1105,9 +1113,8 @@ namespace CodeWriter_WinUI
                                     Lines.RemoveAt(CursorPlace.iLine);
                                     Place newplace = new(Lines[CursorPlace.iLine - 1].Count, CursorPlace.iLine - 1);
                                     Lines[newplace.iLine].LineText += storetext;
-                                    for (int i = newplace.iLine; i < Lines.Count; i++)
-                                        Lines[i].LineNumber = i + 1;
                                     Selection = new SelectionRange(newplace);
+                                    
                                 }
                                 else
                                 {
@@ -1120,7 +1127,8 @@ namespace CodeWriter_WinUI
                                     newplace.iChar--;
                                     Selection = new SelectionRange(newplace);
                                 }
-                                TextChanged();
+                                textChanged();
+                                Invalidate();
                             }
                             else
                             {
@@ -1331,7 +1339,7 @@ namespace CodeWriter_WinUI
 
                 Selection = new(start);
 
-                TextChanged();
+                textChanged();
                 Invalidate();
             }
         }
@@ -1357,22 +1365,28 @@ namespace CodeWriter_WinUI
                 }
                 else
                 {
-                    Lines.Insert(CursorPlace.iLine + i, new Line() { LineText = line });
+                    Lines.Insert(CursorPlace.iLine + i, new Line() { LineNumber = CursorPlace.iLine +1+i,LineText = line });
                 }
                 i++;
             }
             
             Place end = new(i == 1 ? CursorPlace.iChar + text.Length : Lines[CursorPlace.iLine+i-1].Count, CursorPlace.iLine + i-1);
             Selection = new(end);
-            TextChanged();
+            textChanged();
             Invalidate();
         }
 
-        private void TextChanged()
+        private void RecalcLineNumbers()
+        {
+            for (int i = CursorPlace.iLine; i < Lines.Count; i++)
+                Lines[i].LineNumber = i + 1;
+        }
+
+        private void textChanged()
         {
             try
             {
-                CanvasText.Invalidate();
+                RecalcLineNumbers();
                 IsSettingValue = true;
                 string t = string.Join("\n", Lines.Select(x => x.LineText));
                 Text = t;
@@ -1622,7 +1636,8 @@ namespace CodeWriter_WinUI
             Invalidate();
         }
 
-        List<SearchMatch> SearchMatches { get => Get(new List<SearchMatch>()); set { Set(value); CanvasScrollbarMarkers.Invalidate(); } }
+        public List<SyntaxError> SyntaxErrors { get => Get(new List<SyntaxError>()); set { Set(value); CanvasScrollbarMarkers.Invalidate(); CanvasText.Invalidate(); } }
+        public List<SearchMatch> SearchMatches { get => Get(new List<SearchMatch>()); set { Set(value); CanvasScrollbarMarkers.Invalidate(); } }
         private void Tbx_SearchChanged(object sender, TextChangedEventArgs e)
         {
             string text = (sender as TextBox).Text;
@@ -1703,10 +1718,22 @@ namespace CodeWriter_WinUI
                 float height = (float)CanvasScrollbarMarkers.ActualHeight;
 
                 foreach (SearchMatch search in SearchMatches)
-                    args.DrawingSession.FillRectangle(width / 4f, (search.iLine) / (float)Lines.Count * height, width / 2f, 1f, Colors.Green);
+                    args.DrawingSession.DrawLine(width / 3f, search.iLine / (float)Lines.Count * height, width * 2/3f, search.iLine / (float)Lines.Count * height, Colors.Gray, 4f);
 
-                float cursorY = (CursorPlace.iLine) / (float)Lines.Count * height;
-                args.DrawingSession.DrawLine(0, cursorY, width, cursorY, Color_Beam, 1f);
+                foreach (SyntaxError error in SyntaxErrors)
+                {
+                    if (error.SyntaxErrorType == SyntaxErrorType.Error)
+                    {
+                        args.DrawingSession.DrawLine(width * 2/3f, error.iLine / (float)Lines.Count * height, width , error.iLine / (float)Lines.Count * height, Colors.Red, 4f);
+                    }
+                    else if (error.SyntaxErrorType == SyntaxErrorType.Warning)
+                    {
+                        args.DrawingSession.DrawLine(width * 2 / 3f, error.iLine / (float)Lines.Count * height, width , error.iLine / (float)Lines.Count * height, Colors.LightGoldenrodYellow, 4f);
+                    }
+                }
+
+                float cursorY = CursorPlace.iLine / (float)Lines.Count * height;
+                args.DrawingSession.DrawLine(0, cursorY, width, cursorY, Color_Beam, 2f);
             }
         }
 

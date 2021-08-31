@@ -130,11 +130,13 @@
                                 <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
-                            <Button Grid.Row="0" Grid.ColumnSpan="3" Padding="4" HorizontalAlignment="Right" Click="Btn_SearchClose">
+                            
+                            <Button Grid.Row="0" Grid.Column="3" Padding="4" HorizontalAlignment="Right" Click="Btn_SearchClose">
                                 <Button.Content>
                                     <SymbolIcon Symbol="Cancel"></SymbolIcon>
                                 </Button.Content>
                             </Button>
+                            
                             <TextBox Grid.Row="1" x:Name="Tbx_Search" HorizontalAlignment="Stretch" PlaceholderText="Find..." TextChanged="Tbx_SearchChanged"></TextBox>
                             <Button Grid.Row="1" Grid.Column="1" ToolTipService.ToolTip="Find next" Padding="4" Click="Btn_SearchNext">
                                 <SymbolIcon Symbol="Forward"></SymbolIcon>
@@ -142,9 +144,8 @@
                             <ToggleButton Grid.Row="1" Grid.Column="2" ToolTipService.ToolTip="Match case" Padding="4"  IsChecked="{x:Bind IsMatchCase, Mode=TwoWay}">
                                 <SymbolIcon Symbol="FontColor"></SymbolIcon>
                             </ToggleButton>
-                            <ToggleButton Grid.Row="1" Grid.Column="3" Content=".*" ToolTipService.ToolTip="Use Regex" Padding="4"  IsChecked="{x:Bind IsRegex, Mode=TwoWay}">
-                                
-                            </ToggleButton>
+                            <ToggleButton Grid.Row="1" Grid.Column="3" Content=".*" ToolTipService.ToolTip="Use Regex" Padding="4"  IsChecked="{x:Bind IsRegex, Mode=TwoWay}" HorizontalAlignment="Stretch" />
+                            
                             <TextBox Grid.Row="2"  Visibility="Visible" HorizontalAlignment="Stretch" PlaceholderText="Replace..." TextChanged="Tbx_SearchChanged"></TextBox>
                             <Button Grid.Row="2" Grid.Column="1"  Padding="4" ToolTipService.ToolTip="Replace next" >
                                 <SymbolIcon Symbol="Forward"></SymbolIcon>

@@ -19,7 +19,8 @@
             <RowDefinition Height="*"  />
             <RowDefinition Height="Auto"  />
         </Grid.RowDefinitions>
-        <StackPanel Margin="12,12,0,0" Orientation="Horizontal" Spacing="6" >
+        <ScrollViewer Padding="12,12,0,0" HorizontalAlignment="Stretch" VerticalScrollBarVisibility="Disabled" HorizontalScrollMode="Enabled" HorizontalScrollBarVisibility="Hidden" >
+        <StackPanel  Orientation="Horizontal" Spacing="6" >
             <Button x:Name="Btn_Load" Content="Load Textfile" Click="Btn_Load_Click"/>
             <Button x:Name="Btn_Save" Visibility="Collapsed" Content="Save Text" Click="Btn_Save_Click"/>
             <CheckBox  Content="Unsaved Changes" IsChecked="{Binding UnsavedChanges, Mode=OneWay}" IsHitTestVisible="False" />
@@ -30,8 +31,8 @@
                 <TextBlock Text="{Binding ElementName=CW, Path=Selection.End}"></TextBlock>
             </StackPanel>
             <ComboBox VerticalAlignment="Center" ItemsSource="{Binding ThemeOption}" SelectedItem="{Binding Theme, Mode=TwoWay}"></ComboBox>
-            <Button Content="Add Action" Click="Btn_Add_Click"></Button>
-            <Button Content="Options">
+                <Button Content="Add Action" Click="Btn_Add_Click"></Button>
+                <Button Content="Options">
                 <Button.Flyout>
                     <Flyout>
                         <StackPanel>
@@ -47,8 +48,9 @@
                     </Flyout>
                 </Button.Flyout>
             </Button>
-        </StackPanel>
-        <codewriter:CodeWriter x:Name="CW" Grid.Row="1" Text="{Binding Text, Mode=TwoWay}" ErrorOccured="CW_ErrorOccured" FontSize="{Binding FontSize, Mode=TwoWay}" TabLength="{Binding TabLength}" RequestedTheme="{Binding RequestedTheme}" ShowControlCharacters="{Binding ShowControlCharacters}" ShowLineNumbers="{Binding ShowLineNumbers}" ShowLineMarkers="{Binding ShowLineMarkers}" IsFoldingEnabled="{Binding IsFoldingEnabled}" ShowScrollbarMarkers="{Binding ShowScrollbarMarkers}" />
+            </StackPanel>
+        </ScrollViewer>
+        <codewriter:CodeWriter x:Name="CW" Grid.Row="1" Text="{Binding Text, Mode=TwoWay}" TextChanged="CW_TextChanged" ErrorOccured="CW_ErrorOccured" FontSize="{Binding FontSize, Mode=TwoWay}" TabLength="{Binding TabLength}" RequestedTheme="{Binding RequestedTheme}" ShowControlCharacters="{Binding ShowControlCharacters}" ShowLineNumbers="{Binding ShowLineNumbers}" ShowLineMarkers="{Binding ShowLineMarkers}" IsFoldingEnabled="{Binding IsFoldingEnabled}" ShowScrollbarMarkers="{Binding ShowScrollbarMarkers}" />
         <Grid Grid.Row="2">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"  />

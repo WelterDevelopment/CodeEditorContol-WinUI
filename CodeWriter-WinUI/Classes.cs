@@ -165,7 +165,6 @@ namespace CodeWriter_WinUI
     public class Line : Bindable
     {
         public VisibleState VisibleState = VisibleState.Visible;
-        internal int wordWrapIndent = 0;
        
         public List<Char> Chars { get => Get(new List<Char>()); set => Set(value); }
 
@@ -176,28 +175,17 @@ namespace CodeWriter_WinUI
 
         public int Indents
         {
-            get { return LineText.Count(x=>x == '\r'); }
+            get { return LineText.Count(x=>x == '\t'); }
         }
 
-        public string ErrorText { get => Get(""); set => Set(value); }
         public Folding Folding { get => Get(new Folding()); set => Set(value); }
         public string FoldingEndMarker { get; set; }
         public string FoldingStartMarker { get; set; }
         public bool IsChanged { get; set; }
-        public bool IsError { get => Get(false); set => Set(value); }
         public bool IsFoldEnd { get => Get(false); set => Set(value); }
         public bool IsFoldInner { get => Get(false); set => Set(value); }
         public bool IsFoldInnerEnd { get => Get(false); set => Set(value); }
         public bool IsFoldStart { get => Get(false); set => Set(value); }
-
-        public bool IsReadOnly
-        {
-            get { return false; }
-        }
-
-        public SolidColorBrush IsSelected { get => Get(new SolidColorBrush(Colors.Transparent)); set => Set(value); }
-        public bool IsWarning { get => Get(false); set => Set(value); }
-        public DateTime LastVisit { get; set; }
         public int LineNumber { get => Get(0); set => Set(value); }
 
         public string LineText
@@ -207,19 +195,12 @@ namespace CodeWriter_WinUI
             {
                 Set(value);
                 Chars = FormattedText(value);
-                //CharGroups = FormattedText(value);
                 IsFoldStart = FoldableStart(value);
                 IsFoldInnerEnd = FoldableEnd(value);
                 IsFoldInner = !IsFoldStart && !IsFoldInnerEnd;
-                IsError = Error(value);
-                IsWarning = Warning(value);
             }
         }
 
-        public bool Marker { get => Get(false); set => Set(value); }
-        public SolidColorBrush MarkerColor { get => Get(new SolidColorBrush(Colors.ForestGreen)); set => Set(value); }
-        public int startY { get => Get(0); set => Set(value); }
-        public string WarningText { get => Get(""); set => Set(value); }
         public int WordWrapStringsCount { get; internal set; }
 
         public Char this[int index]
@@ -305,22 +286,6 @@ namespace CodeWriter_WinUI
             Chars.RemoveAt(index);
         }
 
-        public virtual void RemoveRange(int index, int count)
-        {
-            if (index >= Count)
-                return;
-            //Chars.RemoveRange(index, Math.Min(Count - index, count));
-        }
-
-        public virtual void TrimExcess()
-        {
-            // Chars.TrimExcess();
-        }
-
-        internal void ClearFoldingMarkers()
-        {
-        }
-
         internal int GetWordWrapStringFinishPosition(int v, Line line)
         {
             return 0;
@@ -334,14 +299,6 @@ namespace CodeWriter_WinUI
         internal int GetWordWrapStringStartPosition(object v)
         {
             return 0;
-        }
-
-        private bool Error(string text)
-        {
-            bool error = false;
-            error = text.Count(x => x == '[') != text.Count(x => x == ']');
-            ErrorText = "Line does not contain the same number of opening and closing brackets";
-            return error;
         }
 
         private bool FoldableEnd(string text)
@@ -365,13 +322,6 @@ namespace CodeWriter_WinUI
             else return false;
         }
 
-        private bool Warning(string text)
-        {
-            bool error = false;
-            error = text.Count() == 6;
-            WarningText = "Line contains 6 characters!";
-            return error;
-        }
     }
 
     public class Place : IEquatable<Place>
@@ -511,8 +461,6 @@ namespace CodeWriter_WinUI
 
         public Place End { get => Get(new Place()); set => Set(value); }
         public Place Start { get => Get(new Place()); set => Set(value); }
-
-
     }
 
     public class RelayCommand : ICommand
@@ -547,11 +495,6 @@ namespace CodeWriter_WinUI
         {
             CanExecuteChanged?.Invoke(this, EventArgs.Empty);
         }
-    }
-
-    public static class Syntax
-    {
-        public static Color Normal(ElementTheme theme) => theme == ElementTheme.Light ? Color.FromArgb(255,20,20,20) : Color.FromArgb(255, 220, 220, 220);
     }
 
     public enum Token
@@ -589,6 +532,15 @@ namespace CodeWriter_WinUI
         public Token Token { get; set; }
     }
 
+    public class SyntaxError
+    {
+        public string Title { get; set; } = "";
+        public string Description { get; set; } = "";
+        public SyntaxErrorType SyntaxErrorType { get; set; } = SyntaxErrorType.None;
+        public int iLine { get; set; } = 0;
+        public int iChar { get; set; } = 0;
+    }
+
     public class EditAction
     {
         public SelectionRange Selection { get; set; }
@@ -600,7 +552,12 @@ namespace CodeWriter_WinUI
     {
         Remove, Add,
     }
-    
+
+    public enum SyntaxErrorType
+    {
+        None, Error, Warning, Message
+    }
+
 
     public class WidthToThickness : IValueConverter
     {

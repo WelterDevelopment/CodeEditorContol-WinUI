@@ -1,4 +1,5 @@
-﻿using Microsoft.UI.Xaml;
+﻿using CodeWriter_WinUI;
+using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using System;
 using System.Collections.Generic;
@@ -45,6 +46,21 @@ namespace CodeWriter_WinUI_TestApp
                 await new ContentDialog() { XamlRoot = CW.XamlRoot, Content = "You Selected the following text:\n"+CW.SelectedText, PrimaryButtonText = "Close", DefaultButton = ContentDialogButton.Primary }.ShowAsync(); 
             };
             CW.Action_Add(item);
+        }
+
+        private void CW_TextChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
+        {
+            // Search for syntax errors and other stuff you want to inform the user about
+            List<SyntaxError> errors = new();
+            foreach (Line line in CW.Lines)
+            {
+                if (line.LineText.Count(x => x == '[') != line.LineText.Count(x => x == ']'))
+                    errors.Add(new() { SyntaxErrorType = SyntaxErrorType.Error, iLine = line.LineNumber - 1, Title = "Unbalanced brackets" });
+
+                if (line.LineText.Count() == 25)
+                    errors.Add(new() { SyntaxErrorType = SyntaxErrorType.Warning, iLine = line.LineNumber - 1, Title = "Warning", Description = "Line contains 25 characters. That's a no-no!" });
+            }
+            CW.SyntaxErrors = errors;
         }
     }
 }
