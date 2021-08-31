@@ -10,7 +10,11 @@ namespace CodeWriter_WinUI_TestApp
         public string Text { get => Get("Hello\nWorld!"); set { Set(value); UnsavedChanges = value != LastSavedText; } }
         public int FontSize { get => Get(20); set => Set(value); }
         public int TabLength { get => Get(2); set => Set(value); }
-        public bool ShowMarkers { get => Get(true); set => Set(value); }
+        public bool ShowScrollbarMarkers { get => Get(true); set => Set(value); }
+        public bool ShowLineMarkers { get => Get(true); set => Set(value); }
+        public bool ShowLineNumbers { get => Get(true); set => Set(value); }
+        public bool IsFoldingEnabled { get => Get(true); set => Set(value); }
+        public bool ShowControlCharacters { get => Get(true); set => Set(value); }
         public bool UnsavedChanges { get => Get(false); set => Set(value); }
 
         public ElementTheme RequestedTheme { get => Get(ElementTheme.Default); set => Set(value); }

@@ -19,11 +19,13 @@ using System.Linq;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Windows.Input;
 using Windows.ApplicationModel.DataTransfer;
 using Windows.Devices.Input;
 using Windows.Foundation;
 using Windows.System;
+using Windows.System.Threading;
 using Windows.UI;
 using Windows.UI.Core;
 
@@ -41,6 +43,10 @@ namespace CodeWriter_WinUI
         public static readonly DependencyProperty ScrollPositionProperty = DependencyProperty.Register("ScrollPosition", typeof(Place), typeof(CodeWriter), new PropertyMetadata(new Place(), (d, e) => ((CodeWriter)d).OnScrollPositionChanged(d, e)));
         public static readonly DependencyProperty TextProperty = DependencyProperty.Register("Text", typeof(string), typeof(CodeWriter), new PropertyMetadata("", (d, e) => ((CodeWriter)d).OnTextChanged(d, e)));
         public static readonly DependencyProperty TabLengthProperty = DependencyProperty.Register("TabLength", typeof(int), typeof(CodeWriter), new PropertyMetadata(2, (d, e) => ((CodeWriter)d).OnTabLengthChanged(d, e)));
+        public static readonly DependencyProperty ShowLineNumbersProperty = DependencyProperty.Register("ShowLineNumbers", typeof(bool), typeof(CodeWriter), new PropertyMetadata(true, (d, e) => ((CodeWriter)d).Invalidate()));
+        public static readonly DependencyProperty ShowScrollbarMarkersProperty = DependencyProperty.Register("ShowScrollbarMarkers", typeof(bool), typeof(CodeWriter), new PropertyMetadata(true, (d, e) => ((CodeWriter)d).Invalidate()));
+        public static readonly DependencyProperty ShowLineMarkersProperty = DependencyProperty.Register("ShowLineMarkers", typeof(bool), typeof(CodeWriter), new PropertyMetadata(true, (d, e) => ((CodeWriter)d).Invalidate()));
+        public static readonly DependencyProperty IsFoldingEnabledProperty = DependencyProperty.Register("IsFoldingEnabled", typeof(bool), typeof(CodeWriter), new PropertyMetadata(true, (d, e) => ((CodeWriter)d).Invalidate()));
 
         private void OnTabLengthChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {
@@ -77,8 +83,6 @@ namespace CodeWriter_WinUI
             { Token.Array, Color.FromArgb(255, 200, 100, 80) },
         };
 
-        private ScrollBar HorizontalScroll;
-
         private int iCharOffset = 0;
 
         private bool invoked = false;
@@ -99,21 +103,25 @@ namespace CodeWriter_WinUI
 
         private int startFontsize = 16;
 
-        private ScrollBar VerticalScroll;
-
         private List<EditAction> EditActionHistory = new();
         private List<Place> CursorPlaceHistory = new();
 
         public CodeWriter()
         {
             InitializeComponent();
-            CharacterReceived += CodeWriter_CharacterReceived;
             Command_Copy = new RelayCommand(() => TextAction_Copy());
             Command_Paste = new RelayCommand(() => { TextAction_Paste(); });
             Command_Delete = new RelayCommand(() => TextAction_Delete());
             Command_Cut = new RelayCommand(() => TextAction_Delete(true));
             Command_SelectAll = new RelayCommand(() => TextAction_SelectText());
+            Command_Find = new RelayCommand(() => TextAction_Find());
             Invalidate();
+        }
+
+        private void TextAction_Find()
+        {
+            IsFindPopupOpen = true;
+            Tbx_Search.Focus( FocusState.Keyboard);
         }
 
         public void TextAction_SelectText(SelectionRange range = null)
@@ -138,6 +146,10 @@ namespace CodeWriter_WinUI
 
         public int CharWidth { get => Get(8); set { Set(value); } }
 
+        public bool IsFindPopupOpen { get => Get(false); set => Set(value); }
+        public bool IsMatchCase { get => Get(false); set => Set(value); }
+        public bool IsRegex { get => Get(false); set => Set(value); }
+
         public Color Color_WeakMarker { get => Get(Color.FromArgb(255, 40, 40, 40)); set => Set(value); }
         public Color Color_FoldingMarker { get => Get(Color.FromArgb(255, 140, 140, 140)); set => Set(value); }
         public Color Color_LeftBackground { get => Get(Color.FromArgb(255, 40, 40, 40)); set => Set(value); }
@@ -152,6 +164,8 @@ namespace CodeWriter_WinUI
         public ICommand Command_Delete { get; set; }
 
         public ICommand Command_SelectAll { get; set; }
+
+        public ICommand Command_Find { get; set; }
 
         public ICommand Command_Paste { get; set; }
 
@@ -169,11 +183,14 @@ namespace CodeWriter_WinUI
                 Set(value);
                 if (isCanvasLoaded)
                 {
-                    var width = Scroll.ActualWidth - Width_Left;
-                    if (value.iChar * CharWidth < HorizontalScroll.Value)
-                        HorizontalScroll.Value = value.iChar * CharWidth;
-                    else if ((value.iChar + 3) * CharWidth - width - HorizontalScroll.Value > 0)
-                        HorizontalScroll.Value = Math.Max((value.iChar + 3) * CharWidth - width, 0);
+                    if (!isLineSelect)
+                    {
+                        var width = Scroll.ActualWidth - Width_Left;
+                        if (value.iChar * CharWidth < HorizontalScroll.Value)
+                            HorizontalScroll.Value = value.iChar * CharWidth;
+                        else if ((value.iChar + 3) * CharWidth - width - HorizontalScroll.Value > 0)
+                            HorizontalScroll.Value = Math.Max((value.iChar + 3) * CharWidth - width, 0);
+                    }
 
                     if (value.iLine * CharHeight < VerticalScroll.Value)
                         VerticalScroll.Value = value.iLine * CharHeight;
@@ -186,6 +203,7 @@ namespace CodeWriter_WinUI
                 CursorPoint = new Point(x, y + CharHeight);
 
                 CanvasBeam.Invalidate();
+                CanvasScrollbarMarkers.Invalidate();
             }
         }
 
@@ -195,6 +213,30 @@ namespace CodeWriter_WinUI
         {
             get => (int)GetValue(FontSizeProperty);
             set { SetValue(FontSizeProperty, value); }
+        }
+
+        public bool ShowLineNumbers
+        {
+            get => (bool)GetValue(ShowLineNumbersProperty);
+            set { SetValue(ShowLineNumbersProperty, value); }
+        }
+
+        public bool ShowScrollbarMarkers
+        {
+            get => (bool)GetValue(ShowScrollbarMarkersProperty);
+            set { SetValue(ShowScrollbarMarkersProperty, value); }
+        }
+
+        public bool ShowLineMarkers
+        {
+            get => (bool)GetValue(ShowLineMarkersProperty);
+            set { SetValue(ShowLineMarkersProperty, value); }
+        }
+
+        public bool IsFoldingEnabled
+        {
+            get => (bool)GetValue(IsFoldingEnabledProperty);
+            set { SetValue(IsFoldingEnabledProperty, value); }
         }
 
         public int HorizontalOffset { get => Get(0); set { Set(value); } }
@@ -330,10 +372,10 @@ namespace CodeWriter_WinUI
         private bool isSelecting { get; set; } = false;
         private int SuggestionIndex { get => Get(0); set => Set(value); }
         private List<IntelliSense> Suggestions { get => Get(Commands); set => Set(value); }
-        private int Width_ErrorMarker { get => CharWidth / 2; }
-        private int Width_FoldingMarker { get => CharWidth; }
+        private int Width_ErrorMarker { get; set; } = 12;
+        private int Width_FoldingMarker { get; set; } = 24;
         private int Width_TextIndent { get => CharWidth/2; }
-        private int Width_WarningMarker { get => CharWidth / 2; }
+        private int Width_WarningMarker { get; set; } = 12;
 
         public Char this[Place place]
         {
@@ -558,36 +600,42 @@ namespace CodeWriter_WinUI
                         float y = CharHeight * (iLine - VisibleLines[0].LineNumber + 1);
                         float x = 0;
                         args.DrawingSession.FillRectangle(0, y, Width_Left - Width_TextIndent, CharHeight, Color_LeftBackground);
-                        args.DrawingSession.DrawText((iLine + 1).ToString(), CharWidth * IntLength(Lines.Count), y, Color_LineNumber, new CanvasTextFormat() { FontFamily = "Consolas", FontSize = FontSize, HorizontalAlignment = CanvasHorizontalAlignment.Right });
 
-                        if (Lines[iLine].IsFoldStart)
-                        {
-                            args.DrawingSession.DrawRectangle(foldPos, y + CharHeight / 4, CharWidth, CharWidth, ActualTheme == ElementTheme.Light ? Color_FoldingMarker.InvertColorBrightness() : Color_FoldingMarker, 2);
-                            args.DrawingSession.DrawLine(foldPos + CharWidth / 4, y + CharHeight / 2, foldPos + CharWidth * 3 / 4, y + CharHeight / 2, ActualTheme == ElementTheme.Light ? Color_FoldingMarker.InvertColorBrightness() : Color_FoldingMarker, 2);
-                        }
-                        else if (Lines[iLine].IsFoldInner)
-                        {
-                            args.DrawingSession.DrawLine(foldPos + CharWidth / 2, y, foldPos + CharWidth / 2, y + CharHeight, ActualTheme == ElementTheme.Light ? Color_FoldingMarker.InvertColorBrightness() : Color_FoldingMarker, 2);
-                        }
-                        else if (Lines[iLine].IsFoldInnerEnd)
-                        {
-                            args.DrawingSession.DrawLine(foldPos + CharWidth / 2, y, foldPos + CharWidth / 2, y + CharHeight, ActualTheme == ElementTheme.Light ? Color_FoldingMarker.InvertColorBrightness() : Color_FoldingMarker, 2);
-                            args.DrawingSession.DrawLine(foldPos + CharWidth / 2, y + CharHeight / 2, foldPos + CharWidth, y + CharHeight / 2, ActualTheme == ElementTheme.Light ? Color_FoldingMarker.InvertColorBrightness() : Color_FoldingMarker, 2);
-                        }
+                        if (ShowLineNumbers)
+                            args.DrawingSession.DrawText((iLine + 1).ToString(), CharWidth * IntLength(Lines.Count), y, Color_LineNumber, new CanvasTextFormat() { FontFamily = "Consolas", FontSize = FontSize, HorizontalAlignment = CanvasHorizontalAlignment.Right });
 
-                        if (Lines[iLine].IsError)
-                        {
-                            args.DrawingSession.FillRectangle(errorPos, y, Width_ErrorMarker, CharHeight, Color.FromArgb(255, 200, 40, 40));
-                        }
+                        if (IsFoldingEnabled)
+                            if (Lines[iLine].IsFoldStart)
+                            {
+                                args.DrawingSession.DrawRectangle(foldPos, y + CharHeight / 4, CharWidth, CharWidth, ActualTheme == ElementTheme.Light ? Color_FoldingMarker.InvertColorBrightness() : Color_FoldingMarker, 2);
+                                args.DrawingSession.DrawLine(foldPos + CharWidth / 4, y + CharHeight / 2, foldPos + CharWidth * 3 / 4, y + CharHeight / 2, ActualTheme == ElementTheme.Light ? Color_FoldingMarker.InvertColorBrightness() : Color_FoldingMarker, 2);
+                            }
+                            else if (Lines[iLine].IsFoldInner)
+                            {
+                                args.DrawingSession.DrawLine(foldPos + CharWidth / 2, y, foldPos + CharWidth / 2, y + CharHeight, ActualTheme == ElementTheme.Light ? Color_FoldingMarker.InvertColorBrightness() : Color_FoldingMarker, 2);
+                            }
+                            else if (Lines[iLine].IsFoldInnerEnd)
+                            {
+                                args.DrawingSession.DrawLine(foldPos + CharWidth / 2, y, foldPos + CharWidth / 2, y + CharHeight, ActualTheme == ElementTheme.Light ? Color_FoldingMarker.InvertColorBrightness() : Color_FoldingMarker, 2);
+                                args.DrawingSession.DrawLine(foldPos + CharWidth / 2, y + CharHeight / 2, foldPos + CharWidth, y + CharHeight / 2, ActualTheme == ElementTheme.Light ? Color_FoldingMarker.InvertColorBrightness() : Color_FoldingMarker, 2);
+                            }
 
-                        if (Lines[iLine].IsWarning)
+                        if (ShowLineMarkers)
                         {
-                            args.DrawingSession.FillRectangle(warningPos, y, Width_WarningMarker, CharHeight, Color.FromArgb(255, 180, 180, 40));
+                            if (Lines[iLine].IsError)
+                            {
+                                args.DrawingSession.FillRectangle(errorPos, y, Width_ErrorMarker, CharHeight, Color.FromArgb(255, 200, 40, 40));
+                            }
+
+                            if (Lines[iLine].IsWarning)
+                            {
+                                args.DrawingSession.FillRectangle(warningPos, y, Width_WarningMarker, CharHeight, Color.FromArgb(255, 180, 180, 40));
+                            }
                         }
 
                         int lastChar = Math.Min(iCharOffset + (int)(Scroll.ActualWidth / CharWidth), Lines[iLine].Count);
                         int indents = 0;
-                        
+
 
                         for (int iChar = 0; iChar < lastChar; iChar++)
                         {
@@ -598,31 +646,31 @@ namespace CodeWriter_WinUI
                                 x = Width_Left + CharWidth * (iChar + indents * (TabLength - 1) - iCharOffset);
                                 indents += 1;
                                 if (ShowControlCharacters)
-                                if (iChar >= iCharOffset - indents * (TabLength-1)) // Draw indent arrows
-                                {
-                                    CanvasPathBuilder pathBuilder = new CanvasPathBuilder(sender);
+                                    if (iChar >= iCharOffset - indents * (TabLength - 1)) // Draw indent arrows
+                                    {
+                                        CanvasPathBuilder pathBuilder = new CanvasPathBuilder(sender);
 
-                                    pathBuilder.BeginFigure(CharWidth * 0.2f, CharHeight / 2);
-                                    pathBuilder.AddLine(CharWidth * (TabLength - 0.2f), CharHeight / 2);
-                                    pathBuilder.EndFigure(CanvasFigureLoop.Open);
+                                        pathBuilder.BeginFigure(CharWidth * 0.2f, CharHeight / 2);
+                                        pathBuilder.AddLine(CharWidth * (TabLength - 0.2f), CharHeight / 2);
+                                        pathBuilder.EndFigure(CanvasFigureLoop.Open);
 
-                                    pathBuilder.BeginFigure(CharWidth * (TabLength - 0.5f), CharHeight * 1 / 4);
-                                    pathBuilder.AddLine(CharWidth * (TabLength - 0.2f), CharHeight / 2);
-                                    pathBuilder.AddLine(CharWidth * (TabLength - 0.5f), CharHeight * 3 / 4);
-                                    pathBuilder.EndFigure(CanvasFigureLoop.Open);
+                                        pathBuilder.BeginFigure(CharWidth * (TabLength - 0.5f), CharHeight * 1 / 4);
+                                        pathBuilder.AddLine(CharWidth * (TabLength - 0.2f), CharHeight / 2);
+                                        pathBuilder.AddLine(CharWidth * (TabLength - 0.5f), CharHeight * 3 / 4);
+                                        pathBuilder.EndFigure(CanvasFigureLoop.Open);
 
-                                    CanvasGeometry arrow = CanvasGeometry.CreatePath(pathBuilder);
+                                        CanvasGeometry arrow = CanvasGeometry.CreatePath(pathBuilder);
 
-                                    args.DrawingSession.DrawGeometry(arrow, x, y, ActualTheme == ElementTheme.Light ? Color_WeakMarker.InvertColorBrightness() : Color_WeakMarker, 2);
-                                }
+                                        args.DrawingSession.DrawGeometry(arrow, x, y, ActualTheme == ElementTheme.Light ? Color_WeakMarker.InvertColorBrightness() : Color_WeakMarker, 2);
+                                    }
                             }
-                            else if (iChar >= iCharOffset-indents*(TabLength-1))
+                            else if (iChar >= iCharOffset - indents * (TabLength - 1))
                             {
-                                x = Width_Left + CharWidth * (iChar + indents*(TabLength-1) - iCharOffset);
+                                x = Width_Left + CharWidth * (iChar + indents * (TabLength - 1) - iCharOffset);
                                 args.DrawingSession.DrawText(c.C.ToString(), x, y, ActualTheme == ElementTheme.Light ? Tokens[c.T].InvertColorBrightness() : Tokens[c.T], new CanvasTextFormat() { FontFamily = "Consolas", FontSize = FontSize });
                             }
                         }
-                        if (ShowControlCharacters && iLine < Lines.Count-1 && lastChar >= iCharOffset - indents * (TabLength - 1))
+                        if (ShowControlCharacters && iLine < Lines.Count - 1 && lastChar >= iCharOffset - indents * (TabLength - 1))
                         {
                             x = Width_Left + CharWidth * (lastChar + indents * (TabLength - 1) - iCharOffset);
                             CanvasPathBuilder enterpath = new CanvasPathBuilder(sender);
@@ -705,6 +753,7 @@ namespace CodeWriter_WinUI
             {
                 ErrorOccured?.Invoke(this, new ErrorEventArgs(ex));
             }
+            args.Handled = true;
         }
 
         private bool IsInsideBrackets(Place place)
@@ -774,6 +823,8 @@ namespace CodeWriter_WinUI
 
             if (VerticalScroll != null && HorizontalScroll != null && Lines != null)
             {
+                
+
                 VerticalScroll.Maximum = (Lines.Count + 2) * CharHeight - Scroll.ActualHeight;
                 VerticalScroll.SmallChange = CharHeight;
                 VerticalScroll.LargeChange = 3 * CharHeight;
@@ -788,6 +839,9 @@ namespace CodeWriter_WinUI
                 HorizontalScroll.SmallChange = CharWidth;
                 HorizontalScroll.LargeChange = 3 * CharWidth;
 
+                VerticalScroll.Visibility = Lines.Count * CharHeight > TextControl.ActualHeight ? Visibility.Visible : Visibility.Collapsed;
+                HorizontalScroll.Visibility = maxchars * CharHeight > TextControl.ActualWidth ? Visibility.Visible : Visibility.Collapsed;
+
                 int StartLine = (int)(VerticalScroll.Value / CharHeight) + 1;                
                 int EndLine = Math.Min((int)((VerticalScroll.Value + Scroll.ActualHeight) / CharHeight) + 1, Lines.Count);
                 VisibleLines.Clear();
@@ -799,7 +853,13 @@ namespace CodeWriter_WinUI
                     }
                 }
 
-                Width_LineNumber = CharWidth * IntLength(Lines.Count);
+
+                Width_LineNumber = ShowLineNumbers ? CharWidth * IntLength(Lines.Count) : 0;
+                Width_FoldingMarker = IsFoldingEnabled ? CharWidth : 0;
+                Width_ErrorMarker = ShowLineNumbers ? CharWidth/2 : 0;
+                Width_WarningMarker = ShowLineNumbers ? CharWidth / 2 : 0;
+
+
 
                 CanvasBeam.Invalidate();
                 CanvasSelection.Invalidate();
@@ -807,10 +867,6 @@ namespace CodeWriter_WinUI
             }
         }
 
-        private void HorizontalScroll_Loaded(object sender, RoutedEventArgs e)
-        {
-            HorizontalScroll = sender as ScrollBar;
-        }
 
         private void HorizontalScroll_ValueChanged(object sender, RangeBaseValueChangedEventArgs e)
         {
@@ -841,6 +897,7 @@ namespace CodeWriter_WinUI
             }
             if (isCanvasLoaded)
             {
+                
                 Invalidate();
                 Selection = new(new(0, 0));
             }
@@ -1013,6 +1070,7 @@ namespace CodeWriter_WinUI
                             Selection = new SelectionRange(newselect, newselect);
                             Invalidate();
                             TextChanged();
+                            e.Handled = true;
                             break;
 
                         case VirtualKey.Delete:
@@ -1320,7 +1378,10 @@ namespace CodeWriter_WinUI
                 Text = t;
                 if (Lines[CursorPlace.iLine].LineText.Length > maxchars)
                 {
-                    HorizontalScroll.Maximum = (Lines[CursorPlace.iLine].LineText.Length + 3) * CharWidth - Scroll.ActualWidth + Width_Left;
+                    maxchars = Lines[CursorPlace.iLine].LineText.Length;
+                    HorizontalScroll.Maximum = (maxchars + 3) * CharWidth - Scroll.ActualWidth + Width_Left;
+                    VerticalScroll.Visibility = Lines.Count * CharHeight > TextControl.ActualHeight ? Visibility.Visible : Visibility.Collapsed;
+                    HorizontalScroll.Visibility = maxchars * CharHeight > TextControl.ActualWidth ? Visibility.Visible : Visibility.Collapsed;
                 }
                 IsSettingValue = false;
             }
@@ -1349,6 +1410,10 @@ namespace CodeWriter_WinUI
                         Selection = new SelectionRange(Selection.Start, end);
                     }
                 }
+                else if (isMiddleClickScrolling)
+                {
+                    middleClickScrollingEndPoint = currentpoint.Position;
+                }
                 else
                 {
                     if (currentpoint.Position.X < Width_Left)
@@ -1362,10 +1427,14 @@ namespace CodeWriter_WinUI
                 }
             }
         }
+        private bool isMiddleClickScrolling { get => Get(false); set { Set(value);} }
+        private Point middleClickScrollingStartPoint = new Point();
+        private Point middleClickScrollingEndPoint = new Point();
 
         private void TextControl_PointerPressed(object sender, PointerRoutedEventArgs e)
         {
             IsSuggesting = false;
+            bool hasfocus =  TextControl.Focus( FocusState.Keyboard);
             ExpPointerPoint currentpoint = e.GetCurrentPoint(TextControl);
             try
             {
@@ -1422,6 +1491,7 @@ namespace CodeWriter_WinUI
                             Place end = new(Lines[start.iLine].Count, start.iLine);
                             Selection = new(start, end);
                         }
+                        isMiddleClickScrolling = false;
                     }
 
                     else if (currentpoint.Properties.IsRightButtonPressed)
@@ -1440,7 +1510,6 @@ namespace CodeWriter_WinUI
                             start = new(Selection.End);
                             end = new(Selection.Start);
                         }
-
                         if (IsSelection)
                         {
                             if (rightpress <= start || rightpress >= end)
@@ -1448,6 +1517,7 @@ namespace CodeWriter_WinUI
                                 Selection = new SelectionRange(rightpress);
                             }
                         }
+                        isMiddleClickScrolling = false;
                     }
 
                     else if (currentpoint.Properties.IsXButton1Pressed)
@@ -1461,6 +1531,60 @@ namespace CodeWriter_WinUI
 
                     else if (currentpoint.Properties.IsMiddleButtonPressed)
                     {
+                        if (!isMiddleClickScrolling)
+                        {
+                            if (VerticalScroll.Maximum > Scroll.ActualHeight && HorizontalScroll.Maximum > Scroll.ActualHeight)
+                            {
+                                isMiddleClickScrolling = true;
+                                Cursor = new CoreCursor(CoreCursorType.SizeAll, 1);
+                                middleClickScrollingStartPoint = currentpoint.Position;
+                                DispatcherTimer Timer = new DispatcherTimer() { Interval = TimeSpan.FromMilliseconds(100) };
+                                Timer.Tick += (a, b) =>
+                                {
+                                    if (!isMiddleClickScrolling)
+                                    {
+                                        ((DispatcherTimer)a).Stop();
+                                    }
+                                    VerticalScroll.Value += middleClickScrollingEndPoint.Y - middleClickScrollingStartPoint.Y;
+                                    HorizontalScroll.Value += middleClickScrollingEndPoint.X - middleClickScrollingStartPoint.X;
+                                };
+                                Timer.Start();
+                            }
+                            else if (VerticalScroll.Maximum > Scroll.ActualHeight)
+                            {
+                                isMiddleClickScrolling = true;
+                                Cursor = new CoreCursor(CoreCursorType.SizeNorthSouth, 1);
+                                middleClickScrollingStartPoint = currentpoint.Position;
+                                DispatcherTimer Timer = new DispatcherTimer() { Interval = TimeSpan.FromMilliseconds(100) };
+                                Timer.Tick += (a, b) =>
+                                {
+                                    if (!isMiddleClickScrolling)
+                                    {
+                                        ((DispatcherTimer)a).Stop();
+                                    }
+                                    VerticalScroll.Value += middleClickScrollingEndPoint.Y - middleClickScrollingStartPoint.Y;
+                                };
+                                Timer.Start();
+                            }
+                            else if (HorizontalScroll.Maximum > Scroll.ActualWidth)
+                            {
+                                isMiddleClickScrolling = true;
+                                Cursor = new CoreCursor( CoreCursorType.SizeWestEast,1);
+                                middleClickScrollingStartPoint = currentpoint.Position;
+                                DispatcherTimer Timer = new DispatcherTimer() { Interval = TimeSpan.FromMilliseconds(100) };
+                                Timer.Tick += (a, b) =>
+                                {
+                                    if (!isMiddleClickScrolling)
+                                    {
+                                        ((DispatcherTimer)a).Stop();
+                                    }
+                                    HorizontalScroll.Value += middleClickScrollingEndPoint.X - middleClickScrollingStartPoint.X;
+                                };
+                                Timer.Start();
+                            }
+                            
+                        }
+                        else isMiddleClickScrolling = false;
                     }
                 }
             }
@@ -1468,6 +1592,7 @@ namespace CodeWriter_WinUI
             {
                 ErrorOccured?.Invoke(this, new ErrorEventArgs(ex));
             }
+            e.Handled = true;
         }
 
         private void TextControl_PointerReleased(object sender, PointerRoutedEventArgs e)
@@ -1477,11 +1602,6 @@ namespace CodeWriter_WinUI
             isLineSelect = false;
         }
 
-        private void VerticalScroll_Loaded(object sender, RoutedEventArgs e)
-        {
-            Debug.WriteLine("VerticalScroll_Loaded");
-            VerticalScroll = sender as ScrollBar;
-        }
 
         private void VerticalScroll_PointerEntered(object sender, PointerRoutedEventArgs e)
         {
@@ -1500,6 +1620,105 @@ namespace CodeWriter_WinUI
                 return;
             }
             Invalidate();
+        }
+
+        List<SearchMatch> SearchMatches { get => Get(new List<SearchMatch>()); set { Set(value); CanvasScrollbarMarkers.Invalidate(); } }
+        private void Tbx_SearchChanged(object sender, TextChangedEventArgs e)
+        {
+            string text = (sender as TextBox).Text;
+            if (text == "")
+            {
+                SearchMatches.Clear();
+                CanvasScrollbarMarkers.Invalidate();
+                return;
+            }
+
+            SearchMatches.Clear();
+            for  (int iLine = 0; iLine < Lines.Count; iLine++)
+            {
+                if (IsRegex)
+                {
+                    bool isValidRegex = true;
+                    MatchCollection coll = null;
+                    try
+                    {
+                        coll = Regex.Matches(Lines[iLine].LineText, text, IsMatchCase ? RegexOptions.None : RegexOptions.IgnoreCase);
+                    }
+                    catch
+                    {
+                        isValidRegex = false;
+                    }
+                    if (isValidRegex && coll != null)
+                    {
+                        foreach (Match m in coll)
+                            SearchMatches.Add(new() { Match = m.Value, iChar = m.Index, iLine = iLine });
+                    }
+                }
+                else
+                {
+                    int nextindex = 0;
+
+                    while (nextindex != -1)
+                    {
+                        nextindex = Lines[iLine].LineText.IndexOf(text, nextindex, IsMatchCase ? StringComparison.CurrentCulture : StringComparison.CurrentCultureIgnoreCase);
+                        if (nextindex != -1)
+                        {
+                            SearchMatches.Add(new() { Match = text, iChar = nextindex, iLine = iLine  });
+                            nextindex++;
+                        }
+                    }
+                }
+            }
+            if (SearchMatches.Count > 0)
+            {
+                Selection = new SelectionRange(new(SearchMatches[0].iChar, SearchMatches[0].iLine));
+                CanvasScrollbarMarkers.Invalidate();
+            }
+        }
+
+        public class SearchMatch
+        {
+            public string Match { get; set; }
+            public int iChar { get; set; }
+            public int iLine { get; set; }
+        }
+
+        private void NormalArrowPointerEntered(object sender, PointerRoutedEventArgs e)
+        {
+            Cursor = new CoreCursor( CoreCursorType.Arrow,1);
+        }
+
+        private float scrollbarSize { get => (float)Application.Current.Resources["ScrollBarSize"]; }
+
+        private void Btn_SearchClose(object sender, RoutedEventArgs e)
+        {
+            IsFindPopupOpen = false;
+        }
+
+        private void CanvasScrollbarMarkers_Draw(CanvasControl sender, CanvasDrawEventArgs args)
+        {
+            if (ShowScrollbarMarkers)
+            {
+                float width = (float)VerticalScroll.ActualWidth;
+                float height = (float)CanvasScrollbarMarkers.ActualHeight;
+
+                foreach (SearchMatch search in SearchMatches)
+                    args.DrawingSession.FillRectangle(width / 4f, (search.iLine) / (float)Lines.Count * height, width / 2f, 1f, Colors.Green);
+
+                float cursorY = (CursorPlace.iLine) / (float)Lines.Count * height;
+                args.DrawingSession.DrawLine(0, cursorY, width, cursorY, Color_Beam, 1f);
+            }
+        }
+
+        int searchindex = 0;
+        private void Btn_SearchNext(object sender, RoutedEventArgs e)
+        {
+            searchindex++;
+            if (searchindex < SearchMatches.Count)
+            {
+                SearchMatch sm = SearchMatches[searchindex];
+                Selection = new(new(sm.iChar, sm.iLine));
+            }
         }
     }
 }

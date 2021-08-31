@@ -1,11 +1,13 @@
 ﻿using Microsoft.UI;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Data;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Globalization;
 using System.Linq;
 using System.Numerics;
 using System.Runtime.CompilerServices;
@@ -598,6 +600,20 @@ namespace CodeWriter_WinUI
     {
         Remove, Add,
     }
+    
 
+    public class WidthToThickness : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, string culture)
+        {
+            double offset = (double)value;
+            return new Thickness(0,offset,0,offset);
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, string culture)
+        {
+            return 0;
+        }
+    }
 
 }

@@ -37,13 +37,18 @@
                         <StackPanel>
                             <Slider Width="150" Header="Font Size"  Value="{Binding FontSize, Mode=TwoWay}" Minimum="6" Maximum="64"/>
                             <Slider Width="150" Header="Tab Length"  Value="{Binding TabLength, Mode=TwoWay}" Minimum="0" Maximum="5"/>
-                            <CheckBox  Content="Show tab/newline markers" IsChecked="{Binding ShowMarkers, Mode=TwoWay}" />
+
+                            <CheckBox Content="Enable code folding" IsChecked="{Binding IsFoldingEnabled, Mode=TwoWay}" />
+                            <CheckBox Content="Show line numbers" IsChecked="{Binding ShowLineNumbers, Mode=TwoWay}" />
+                            <CheckBox Content="Show tab/newline markers" IsChecked="{Binding ShowControlCharacters, Mode=TwoWay}" />
+                            <CheckBox Content="Show warning/error markers" IsChecked="{Binding ShowLineMarkers, Mode=TwoWay}" />
+                            <CheckBox Content="Show scrollbar markers" IsChecked="{Binding ShowScrollbarMarkers, Mode=TwoWay}" />
                         </StackPanel>
                     </Flyout>
                 </Button.Flyout>
             </Button>
         </StackPanel>
-        <codewriter:CodeWriter x:Name="CW" Grid.Row="1" Text="{Binding Text, Mode=TwoWay}" ErrorOccured="CW_ErrorOccured" FontSize="{Binding FontSize, Mode=TwoWay}" TabLength="{Binding TabLength}" RequestedTheme="{Binding RequestedTheme}" ShowControlCharacters="{Binding ShowMarkers}" />
+        <codewriter:CodeWriter x:Name="CW" Grid.Row="1" Text="{Binding Text, Mode=TwoWay}" ErrorOccured="CW_ErrorOccured" FontSize="{Binding FontSize, Mode=TwoWay}" TabLength="{Binding TabLength}" RequestedTheme="{Binding RequestedTheme}" ShowControlCharacters="{Binding ShowControlCharacters}" ShowLineNumbers="{Binding ShowLineNumbers}" ShowLineMarkers="{Binding ShowLineMarkers}" IsFoldingEnabled="{Binding IsFoldingEnabled}" ShowScrollbarMarkers="{Binding ShowScrollbarMarkers}" />
         <Grid Grid.Row="2">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"  />
