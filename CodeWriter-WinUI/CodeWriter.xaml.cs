@@ -19,13 +19,11 @@ using System.Linq;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
-using System.Threading;
 using System.Windows.Input;
 using Windows.ApplicationModel.DataTransfer;
 using Windows.Devices.Input;
 using Windows.Foundation;
 using Windows.System;
-using Windows.System.Threading;
 using Windows.UI;
 using Windows.UI.Core;
 
@@ -72,8 +70,8 @@ namespace CodeWriter_WinUI
         {
             { Token.Normal, Color.FromArgb(255, 220, 220, 220) },
             { Token.Command, Color.FromArgb(255, 50, 130, 210) },
-            { Token.Environment, Color.FromArgb(255, 40, 180, 140) },
-            { Token.Comment, Color.FromArgb(255, 40, 180, 80) },
+            { Token.Environment, Color.FromArgb(255, 50, 190, 150) },
+            { Token.Comment, Color.FromArgb(255, 40, 190, 90) },
             { Token.Key, Color.FromArgb(255, 150, 120, 200) },
             { Token.Bracket, Color.FromArgb(255, 80, 40, 180) },
             { Token.Reference, Color.FromArgb(255, 180, 120, 40) },
@@ -148,9 +146,9 @@ namespace CodeWriter_WinUI
 
         public int CharWidth { get => Get(8); set { Set(value); } }
 
-        public bool IsFindPopupOpen { get => Get(false); set => Set(value); }
-        public bool IsMatchCase { get => Get(false); set => Set(value); }
-        public bool IsRegex { get => Get(false); set => Set(value); }
+        public bool IsFindPopupOpen { get => Get(false); set { Set(value); if (!value) { Tbx_Search.Text = ""; } } }
+        public bool IsMatchCase { get => Get(false); set { Set(value); Tbx_SearchChanged(null,null); } }
+        public bool IsRegex { get => Get(false); set { Set(value); Tbx_SearchChanged(null, null); } }
 
         public Color Color_WeakMarker { get => Get(Color.FromArgb(255, 40, 40, 40)); set => Set(value); }
         public Color Color_FoldingMarker { get => Get(Color.FromArgb(255, 140, 140, 140)); set => Set(value); }
@@ -485,7 +483,7 @@ namespace CodeWriter_WinUI
             }
         }
 
-        private void DrawSelection(CanvasDrawingSession session, int Line, int StartChar, int EndChar )
+        private void DrawSelection(CanvasDrawingSession session, int Line, int StartChar, int EndChar,  SelectionType selectionType = SelectionType.Selection )
         {
             int xtaboffset = 0;
             for (int i = 0; i < EndChar; i++)
@@ -501,10 +499,10 @@ namespace CodeWriter_WinUI
                     if (i < Lines[Line].Count - 1 && Lines[Line][i].C == '\t')
                     {
                         xtaboffset += CharWidth * (TabLength - 1);
-                        DrawSelectionCell(session, x, y, TabLength);
+                        DrawSelectionCell(session, x, y, selectionType, TabLength);
                     }
                     else
-                        DrawSelectionCell(session, x, y);
+                        DrawSelectionCell(session, x, y, selectionType);
                 }
             }
         }
@@ -515,44 +513,51 @@ namespace CodeWriter_WinUI
             {
                 if (VisibleLines.Count > 0)
                 {
-                    int x = 0;
-                    int y = 0;
-                    Place start = new Place();
-                    Place end = new Place();
-
-                    if (Selection.Start < Selection.End)
+                    if (IsSelection)
                     {
-                        start = new(Selection.Start);
-                        end = new(Selection.End);
+                        Place start = new Place();
+                        Place end = new Place();
+
+                        if (Selection.Start < Selection.End)
+                        {
+                            start = new(Selection.Start);
+                            end = new(Selection.End);
+                        }
+                        else
+                        {
+                            start = new(Selection.End);
+                            end = new(Selection.Start);
+                        }
+
+                        if (start.iLine < VisibleLines[0].LineNumber - 1)
+                        {
+                            start.iLine = VisibleLines[0].LineNumber - 1;
+                            start.iChar = 0;
+                        }
+
+                        if (end.iLine > VisibleLines.Last().LineNumber - 1)
+                        {
+                            end.iLine = VisibleLines.Last().LineNumber - 1;
+                            end.iChar = VisibleLines.Last().Count;
+                        }
+
+                        for (int lp = start.iLine; lp <= end.iLine; lp++)
+                            if (lp >= VisibleLines[0].LineNumber - 1 && lp <= VisibleLines.Last().LineNumber - 1)
+                                if (start.iLine == end.iLine)
+                                    DrawSelection(args.DrawingSession, start.iLine, start.iChar, end.iChar);
+                                else if (lp == start.iLine)
+                                    DrawSelection(args.DrawingSession, lp, start.iChar, Lines[lp].Count + 1);
+                                else if (lp > start.iLine && lp < end.iLine)
+                                    DrawSelection(args.DrawingSession, lp, 0, Lines[lp].Count + 1);
+                                else if (lp == end.iLine)
+                                    DrawSelection(args.DrawingSession, lp, 0, end.iChar);
                     }
-                    else
+                    
+                    foreach(SearchMatch match in SearchMatches)
                     {
-                        start = new(Selection.End);
-                        end = new(Selection.Start);
+                        if (match.iLine >= VisibleLines[0].LineNumber - 1 && match.iLine <= VisibleLines.Last().LineNumber - 1)
+                            DrawSelection(args.DrawingSession, match.iLine, match.iChar, match.iChar + match.Match.Length, SelectionType.SearchMatch);
                     }
-
-                    if (start.iLine < VisibleLines[0].LineNumber - 1)
-                    {
-                        start.iLine = VisibleLines[0].LineNumber - 1;
-                        start.iChar = 0;
-                    }
-
-                    if (end.iLine > VisibleLines.Last().LineNumber - 1)
-                    {
-                        end.iLine = VisibleLines.Last().LineNumber - 1;
-                        end.iChar = VisibleLines.Last().Count;
-                    }
-
-                    for (int lp = start.iLine; lp <= end.iLine; lp++)
-                        if (start.iLine == end.iLine)
-                            DrawSelection(args.DrawingSession, start.iLine, start.iChar, end.iChar);
-                        else if (lp == start.iLine)
-                            DrawSelection(args.DrawingSession, lp, start.iChar, Lines[lp].Count + 1);
-                        else if (lp > start.iLine && lp < end.iLine)
-                            DrawSelection(args.DrawingSession, lp, 0, Lines[lp].Count + 1);
-                        else if (lp == end.iLine)
-                            DrawSelection(args.DrawingSession, lp, 0, end.iChar);
-
                 }
             }
             catch (Exception ex)
@@ -586,6 +591,12 @@ namespace CodeWriter_WinUI
             {
                 ErrorOccured?.Invoke(this, new ErrorEventArgs(ex));
             }
+        }
+
+        public void Save()
+        {
+            Lines.ForEach(x => x.IsUnsaved = false);
+            CanvasText.Invalidate();
         }
 
         private void CanvasText_Draw(CanvasControl sender, CanvasDrawEventArgs args)
@@ -622,16 +633,22 @@ namespace CodeWriter_WinUI
                                 args.DrawingSession.DrawLine(foldPos + CharWidth / 2, y + CharHeight / 2, foldPos + CharWidth, y + CharHeight / 2, ActualTheme == ElementTheme.Light ? Color_FoldingMarker.InvertColorBrightness() : Color_FoldingMarker, 2);
                             }
 
-                        if (ShowLineMarkers && SyntaxErrors.Any(x=>x.iLine == iLine))
+                        if (ShowLineMarkers)
                         {
-                            SyntaxError lineError = SyntaxErrors.First(x => x.iLine == iLine);
-                            if (lineError.SyntaxErrorType == SyntaxErrorType.Error)
+                            if (Lines[iLine].IsUnsaved)
+                                args.DrawingSession.FillRectangle(warningPos, y, Width_ErrorMarker, CharHeight, Color.FromArgb(255, 120, 180, 230));
+
+                            if (SyntaxErrors.Any(x => x.iLine == iLine))
                             {
-                                args.DrawingSession.FillRectangle(errorPos, y, Width_ErrorMarker, CharHeight, Color.FromArgb(255, 200, 40, 40));
-                            }
-                            if (lineError.SyntaxErrorType == SyntaxErrorType.Warning)
-                            {
-                                args.DrawingSession.FillRectangle(warningPos, y, Width_WarningMarker, CharHeight, Color.FromArgb(255, 180, 180, 40));
+                                SyntaxError lineError = SyntaxErrors.First(x => x.iLine == iLine);
+                                if (lineError.SyntaxErrorType == SyntaxErrorType.Error)
+                                {
+                                    args.DrawingSession.FillRectangle(errorPos, y, Width_ErrorMarker, CharHeight, Color.FromArgb(255, 200, 40, 40));
+                                }
+                                if (lineError.SyntaxErrorType == SyntaxErrorType.Warning)
+                                {
+                                    args.DrawingSession.FillRectangle(warningPos, y, Width_WarningMarker, CharHeight, Color.FromArgb(255, 180, 180, 40));
+                                }
                             }
                         }
 
@@ -800,9 +817,18 @@ namespace CodeWriter_WinUI
             return closePos;
         }
 
-        private void DrawSelectionCell(CanvasDrawingSession session, int x, int y, int w = 1)
+        private void DrawSelectionCell(CanvasDrawingSession session, int x, int y, SelectionType selectionType, int w = 1)
         {
-            session.FillRectangle(x, y, CharWidth*w, CharHeight, ActualTheme == ElementTheme.Light ? Color_Selection.InvertColorBrightness() : Color_Selection);
+            Color color = Color_Selection;
+            if (selectionType == SelectionType.SearchMatch)
+            {
+                color = Color.FromArgb(255,60,60,60);
+            }
+            else if (selectionType == SelectionType.WordLight)
+            {
+                color = Colors.DeepSkyBlue;
+            }
+            session.FillRectangle(x, y, CharWidth*w+1, CharHeight+1, ActualTheme == ElementTheme.Light ? color.InvertColorBrightness() : color);
         }
 
         public int CurrentLine = 0;
@@ -867,6 +893,7 @@ namespace CodeWriter_WinUI
                 CanvasBeam.Invalidate();
                 CanvasSelection.Invalidate();
                 CanvasText.Invalidate();
+                CanvasScrollbarMarkers.Invalidate();
             }
         }
 
@@ -1187,6 +1214,8 @@ namespace CodeWriter_WinUI
                                 newplace.iChar = Lines[CursorPlace.iLine].Count;
                                 Selection = new(newplace);
                             }
+                            else if (IsSelection)
+                                Selection = new(Selection.VisualStart);
                             break;
 
                         case VirtualKey.Right:
@@ -1204,6 +1233,8 @@ namespace CodeWriter_WinUI
                                 newplace.iChar = 0;
                                 Selection = new(newplace);
                             }
+                            else if (IsSelection)
+                                Selection = new(Selection.VisualEnd);
                             break;
                     }
                 }
@@ -1432,12 +1463,36 @@ namespace CodeWriter_WinUI
                 {
                     if (currentpoint.Position.X < Width_Left)
                     {
-                        Cursor = new CoreCursor(CoreCursorType.Hand, 1);
+                        Cursor = new CoreCursor(CoreCursorType.Arrow, 1);
+                    }
+                    else if (IsSelection)
+                    {
+                        Place rightpress = PointerToPlace(currentpoint.Position);
+
+                        Place start;
+                        Place end;
+                        if (Selection.Start < Selection.End)
+                        {
+                            start = new(Selection.Start);
+                            end = new(Selection.End);
+                        }
+                        else
+                        {
+                            start = new(Selection.End);
+                            end = new(Selection.Start);
+                        }
+                        if (IsSelection)
+                        {
+                            if (rightpress <= start || rightpress >= end)
+                            {
+                                Cursor = new CoreCursor(CoreCursorType.IBeam, 1);
+                            }
+                            else
+                                Cursor = new CoreCursor(CoreCursorType.Arrow, 1);
+                        }
                     }
                     else
-                    {
                         Cursor = new CoreCursor(CoreCursorType.IBeam, 1);
-                    }
                 }
             }
         }
@@ -1531,6 +1586,8 @@ namespace CodeWriter_WinUI
                                 Selection = new SelectionRange(rightpress);
                             }
                         }
+                        else
+                            Selection = new SelectionRange(rightpress);
                         isMiddleClickScrolling = false;
                     }
 
@@ -1640,11 +1697,13 @@ namespace CodeWriter_WinUI
         public List<SearchMatch> SearchMatches { get => Get(new List<SearchMatch>()); set { Set(value); CanvasScrollbarMarkers.Invalidate(); } }
         private void Tbx_SearchChanged(object sender, TextChangedEventArgs e)
         {
-            string text = (sender as TextBox).Text;
+            searchindex = 0;
+            string text = Tbx_Search.Text;
             if (text == "")
             {
                 SearchMatches.Clear();
                 CanvasScrollbarMarkers.Invalidate();
+                CanvasSelection.Invalidate();
                 return;
             }
 
@@ -1687,8 +1746,9 @@ namespace CodeWriter_WinUI
             if (SearchMatches.Count > 0)
             {
                 Selection = new SelectionRange(new(SearchMatches[0].iChar, SearchMatches[0].iLine));
-                CanvasScrollbarMarkers.Invalidate();
             }
+            CanvasScrollbarMarkers.Invalidate();
+            CanvasSelection.Invalidate();
         }
 
         public class SearchMatch
@@ -1718,22 +1778,22 @@ namespace CodeWriter_WinUI
                 float height = (float)CanvasScrollbarMarkers.ActualHeight;
 
                 foreach (SearchMatch search in SearchMatches)
-                    args.DrawingSession.DrawLine(width / 3f, search.iLine / (float)Lines.Count * height, width * 2/3f, search.iLine / (float)Lines.Count * height, Colors.Gray, 4f);
+                    args.DrawingSession.DrawLine(width / 3f, search.iLine / (float)Lines.Count * height, width * 2/3f, search.iLine / (float)Lines.Count * height, ActualTheme == ElementTheme.Light ? Colors.LightGray.ChangeColorBrightness(-0.3f) : Colors.LightGray, 4f);
 
                 foreach (SyntaxError error in SyntaxErrors)
                 {
                     if (error.SyntaxErrorType == SyntaxErrorType.Error)
                     {
-                        args.DrawingSession.DrawLine(width * 2/3f, error.iLine / (float)Lines.Count * height, width , error.iLine / (float)Lines.Count * height, Colors.Red, 4f);
+                        args.DrawingSession.DrawLine(width * 2/3f, error.iLine / (float)Lines.Count * height, width , error.iLine / (float)Lines.Count * height, ActualTheme == ElementTheme.Light ? Colors.Red.ChangeColorBrightness(-0.2f) : Colors.Red, 4f);
                     }
                     else if (error.SyntaxErrorType == SyntaxErrorType.Warning)
                     {
-                        args.DrawingSession.DrawLine(width * 2 / 3f, error.iLine / (float)Lines.Count * height, width , error.iLine / (float)Lines.Count * height, Colors.LightGoldenrodYellow, 4f);
+                        args.DrawingSession.DrawLine(width * 2 / 3f, error.iLine / (float)Lines.Count * height, width , error.iLine / (float)Lines.Count * height, ActualTheme == ElementTheme.Light ? Colors.Yellow.ChangeColorBrightness(-0.2f) : Colors.Yellow, 4f);
                     }
                 }
 
                 float cursorY = CursorPlace.iLine / (float)Lines.Count * height;
-                args.DrawingSession.DrawLine(0, cursorY, width, cursorY, Color_Beam, 2f);
+                args.DrawingSession.DrawLine(0, cursorY, width, cursorY, ActualTheme == ElementTheme.Light ? Color_Beam.InvertColorBrightness() : Color_Beam, 2f);
             }
         }
 
@@ -1741,10 +1801,30 @@ namespace CodeWriter_WinUI
         private void Btn_SearchNext(object sender, RoutedEventArgs e)
         {
             searchindex++;
-            if (searchindex < SearchMatches.Count)
+            if (searchindex >= SearchMatches.Count)
+            {
+                searchindex = 0;
+            }
+
+            if (SearchMatches.Count > 0)
             {
                 SearchMatch sm = SearchMatches[searchindex];
                 Selection = new(new(sm.iChar, sm.iLine));
+            }
+
+        }
+
+        private void TextControl_DragStarting(UIElement sender, DragStartingEventArgs args)
+        {
+            Debug.WriteLine(args.Data.Properties.Count);
+        }
+
+        private void Tbx_Search_KeyDown(object sender, KeyRoutedEventArgs e)
+        {
+            if (e.Key == VirtualKey.Enter)
+            {
+                Btn_SearchNext(null,null);
+                e.Handled = true;
             }
         }
     }

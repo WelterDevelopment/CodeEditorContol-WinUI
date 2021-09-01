@@ -7,6 +7,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.ComponentModel.DataAnnotations;
 using System.Globalization;
 using System.Linq;
 using System.Numerics;
@@ -106,6 +107,7 @@ namespace CodeWriter_WinUI
 
         public static Color InvertColorBrightness(this Color color)
         {
+            // ToDo: Come up with some fancy way of producing perfect colors for the light theme
             float red = color.R;
             float green = color.G;
             float blue = color.B;
@@ -113,8 +115,8 @@ namespace CodeWriter_WinUI
             float lumi = (0.33f * red) + (0.33f * green) + (0.33f * blue);
 
             red = 255 - lumi + 0.6f * (red - lumi);
-            green = 255 - lumi + 0.3f * (green - lumi);
-            blue = 255 - lumi + 0.5f * (blue - lumi);
+            green = 255 - lumi + 0.35f * (green - lumi);
+            blue = 255 - lumi + 0.4f * (blue - lumi);
 
             return Color.FromArgb(color.A, (byte)red, (byte)green, (byte)blue);
         }
@@ -181,18 +183,29 @@ namespace CodeWriter_WinUI
         public Folding Folding { get => Get(new Folding()); set => Set(value); }
         public string FoldingEndMarker { get; set; }
         public string FoldingStartMarker { get; set; }
-        public bool IsChanged { get; set; }
+        public bool IsUnsaved { get => Get(false); set { Set(value); if (!value) lastsavedtext = LineText; } }
         public bool IsFoldEnd { get => Get(false); set => Set(value); }
         public bool IsFoldInner { get => Get(false); set => Set(value); }
         public bool IsFoldInnerEnd { get => Get(false); set => Set(value); }
         public bool IsFoldStart { get => Get(false); set => Set(value); }
         public int LineNumber { get => Get(0); set => Set(value); }
-
+        string lastsavedtext = "";
+        private bool initialized = false;
+       
         public string LineText
         {
             get => Get("");
             set
             {
+                if (!initialized)
+                {
+                    initialized = true;
+                }
+                else
+                {
+                    IsUnsaved = value != lastsavedtext;
+                }
+                
                 Set(value);
                 Chars = FormattedText(value);
                 IsFoldStart = FoldableStart(value);
@@ -461,6 +474,9 @@ namespace CodeWriter_WinUI
 
         public Place End { get => Get(new Place()); set => Set(value); }
         public Place Start { get => Get(new Place()); set => Set(value); }
+
+        public Place VisualEnd { get => End > Start ? End : Start; }
+        public Place VisualStart { get => End > Start ? End : Start; }
     }
 
     public class RelayCommand : ICommand
@@ -495,6 +511,11 @@ namespace CodeWriter_WinUI
         {
             CanExecuteChanged?.Invoke(this, EventArgs.Empty);
         }
+    }
+
+    public enum SelectionType
+    {
+        Selection, SearchMatch, WordLight
     }
 
     public enum Token

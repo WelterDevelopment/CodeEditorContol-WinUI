@@ -3,6 +3,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.IO;
 using System.Linq;
 
@@ -20,6 +21,7 @@ namespace CodeWriter_WinUI_TestApp
         private  void Btn_Load_Click(object sender, RoutedEventArgs e)
         {
             VM.Text = VM.LastSavedText = File.ReadAllText(Path.Combine(Windows.ApplicationModel.Package.Current.InstalledLocation.Path, "ExampleText.tex"));
+            CW.Save();
             Btn_Save.Visibility = Visibility.Visible;
             Btn_Load.Content = "Reload Textfile";
         }
@@ -28,6 +30,7 @@ namespace CodeWriter_WinUI_TestApp
         {
             File.WriteAllText(Path.Combine(Windows.ApplicationModel.Package.Current.InstalledLocation.Path, "ExampleText.tex"),VM.Text);
             VM.LastSavedText = VM.Text;
+            CW.Save();
         }
 
         private void CW_ErrorOccured(object sender, ErrorEventArgs e)
@@ -48,7 +51,7 @@ namespace CodeWriter_WinUI_TestApp
             CW.Action_Add(item);
         }
 
-        private void CW_TextChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
+        private void CW_TextChanged(object sender, PropertyChangedEventArgs e)
         {
             // Search for syntax errors and other stuff you want to inform the user about
             List<SyntaxError> errors = new();

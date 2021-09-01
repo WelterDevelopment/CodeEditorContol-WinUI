@@ -32,7 +32,7 @@
 
         <Grid Grid.Column="0" x:Name="ScrollContent"   ManipulationMode="TranslateX,TranslateY,TranslateInertia,Scale" ManipulationStarted="ScrollContent_ManipulationStarted"  ManipulationDelta="ScrollContent_ManipulationDelta"  Background="{x:Bind Background}" >
 
-            <Grid x:Name="TextControl"  KeyDown="Scroll_KeyDown" KeyUp="Scroll_KeyUp"  PointerMoved="TextControl_PointerMoved" PointerPressed="TextControl_PointerPressed" PointerReleased="TextControl_PointerReleased" PointerCaptureLost="TextControl_PointerReleased" PointerCanceled="TextControl_PointerReleased" PointerExited="TextControl_PointerReleased">
+            <Grid x:Name="TextControl"  KeyDown="Scroll_KeyDown" KeyUp="Scroll_KeyUp" AllowDrop="True" CanDrag="True" DragStarting="TextControl_DragStarting" PointerMoved="TextControl_PointerMoved" PointerPressed="TextControl_PointerPressed" PointerReleased="TextControl_PointerReleased" PointerCaptureLost="TextControl_PointerReleased" PointerCanceled="TextControl_PointerReleased" PointerExited="TextControl_PointerReleased">
                 <Grid.ContextFlyout>
                     <MenuFlyout x:Name="ContextMenu" >
                         <MenuFlyoutItem Text="Copy" Command="{x:Bind Command_Copy}" IsEnabled="{x:Bind IsSelection}" >
@@ -137,7 +137,7 @@
                                 </Button.Content>
                             </Button>
                             
-                            <TextBox Grid.Row="1" x:Name="Tbx_Search" HorizontalAlignment="Stretch" PlaceholderText="Find..." TextChanged="Tbx_SearchChanged"></TextBox>
+                            <TextBox Grid.Row="1" x:Name="Tbx_Search" KeyDown="Tbx_Search_KeyDown" HorizontalAlignment="Stretch" PlaceholderText="Find..." TextChanged="Tbx_SearchChanged"></TextBox>
                             <Button Grid.Row="1" Grid.Column="1" ToolTipService.ToolTip="Find next" Padding="4" Click="Btn_SearchNext">
                                 <SymbolIcon Symbol="Forward"></SymbolIcon>
                             </Button>
