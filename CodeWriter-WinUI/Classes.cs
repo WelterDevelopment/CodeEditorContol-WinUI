@@ -189,22 +189,17 @@ namespace CodeWriter_WinUI
         public bool IsFoldInnerEnd { get => Get(false); set => Set(value); }
         public bool IsFoldStart { get => Get(false); set => Set(value); }
         public int LineNumber { get => Get(0); set => Set(value); }
-        string lastsavedtext = "";
-        private bool initialized = false;
+        string lastsavedtext = null;
+
+        public int iLine { get => LineNumber - 1; }
        
         public string LineText
         {
             get => Get("");
             set
             {
-                if (!initialized)
-                {
-                    initialized = true;
-                }
-                else
-                {
-                    IsUnsaved = value != lastsavedtext;
-                }
+                
+                IsUnsaved = value != lastsavedtext;
                 
                 Set(value);
                 Chars = FormattedText(value);

@@ -149,7 +149,8 @@ namespace CodeWriter_WinUI
         public bool IsFindPopupOpen { get => Get(false); set { Set(value); if (!value) { Tbx_Search.Text = ""; } } }
         public bool IsMatchCase { get => Get(false); set { Set(value); Tbx_SearchChanged(null,null); } }
         public bool IsRegex { get => Get(false); set { Set(value); Tbx_SearchChanged(null, null); } }
-
+        
+        public Color Color_UnsavedMarker { get => Get(Color.FromArgb(255, 80, 190, 230)); set => Set(value); }
         public Color Color_WeakMarker { get => Get(Color.FromArgb(255, 40, 40, 40)); set => Set(value); }
         public Color Color_FoldingMarker { get => Get(Color.FromArgb(255, 140, 140, 140)); set => Set(value); }
         public Color Color_LeftBackground { get => Get(Color.FromArgb(255, 40, 40, 40)); set => Set(value); }
@@ -529,20 +530,20 @@ namespace CodeWriter_WinUI
                             end = new(Selection.Start);
                         }
 
-                        if (start.iLine < VisibleLines[0].LineNumber - 1)
+                        if (start.iLine < VisibleLines[0].iLine)
                         {
-                            start.iLine = VisibleLines[0].LineNumber - 1;
+                            start.iLine = VisibleLines[0].iLine;
                             start.iChar = 0;
                         }
 
-                        if (end.iLine > VisibleLines.Last().LineNumber - 1)
+                        if (end.iLine > VisibleLines.Last().iLine)
                         {
-                            end.iLine = VisibleLines.Last().LineNumber - 1;
+                            end.iLine = VisibleLines.Last().iLine;
                             end.iChar = VisibleLines.Last().Count;
                         }
 
                         for (int lp = start.iLine; lp <= end.iLine; lp++)
-                            if (lp >= VisibleLines[0].LineNumber - 1 && lp <= VisibleLines.Last().LineNumber - 1)
+                            if (lp >= VisibleLines[0].iLine && lp <= VisibleLines.Last().iLine)
                                 if (start.iLine == end.iLine)
                                     DrawSelection(args.DrawingSession, start.iLine, start.iChar, end.iChar);
                                 else if (lp == start.iLine)
@@ -555,7 +556,7 @@ namespace CodeWriter_WinUI
                     
                     foreach(SearchMatch match in SearchMatches)
                     {
-                        if (match.iLine >= VisibleLines[0].LineNumber - 1 && match.iLine <= VisibleLines.Last().LineNumber - 1)
+                        if (match.iLine >= VisibleLines[0].iLine && match.iLine <= VisibleLines.Last().iLine)
                             DrawSelection(args.DrawingSession, match.iLine, match.iChar, match.iChar + match.Match.Length, SelectionType.SearchMatch);
                     }
                 }
@@ -608,7 +609,7 @@ namespace CodeWriter_WinUI
                     int foldPos = Width_LineNumber + Width_ErrorMarker + Width_WarningMarker;
                     int errorPos = Width_LineNumber;
                     int warningPos = Width_LineNumber + Width_ErrorMarker;
-                    for (int iLine = VisibleLines[0].LineNumber - 1; iLine < VisibleLines.Last().LineNumber; iLine++)
+                    for (int iLine = VisibleLines[0].iLine; iLine < VisibleLines.Last().LineNumber; iLine++)
                     {
                         float y = CharHeight * (iLine - VisibleLines[0].LineNumber + 1);
                         float x = 0;
@@ -636,7 +637,7 @@ namespace CodeWriter_WinUI
                         if (ShowLineMarkers)
                         {
                             if (Lines[iLine].IsUnsaved)
-                                args.DrawingSession.FillRectangle(warningPos, y, Width_ErrorMarker, CharHeight, Color.FromArgb(255, 120, 180, 230));
+                                args.DrawingSession.FillRectangle(warningPos, y, Width_ErrorMarker, CharHeight, ActualTheme == ElementTheme.Light ? Color_UnsavedMarker.ChangeColorBrightness(-0.2f) : Color_UnsavedMarker);
 
                             if (SyntaxErrors.Any(x => x.iLine == iLine))
                             {
@@ -921,7 +922,7 @@ namespace CodeWriter_WinUI
             int lineNumber = 1;
             foreach (string line in lines)
             {
-                Line l = new Line() { LineNumber = lineNumber, LineText = line };
+                Line l = new Line() { LineNumber = lineNumber, LineText = line, IsUnsaved = false };
                 Lines.Add(l);
                 lineNumber++;
             }
@@ -1013,7 +1014,7 @@ namespace CodeWriter_WinUI
 
         private Place PointerToPlace(Point currentpoint)
         {
-            int iline = Math.Min((int)(currentpoint.Y / CharHeight) + VisibleLines[0].LineNumber - 1, Lines.Count - 1);
+            int iline = Math.Min((int)(currentpoint.Y / CharHeight) + VisibleLines[0].iLine, Lines.Count - 1);
             int ichar = 0;
             if ((int)currentpoint.X - Width_Left - HorizontalOffset > 0)
             {
@@ -1095,7 +1096,7 @@ namespace CodeWriter_WinUI
                                 storetext = Lines[CursorPlace.iLine].LineText.Substring(CursorPlace.iChar);
                                 Lines[CursorPlace.iLine].LineText = Lines[CursorPlace.iLine].LineText.Remove(CursorPlace.iChar);
                             }
-                            Lines.Insert(CursorPlace.iLine + 1, new Line() { LineNumber = CursorPlace.iLine, LineText = storetext });
+                            Lines.Insert(CursorPlace.iLine + 1, new Line() { LineNumber = CursorPlace.iLine, LineText = storetext, IsUnsaved = true  });
                             for (int i = CursorPlace.iLine + 1; i < Lines.Count; i++)
                                 Lines[i].LineNumber = i + 1;
                             Place newselect = CursorPlace;
@@ -1396,7 +1397,7 @@ namespace CodeWriter_WinUI
                 }
                 else
                 {
-                    Lines.Insert(CursorPlace.iLine + i, new Line() { LineNumber = CursorPlace.iLine +1+i,LineText = line });
+                    Lines.Insert(CursorPlace.iLine + i, new Line() { LineNumber = CursorPlace.iLine +1+i, LineText = line, IsUnsaved = true  });
                 }
                 i++;
             }
@@ -1779,6 +1780,9 @@ namespace CodeWriter_WinUI
 
                 foreach (SearchMatch search in SearchMatches)
                     args.DrawingSession.DrawLine(width / 3f, search.iLine / (float)Lines.Count * height, width * 2/3f, search.iLine / (float)Lines.Count * height, ActualTheme == ElementTheme.Light ? Colors.LightGray.ChangeColorBrightness(-0.3f) : Colors.LightGray, 4f);
+
+                foreach (Line line in Lines.Where(x=>x.IsUnsaved))
+                    args.DrawingSession.DrawLine(0, line.iLine / (float)Lines.Count * height, width * 1/3f, line.iLine / (float)Lines.Count * height, ActualTheme == ElementTheme.Light ? Color_UnsavedMarker.ChangeColorBrightness(-0.2f) : Color_UnsavedMarker, 4f);
 
                 foreach (SyntaxError error in SyntaxErrors)
                 {
