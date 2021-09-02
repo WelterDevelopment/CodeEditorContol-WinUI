@@ -395,6 +395,7 @@ namespace CodeWriter_WinUI
             return new Place(p1.iChar + p2.iChar, p1.iLine + p2.iLine);
         }
 
+
         public static bool operator <(Place p1, Place p2)
         {
             if (p1.iLine < p2.iLine) return true;
@@ -497,8 +498,8 @@ namespace CodeWriter_WinUI
         public Place End { get => Get(new Place()); set => Set(value); }
         public Place Start { get => Get(new Place()); set => Set(value); }
 
-        public Place VisualEnd { get => End > Start ? End : Start; }
-        public Place VisualStart { get => End > Start ? Start : End; }
+        public Place VisualEnd { get => End > Start ? new(End) : new(Start); }
+        public Place VisualStart { get => End > Start ? new(Start) : new(End); }
     }
 
     public class RelayCommand : ICommand
