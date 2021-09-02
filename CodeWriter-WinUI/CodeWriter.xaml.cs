@@ -33,7 +33,7 @@ namespace CodeWriter_WinUI
     {
         public static readonly DependencyProperty ShowControlCharactersProperty = DependencyProperty.Register("ShowControlCharacters", typeof(bool), typeof(CodeWriter), new PropertyMetadata(true, (d, e) => ((CodeWriter)d).OnShowControlCharactersChanged(d, e)));
 
-       
+
         public static new readonly DependencyProperty FontSizeProperty = DependencyProperty.Register("FontSize", typeof(int), typeof(CodeWriter), new PropertyMetadata(12, (d, e) => ((CodeWriter)d).FontSizeChanged(d, e)));
 
         public static new readonly DependencyProperty RequestedThemeProperty = DependencyProperty.Register("RequestedTheme", typeof(ElementTheme), typeof(CodeWriter), new PropertyMetadata(12, (d, e) => ((CodeWriter)d).RequestedThemeChanged(d, e)));
@@ -66,7 +66,7 @@ namespace CodeWriter_WinUI
             ContextMenu.Items.Remove(item);
         }
 
-        public Dictionary<Token, Color> Tokens = new()
+        public Dictionary<Token, Color> TokenColors = new()
         {
             { Token.Normal, Color.FromArgb(255, 220, 220, 220) },
             { Token.Command, Color.FromArgb(255, 50, 130, 210) },
@@ -74,11 +74,12 @@ namespace CodeWriter_WinUI
             { Token.Comment, Color.FromArgb(255, 40, 190, 90) },
             { Token.Key, Color.FromArgb(255, 150, 120, 200) },
             { Token.Bracket, Color.FromArgb(255, 80, 40, 180) },
-            { Token.Reference, Color.FromArgb(255, 180, 120, 40) },
+            { Token.Reference, Color.FromArgb(255, 180, 140, 40) },
             { Token.Math, Color.FromArgb(255, 220, 160, 60) },
             { Token.Symbol, Color.FromArgb(255, 140, 200, 240) },
-            { Token.Style, Color.FromArgb(255, 200, 140, 100) },
+            { Token.Style, Color.FromArgb(255, 220, 130, 100) },
             { Token.Array, Color.FromArgb(255, 200, 100, 80) },
+            { Token.Primitive, Color.FromArgb(255, 230, 120, 100) },
         };
 
         private int iCharOffset = 0;
@@ -97,7 +98,7 @@ namespace CodeWriter_WinUI
 
         private List<VirtualKey> Modifiers = new List<VirtualKey>();
 
-        private Point pos = new Point() { };
+        private Point previousPosition = new Point() { };
 
         private int startFontsize = 16;
 
@@ -119,14 +120,14 @@ namespace CodeWriter_WinUI
         private void TextAction_Find()
         {
             IsFindPopupOpen = true;
-            Tbx_Search.Focus( FocusState.Keyboard);
+            Tbx_Search.Focus(FocusState.Keyboard);
         }
 
         public void TextAction_SelectText(SelectionRange range = null)
         {
-            if (range == null && Lines.Count>0)
+            if (range == null && Lines.Count > 0)
             {
-                Selection = new SelectionRange(new(0, 0), new(Lines.Last().Count, Lines.Count-1));
+                Selection = new SelectionRange(new(0, 0), new(Lines.Last().Count, Lines.Count - 1));
             }
         }
 
@@ -147,14 +148,14 @@ namespace CodeWriter_WinUI
         public int CharWidth { get => Get(8); set { Set(value); } }
 
         public bool IsFindPopupOpen { get => Get(false); set { Set(value); if (!value) { Tbx_Search.Text = ""; } } }
-        public bool IsMatchCase { get => Get(false); set { Set(value); Tbx_SearchChanged(null,null); } }
+        public bool IsMatchCase { get => Get(false); set { Set(value); Tbx_SearchChanged(null, null); } }
         public bool IsRegex { get => Get(false); set { Set(value); Tbx_SearchChanged(null, null); } }
-        
+
         public Color Color_UnsavedMarker { get => Get(Color.FromArgb(255, 80, 190, 230)); set => Set(value); }
         public Color Color_WeakMarker { get => Get(Color.FromArgb(255, 40, 40, 40)); set => Set(value); }
         public Color Color_FoldingMarker { get => Get(Color.FromArgb(255, 140, 140, 140)); set => Set(value); }
         public Color Color_LeftBackground { get => Get(Color.FromArgb(255, 40, 40, 40)); set => Set(value); }
-        public Color Color_LineNumber { get => Get(Color.FromArgb(255, 40, 140, 160)); set => Set(value); }
+        public Color Color_LineNumber { get => Get(Color.FromArgb(255, 100, 160, 200)); set => Set(value); }
         public Color Color_Selection { get => Get(Color.FromArgb(255, 25, 50, 80)); set => Set(value); }
         public Color Color_Beam { get => Get(Color.FromArgb(255, 200, 200, 200)); set => Set(value); }
 
@@ -193,10 +194,10 @@ namespace CodeWriter_WinUI
                             HorizontalScroll.Value = Math.Max((value.iChar + 3) * CharWidth - width, 0);
                     }
 
-                    if ((value.iLine+1) * CharHeight <= VerticalScroll.Value)
+                    if ((value.iLine + 1) * CharHeight <= VerticalScroll.Value)
                         VerticalScroll.Value = value.iLine * CharHeight;
-                    else if ((value.iLine+2) * CharHeight  > VerticalScroll.Value + Scroll.ActualHeight)
-                        VerticalScroll.Value = Math.Min((value.iLine+2) * CharHeight - Scroll.ActualHeight, VerticalScroll.Maximum);
+                    else if ((value.iLine + 2) * CharHeight > VerticalScroll.Value + Scroll.ActualHeight)
+                        VerticalScroll.Value = Math.Min((value.iLine + 2) * CharHeight - Scroll.ActualHeight, VerticalScroll.Maximum);
                 }
 
                 int x = CharWidth * (value.iChar - iCharOffset) + Width_Left;
@@ -293,19 +294,8 @@ namespace CodeWriter_WinUI
                 if (Selection.Start == Selection.End)
                     return "";
 
-                Place start;
-                Place end;
-
-                if (Selection.Start < Selection.End)
-                {
-                    start = new(Selection.Start);
-                    end = new(Selection.End);
-                }
-                else
-                {
-                    start = new(Selection.End);
-                    end = new(Selection.Start);
-                }
+                Place start = Selection.VisualStart;
+                Place end = Selection.VisualEnd;
 
                 if (start.iLine == end.iLine)
                 {
@@ -323,7 +313,7 @@ namespace CodeWriter_WinUI
                             text += Lines[iLine].LineText + "\n";
                     }
                 }
-                   
+
                 return text;
             }
         }
@@ -335,7 +325,7 @@ namespace CodeWriter_WinUI
             {
                 Set(value);
                 CursorPlace = new Place(value.End.iChar, value.End.iLine);
-                IsSelection = Selection.Start.iChar != Selection.End.iChar | Selection.Start.iLine != Selection.End.iLine;
+                IsSelection = value.Start != value.End;
                 CanvasSelection.Invalidate();
             }
         }
@@ -375,7 +365,7 @@ namespace CodeWriter_WinUI
         private List<IntelliSense> Suggestions { get => Get(Commands); set => Set(value); }
         private int Width_ErrorMarker { get; set; } = 12;
         private int Width_FoldingMarker { get; set; } = 24;
-        private int Width_TextIndent { get => CharWidth/2; }
+        private int Width_TextIndent { get => CharWidth / 2; }
         private int Width_WarningMarker { get; set; } = 12;
 
         public Char this[Place place]
@@ -449,11 +439,11 @@ namespace CodeWriter_WinUI
                     int x = (int)(Width_Left + HorizontalOffset + CursorPlace.iChar * CharWidth);
                     int y = (int)((CursorPlace.iLine - VisibleLines[0].LineNumber + 1) * CharHeight - 1 / 2 * CharHeight);
 
-                    for (int i = 0; i< CursorPlace.iChar; i++)
+                    for (int i = 0; i < CursorPlace.iChar; i++)
                     {
                         if (Lines[CursorPlace.iLine][i].C == '\t')
                         {
-                            x += CharWidth * (TabLength -1);
+                            x += CharWidth * (TabLength - 1);
                         }
                     }
 
@@ -484,7 +474,7 @@ namespace CodeWriter_WinUI
             }
         }
 
-        private void DrawSelection(CanvasDrawingSession session, int Line, int StartChar, int EndChar,  SelectionType selectionType = SelectionType.Selection )
+        private void DrawSelection(CanvasDrawingSession session, int Line, int StartChar, int EndChar, SelectionType selectionType = SelectionType.Selection)
         {
             int xtaboffset = 0;
             for (int i = 0; i < EndChar; i++)
@@ -516,19 +506,8 @@ namespace CodeWriter_WinUI
                 {
                     if (IsSelection)
                     {
-                        Place start = new Place();
-                        Place end = new Place();
-
-                        if (Selection.Start < Selection.End)
-                        {
-                            start = new(Selection.Start);
-                            end = new(Selection.End);
-                        }
-                        else
-                        {
-                            start = new(Selection.End);
-                            end = new(Selection.Start);
-                        }
+                        Place start = Selection.VisualStart;
+                        Place end = Selection.VisualEnd;
 
                         if (start.iLine < VisibleLines[0].iLine)
                         {
@@ -553,8 +532,8 @@ namespace CodeWriter_WinUI
                                 else if (lp == end.iLine)
                                     DrawSelection(args.DrawingSession, lp, 0, end.iChar);
                     }
-                    
-                    foreach(SearchMatch match in SearchMatches)
+
+                    foreach (SearchMatch match in SearchMatches)
                     {
                         if (match.iLine >= VisibleLines[0].iLine && match.iLine <= VisibleLines.Last().iLine)
                             DrawSelection(args.DrawingSession, match.iLine, match.iChar, match.iChar + match.Match.Length, SelectionType.SearchMatch);
@@ -567,7 +546,7 @@ namespace CodeWriter_WinUI
             }
         }
 
-       
+
         private void CanvasText_CreateResources(CanvasControl sender, Microsoft.Graphics.Canvas.UI.CanvasCreateResourcesEventArgs args)
         {
             try
@@ -687,7 +666,7 @@ namespace CodeWriter_WinUI
                             else if (iChar >= iCharOffset - indents * (TabLength - 1))
                             {
                                 x = Width_Left + CharWidth * (iChar + indents * (TabLength - 1) - iCharOffset);
-                                args.DrawingSession.DrawText(c.C.ToString(), x, y, ActualTheme == ElementTheme.Light ? Tokens[c.T].InvertColorBrightness() : Tokens[c.T], new CanvasTextFormat() { FontFamily = "Consolas", FontSize = FontSize });
+                                args.DrawingSession.DrawText(c.C.ToString(), x, y, ActualTheme == ElementTheme.Light ? TokenColors[c.T].InvertColorBrightness() : TokenColors[c.T], new CanvasTextFormat() { FontFamily = "Consolas", FontSize = FontSize });
                             }
                         }
                         if (ShowControlCharacters && iLine < Lines.Count - 1 && lastChar >= iCharOffset - indents * (TabLength - 1))
@@ -727,6 +706,7 @@ namespace CodeWriter_WinUI
                 {
                     if (IsSelection)
                     {
+                        TextAction_Delete();
                         if (Selection.Start.iChar < Selection.End.iChar)
                         {
                             Lines[CursorPlace.iLine].LineText = Lines[CursorPlace.iLine].LineText.Remove(Selection.Start.iChar, Selection.End.iChar - Selection.Start.iChar);
@@ -737,6 +717,8 @@ namespace CodeWriter_WinUI
                             Lines[CursorPlace.iLine].LineText = Lines[CursorPlace.iLine].LineText.Remove(Selection.End.iChar, Selection.Start.iChar - Selection.End.iChar);
                             Selection = new SelectionRange(Selection.End, Selection.End);
                         }
+
+
                     }
 
                     if (args.Character == ',' && !IsSuggesting && IsInsideBrackets(CursorPlace))
@@ -761,6 +743,7 @@ namespace CodeWriter_WinUI
                     }
 
                     Lines[CursorPlace.iLine].LineText = Lines[CursorPlace.iLine].LineText.Insert(CursorPlace.iChar, args.Character.ToString());
+
                     if (args.Character == '[')
                     {
                         Lines[CursorPlace.iLine].LineText = Lines[CursorPlace.iLine].LineText.Insert(CursorPlace.iChar + 1, "]");
@@ -823,13 +806,13 @@ namespace CodeWriter_WinUI
             Color color = Color_Selection;
             if (selectionType == SelectionType.SearchMatch)
             {
-                color = Color.FromArgb(255,60,60,60);
+                color = Color.FromArgb(255, 60, 60, 60);
             }
             else if (selectionType == SelectionType.WordLight)
             {
                 color = Colors.DeepSkyBlue;
             }
-            session.FillRectangle(x, y, CharWidth*w+1, CharHeight+1, ActualTheme == ElementTheme.Light ? color.InvertColorBrightness() : color);
+            session.FillRectangle(x, y, CharWidth * w + 1, CharHeight + 1, ActualTheme == ElementTheme.Light ? color.InvertColorBrightness() : color);
         }
 
         public int CurrentLine = 0;
@@ -853,7 +836,7 @@ namespace CodeWriter_WinUI
 
             if (VerticalScroll != null && HorizontalScroll != null && Lines != null)
             {
-                
+
 
                 VerticalScroll.Maximum = (Lines.Count + 2) * CharHeight - Scroll.ActualHeight;
                 VerticalScroll.SmallChange = CharHeight;
@@ -872,7 +855,7 @@ namespace CodeWriter_WinUI
                 VerticalScroll.Visibility = Lines.Count * CharHeight > TextControl.ActualHeight ? Visibility.Visible : Visibility.Collapsed;
                 HorizontalScroll.Visibility = maxchars * CharHeight > TextControl.ActualWidth ? Visibility.Visible : Visibility.Collapsed;
 
-                int StartLine = (int)(VerticalScroll.Value / CharHeight) + 1;                
+                int StartLine = (int)(VerticalScroll.Value / CharHeight) + 1;
                 int EndLine = Math.Min((int)((VerticalScroll.Value + Scroll.ActualHeight) / CharHeight) + 1, Lines.Count);
                 VisibleLines.Clear();
                 foreach (Line l in Lines)
@@ -886,7 +869,7 @@ namespace CodeWriter_WinUI
 
                 Width_LineNumber = ShowLineNumbers ? CharWidth * IntLength(Lines.Count) : 0;
                 Width_FoldingMarker = IsFoldingEnabled ? CharWidth : 0;
-                Width_ErrorMarker = ShowLineNumbers ? CharWidth/2 : 0;
+                Width_ErrorMarker = ShowLineNumbers ? CharWidth / 2 : 0;
                 Width_WarningMarker = ShowLineNumbers ? CharWidth / 2 : 0;
 
 
@@ -928,7 +911,7 @@ namespace CodeWriter_WinUI
             }
             if (isCanvasLoaded)
             {
-                
+
                 Invalidate();
                 Selection = new(new(0, 0));
             }
@@ -958,14 +941,14 @@ namespace CodeWriter_WinUI
             return new(width, height);
         }
 
-        private void FontSizeChanged(DependencyObject d, DependencyPropertyChangedEventArgs e) 
+        private void FontSizeChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {
             int currline = 0;
             if (VerticalScroll != null)
             {
                 currline = (int)VerticalScroll.Value / CharHeight;
             }
-            Invalidate(); 
+            Invalidate();
             if (VerticalScroll != null)
             {
                 VerticalScroll.Value = currline * CharHeight;
@@ -1034,10 +1017,8 @@ namespace CodeWriter_WinUI
                             currentvisibleplace += 1;
                         }
                 }
-
                 ichar = Math.Min(actualcharplace, Lines[iline].Count);
             }
-
             return new Place(ichar, iline);
         }
 
@@ -1096,7 +1077,7 @@ namespace CodeWriter_WinUI
                                 storetext = Lines[CursorPlace.iLine].LineText.Substring(CursorPlace.iChar);
                                 Lines[CursorPlace.iLine].LineText = Lines[CursorPlace.iLine].LineText.Remove(CursorPlace.iChar);
                             }
-                            Lines.Insert(CursorPlace.iLine + 1, new Line() { LineNumber = CursorPlace.iLine, LineText = storetext, IsUnsaved = true  });
+                            Lines.Insert(CursorPlace.iLine + 1, new Line() { LineNumber = CursorPlace.iLine, LineText = storetext, IsUnsaved = true });
                             for (int i = CursorPlace.iLine + 1; i < Lines.Count; i++)
                                 Lines[i].LineNumber = i + 1;
                             Place newselect = CursorPlace;
@@ -1142,7 +1123,7 @@ namespace CodeWriter_WinUI
                                     Place newplace = new(Lines[CursorPlace.iLine - 1].Count, CursorPlace.iLine - 1);
                                     Lines[newplace.iLine].LineText += storetext;
                                     Selection = new SelectionRange(newplace);
-                                    
+
                                 }
                                 else
                                 {
@@ -1270,9 +1251,8 @@ namespace CodeWriter_WinUI
                     HorizontalScroll.Value = Math.Max(HorizontalScroll.Value + mwd * 3, 0);
                 }
             }
-            else if (Modifiers.Contains(VirtualKey.Control))
+            else if (e.KeyModifiers == VirtualKeyModifiers.Control)
             {
-                //FontSize += Math.Sign(mwd);
                 int newfontsize = FontSize + Math.Sign(mwd);
                 if (newfontsize >= MinFontSize && newfontsize <= MaxFontSize)
                     SetValue(FontSizeProperty, newfontsize);
@@ -1316,94 +1296,105 @@ namespace CodeWriter_WinUI
 
         private void TextAction_Delete(bool cut = false)
         {
-            if (IsSelection)
+            try
             {
-                if (cut)
+                if (IsSelection)
                 {
-                    TextAction_Copy();
+                    if (cut)
+                    {
+                        TextAction_Copy();
+                    }
+
+                    Place start = Selection.VisualStart;
+                    Place end = Selection.VisualEnd;
+
+                    string storetext = "";
+                    int removedlines = 0;
+                    for (int iLine = start.iLine; iLine <= end.iLine; iLine++)
+                    {
+                        if (end.iLine == start.iLine)
+                        {
+                            Lines[iLine].LineText = Lines[iLine].LineText.Remove(start.iChar, end.iChar - start.iChar);
+                        }
+                        else if (iLine == start.iLine)
+                        {
+                            if (start.iChar < Lines[iLine].Count)
+                                Lines[iLine].LineText = Lines[iLine].LineText.Remove(start.iChar);
+                        }
+                        else if (iLine == end.iLine)
+                        {
+                            if (end.iChar == Lines[iLine - removedlines].Count - 1)
+                                Lines.RemoveAt(iLine - removedlines);
+                            else
+                            {
+                                storetext = Lines[iLine - removedlines].LineText.Substring(end.iChar);
+                                Lines.RemoveAt(iLine - removedlines);
+                            }
+                        }
+                        else
+                        {
+                            Lines.RemoveAt(iLine - removedlines);
+                            removedlines += 1;
+                        }
+                    }
+
+                    Lines[start.iLine].LineText += storetext;
+                    Selection = new(start);
                 }
+            }
+            catch (Exception ex)
+            {
+                ErrorOccured?.Invoke(this, new ErrorEventArgs(ex));
+            }
+            textChanged();
+            Invalidate();
+        }
 
-                Place start;
-                Place end;
-
-                if (Selection.Start < Selection.End)
+        private async void TextAction_Paste(string texttopaste = null, Place placetopaste = null)
+        {
+            try
+            {
+                if (IsSelection)
                 {
-                    start = new(Selection.Start);
-                    end = new(Selection.End);
+                    TextAction_Delete();
+                }
+                string text = "";
+                if (texttopaste == null)
+                {
+                    DataPackageView dataPackageView = Clipboard.GetContent();
+                    if (dataPackageView.Contains(StandardDataFormats.Text))
+                    {
+                        text += await dataPackageView.GetTextAsync();
+                    }
                 }
                 else
                 {
-                    start = new(Selection.End);
-                    end = new(Selection.Start);
+                    text = texttopaste;
                 }
 
-                string storetext = "";
-                int removedlines = 0;
-                for (int iLine = start.iLine; iLine <= end.iLine; iLine++)
+                Place place = placetopaste ?? CursorPlace;
+
+                int i = 0;
+                foreach (string line in text.Split('\n', StringSplitOptions.None))
                 {
-                    if (end.iLine == start.iLine)
+                    if (i == 0)
                     {
-                        Lines[iLine].LineText = Lines[iLine].LineText.Remove(start.iChar, end.iChar - start.iChar);
-                    }
-                    else if (iLine == start.iLine)
-                    {
-                        if (start.iChar < Lines[iLine].Count)
-                            Lines[iLine].LineText = Lines[iLine].LineText.Remove(start.iChar);
-                    }
-                    else if (iLine == end.iLine)
-                    {
-                        if (end.iChar == Lines[iLine - removedlines].Count - 1)
-                            Lines.RemoveAt(iLine - removedlines);
-                        else
-                        {
-                            storetext = Lines[iLine - removedlines].LineText.Substring(end.iChar);
-                            Lines.RemoveAt(iLine - removedlines);
-                        }
+                        Lines[place.iLine].LineText = Lines[place.iLine].LineText.Insert(place.iChar, line);
                     }
                     else
                     {
-                        Lines.RemoveAt(iLine - removedlines);
-                        removedlines += 1;
+                        Lines.Insert(place.iLine + i, new Line() { LineNumber = place.iLine + 1 + i, LineText = line, IsUnsaved = true });
                     }
+                    i++;
                 }
 
-                Lines[start.iLine].LineText += storetext;
-
-                Selection = new(start);
-
-                textChanged();
-                Invalidate();
+                Place end = new(i == 1 ? place.iChar + text.Length : Lines[place.iLine + i - 1].Count, place.iLine + i - 1);
+                Selection = new(end);
             }
-        }
-
-        private async void TextAction_Paste()
-        {
-            if (IsSelection)
+            catch (Exception ex)
             {
-                TextAction_Delete();
+                ErrorOccured?.Invoke(this, new ErrorEventArgs(ex));
             }
-            string text = "";
-            DataPackageView dataPackageView = Clipboard.GetContent();
-            if (dataPackageView.Contains(StandardDataFormats.Text))
-            {
-                text += await dataPackageView.GetTextAsync();
-            }
-            int i = 0;
-            foreach (string line in text.Split('\n', StringSplitOptions.None))
-            {
-                if (i == 0)
-                {
-                    Lines[CursorPlace.iLine].LineText = Lines[CursorPlace.iLine].LineText.Insert(CursorPlace.iChar, line);
-                }
-                else
-                {
-                    Lines.Insert(CursorPlace.iLine + i, new Line() { LineNumber = CursorPlace.iLine +1+i, LineText = line, IsUnsaved = true  });
-                }
-                i++;
-            }
-            
-            Place end = new(i == 1 ? CursorPlace.iChar + text.Length : Lines[CursorPlace.iLine+i-1].Count, CursorPlace.iLine + i-1);
-            Selection = new(end);
             textChanged();
             Invalidate();
         }
@@ -1439,88 +1430,110 @@ namespace CodeWriter_WinUI
 
         private void TextControl_PointerMoved(object sender, PointerRoutedEventArgs e)
         {
-            ExpPointerPoint currentpoint = e.GetCurrentPoint(TextControl);
-
-            if (e.Pointer.PointerDeviceType == PointerDeviceType.Mouse | e.Pointer.PointerDeviceType == PointerDeviceType.Pen)
+            try
             {
-                if (isSelecting)
-                {
-                    if (!isLineSelect)
-                    {
-                        Selection = new SelectionRange(Selection.Start, PointerToPlace(currentpoint.Position));
-                    }
-                    else
-                    {
-                        Place end = PointerToPlace(currentpoint.Position);
-                        end.iChar = Lines[end.iLine].Count;
-                        Selection = new SelectionRange(Selection.Start, end);
-                    }
-                }
-                else if (isMiddleClickScrolling)
-                {
-                    middleClickScrollingEndPoint = currentpoint.Position;
-                }
-                else
-                {
-                    if (currentpoint.Position.X < Width_Left)
-                    {
-                        Cursor = new CoreCursor(CoreCursorType.Arrow, 1);
-                    }
-                    else if (IsSelection)
-                    {
-                        Place rightpress = PointerToPlace(currentpoint.Position);
+                ExpPointerPoint currentpoint = e.GetCurrentPoint(TextControl);
 
-                        Place start;
-                        Place end;
-                        if (Selection.Start < Selection.End)
+                if (e.Pointer.PointerDeviceType == PointerDeviceType.Mouse | e.Pointer.PointerDeviceType == PointerDeviceType.Pen)
+                {
+                    if (isSelecting)
+                    {
+                        if (!isLineSelect)
                         {
-                            start = new(Selection.Start);
-                            end = new(Selection.End);
+                            Selection = new SelectionRange(Selection.Start, PointerToPlace(currentpoint.Position));
                         }
                         else
                         {
-                            start = new(Selection.End);
-                            end = new(Selection.Start);
-                        }
-                        if (IsSelection)
-                        {
-                            if (rightpress <= start || rightpress >= end)
-                            {
-                                Cursor = new CoreCursor(CoreCursorType.IBeam, 1);
-                            }
-                            else
-                                Cursor = new CoreCursor(CoreCursorType.Arrow, 1);
+                            Place end = PointerToPlace(currentpoint.Position);
+                            end.iChar = Lines[end.iLine].Count;
+                            Selection = new SelectionRange(Selection.Start, end);
                         }
                     }
+                    else if (isMiddleClickScrolling)
+                    {
+                        middleClickScrollingEndPoint = currentpoint.Position;
+                    }
                     else
-                        Cursor = new CoreCursor(CoreCursorType.IBeam, 1);
+                    {
+                        if (currentpoint.Position.X < Width_Left)
+                        {
+                            Cursor = new CoreCursor(CoreCursorType.Arrow, 1);
+                        }
+                        else if (IsSelection)
+                        {
+                            Place rightpress = PointerToPlace(currentpoint.Position);
+
+                            Place start = Selection.VisualStart;
+                            Place end = Selection.VisualEnd;
+                            if (IsSelection)
+                            {
+                                if (rightpress <= start || rightpress >= end)
+                                {
+                                    Cursor = new CoreCursor(CoreCursorType.IBeam, 1);
+                                }
+                                else
+                                    Cursor = new CoreCursor(CoreCursorType.Arrow, 1);
+                            }
+                        }
+                        else
+                            Cursor = new CoreCursor(CoreCursorType.IBeam, 1);
+                    }
                 }
             }
+            catch (Exception ex)
+            {
+                ErrorOccured?.Invoke(this, new ErrorEventArgs(ex));
+            }
         }
-        private bool isMiddleClickScrolling { get => Get(false); set { Set(value);} }
+        private bool isMiddleClickScrolling { get => Get(false); set { Set(value); } }
         private Point middleClickScrollingStartPoint = new Point();
         private Point middleClickScrollingEndPoint = new Point();
+
+        private bool isDragging = false;
 
         private void TextControl_PointerPressed(object sender, PointerRoutedEventArgs e)
         {
             IsSuggesting = false;
-            bool hasfocus =  TextControl.Focus( FocusState.Keyboard);
+            bool hasfocus = TextControl.Focus(FocusState.Keyboard);
             ExpPointerPoint currentpoint = e.GetCurrentPoint(TextControl);
             try
             {
                 if (e.Pointer.PointerDeviceType == PointerDeviceType.Touch)
                 {
+                    Place start = PointerToPlace(currentpoint.Position);
+                    Place end = new Place(start.iChar, start.iLine);
+                    var matches = Regex.Matches(Lines[start.iLine].LineText, @"\b\w+?\b");
+                    foreach (Match match in matches)
+                    {
+                        int istart = match.Index;
+                        int iend = match.Index + match.Length;
+                        if (start.iChar <= iend && start.iChar >= istart)
+                        {
+                            start.iChar = istart;
+                            end.iChar = iend;
+                        }
+                    }
+                    Selection = new(start, end);
                 }
                 else if (e.Pointer.PointerDeviceType == PointerDeviceType.Mouse | e.Pointer.PointerDeviceType == PointerDeviceType.Pen)
                 {
                     if (currentpoint.Properties.IsLeftButtonPressed)
                     {
+                        if (IsSelection)
+                        {
+                            Place pos = PointerToPlace(currentpoint.Position);
+                            if (pos > Selection.VisualStart && pos <= Selection.VisualEnd)
+                            {
+                                isDragging = true;
+                                return;
+                            }
+                        }
                         isLineSelect = currentpoint.Position.X < Width_Left;
 
                         isSelecting = true;
                         if (!isLineSelect)
                         {
-                            if (pos != currentpoint.Position)
+                            if (previousPosition != currentpoint.Position)
                             {
                                 Place start = PointerToPlace(currentpoint.Position);
                                 Place end = PointerToPlace(currentpoint.Position);
@@ -1538,7 +1551,7 @@ namespace CodeWriter_WinUI
                             }
                             else
                             {
-                                Place start = PointerToPlace(pos);
+                                Place start = PointerToPlace(previousPosition);
                                 Place end = new Place(start.iChar, start.iLine);
                                 var matches = Regex.Matches(Lines[start.iLine].LineText, @"\b\w+?\b");
                                 foreach (Match match in matches)
@@ -1553,7 +1566,7 @@ namespace CodeWriter_WinUI
                                 }
                                 Selection = new(start, end);
                             }
-                            pos = currentpoint.Position;
+                            previousPosition = currentpoint.Position;
                         }
                         else
                         {
@@ -1562,24 +1575,15 @@ namespace CodeWriter_WinUI
                             Selection = new(start, end);
                         }
                         isMiddleClickScrolling = false;
+                        previousPosition = currentpoint.Position;
                     }
 
                     else if (currentpoint.Properties.IsRightButtonPressed)
                     {
                         Place rightpress = PointerToPlace(currentpoint.Position);
 
-                        Place start;
-                        Place end;
-                        if (Selection.Start < Selection.End)
-                        {
-                            start = new(Selection.Start);
-                            end = new(Selection.End);
-                        }
-                        else
-                        {
-                            start = new(Selection.End);
-                            end = new(Selection.Start);
-                        }
+                        Place start = Selection.VisualStart;
+                        Place end = Selection.VisualEnd;
                         if (IsSelection)
                         {
                             if (rightpress <= start || rightpress >= end)
@@ -1641,7 +1645,7 @@ namespace CodeWriter_WinUI
                             else if (HorizontalScroll.Maximum > Scroll.ActualWidth)
                             {
                                 isMiddleClickScrolling = true;
-                                Cursor = new CoreCursor( CoreCursorType.SizeWestEast,1);
+                                Cursor = new CoreCursor(CoreCursorType.SizeWestEast, 1);
                                 middleClickScrollingStartPoint = currentpoint.Position;
                                 DispatcherTimer Timer = new DispatcherTimer() { Interval = TimeSpan.FromMilliseconds(100) };
                                 Timer.Tick += (a, b) =>
@@ -1654,7 +1658,7 @@ namespace CodeWriter_WinUI
                                 };
                                 Timer.Start();
                             }
-                            
+
                         }
                         else isMiddleClickScrolling = false;
                     }
@@ -1670,6 +1674,18 @@ namespace CodeWriter_WinUI
         private void TextControl_PointerReleased(object sender, PointerRoutedEventArgs e)
         {
             ExpPointerPoint currentpoint = e.GetCurrentPoint(TextControl);
+            Place place = PointerToPlace(currentpoint.Position);
+            isSelecting = false;
+            isLineSelect = false;
+            if (isDragging && place > Selection.VisualStart && place < Selection.VisualEnd)
+            {
+                isDragging = false;
+                Selection = new SelectionRange(new(PointerToPlace(currentpoint.Position)));
+            }
+        }
+
+        private void TextControl_PointerLost(object sender, PointerRoutedEventArgs e)
+        {
             isSelecting = false;
             isLineSelect = false;
         }
@@ -1682,14 +1698,21 @@ namespace CodeWriter_WinUI
 
         private void VerticalScroll_ValueChanged(object sender, RangeBaseValueChangedEventArgs e)
         {
-            if (e.NewValue == e.OldValue)
+            try
             {
-                return;
+                if (e.NewValue == e.OldValue)
+                {
+                    return;
+                }
+                int updown = e.NewValue > e.OldValue ? -1 : 0;
+                if (Math.Abs((int)e.NewValue - (VisibleLines[0].LineNumber + updown) * CharHeight) < CharHeight)
+                {
+                    return;
+                }
             }
-            int updown = e.NewValue > e.OldValue ? -1 : 0;
-            if (Math.Abs((int)e.NewValue - (VisibleLines[0].LineNumber + updown) * CharHeight) < CharHeight)
+            catch (Exception ex)
             {
-                return;
+                ErrorOccured?.Invoke(this, new ErrorEventArgs(ex));
             }
             Invalidate();
         }
@@ -1698,70 +1721,70 @@ namespace CodeWriter_WinUI
         public List<SearchMatch> SearchMatches { get => Get(new List<SearchMatch>()); set { Set(value); CanvasScrollbarMarkers.Invalidate(); } }
         private void Tbx_SearchChanged(object sender, TextChangedEventArgs e)
         {
-            searchindex = 0;
-            string text = Tbx_Search.Text;
-            if (text == "")
+            try
             {
-                SearchMatches.Clear();
-                CanvasScrollbarMarkers.Invalidate();
-                CanvasSelection.Invalidate();
-                return;
-            }
-
-            SearchMatches.Clear();
-            for  (int iLine = 0; iLine < Lines.Count; iLine++)
-            {
-                if (IsRegex)
+                searchindex = 0;
+                string text = Tbx_Search.Text;
+                if (text == "")
                 {
-                    bool isValidRegex = true;
-                    MatchCollection coll = null;
-                    try
-                    {
-                        coll = Regex.Matches(Lines[iLine].LineText, text, IsMatchCase ? RegexOptions.None : RegexOptions.IgnoreCase);
-                    }
-                    catch
-                    {
-                        isValidRegex = false;
-                    }
-                    if (isValidRegex && coll != null)
-                    {
-                        foreach (Match m in coll)
-                            SearchMatches.Add(new() { Match = m.Value, iChar = m.Index, iLine = iLine });
-                    }
+                    SearchMatches.Clear();
+                    CanvasScrollbarMarkers.Invalidate();
+                    CanvasSelection.Invalidate();
+                    return;
                 }
-                else
-                {
-                    int nextindex = 0;
 
-                    while (nextindex != -1)
+                SearchMatches.Clear();
+                for (int iLine = 0; iLine < Lines.Count; iLine++)
+                {
+                    if (IsRegex)
                     {
-                        nextindex = Lines[iLine].LineText.IndexOf(text, nextindex, IsMatchCase ? StringComparison.CurrentCulture : StringComparison.CurrentCultureIgnoreCase);
-                        if (nextindex != -1)
+                        bool isValidRegex = true;
+                        MatchCollection coll = null;
+                        try
                         {
-                            SearchMatches.Add(new() { Match = text, iChar = nextindex, iLine = iLine  });
-                            nextindex++;
+                            coll = Regex.Matches(Lines[iLine].LineText, text, IsMatchCase ? RegexOptions.None : RegexOptions.IgnoreCase);
+                        }
+                        catch
+                        {
+                            isValidRegex = false;
+                        }
+                        if (isValidRegex && coll != null)
+                        {
+                            foreach (Match m in coll)
+                                SearchMatches.Add(new() { Match = m.Value, iChar = m.Index, iLine = iLine });
+                        }
+                    }
+                    else
+                    {
+                        int nextindex = 0;
+
+                        while (nextindex != -1)
+                        {
+                            nextindex = Lines[iLine].LineText.IndexOf(text, nextindex, IsMatchCase ? StringComparison.CurrentCulture : StringComparison.CurrentCultureIgnoreCase);
+                            if (nextindex != -1)
+                            {
+                                SearchMatches.Add(new() { Match = text, iChar = nextindex, iLine = iLine });
+                                nextindex++;
+                            }
                         }
                     }
                 }
+                if (SearchMatches.Count > 0)
+                {
+                    Selection = new SelectionRange(new(SearchMatches[0].iChar, SearchMatches[0].iLine));
+                }
+                CanvasScrollbarMarkers.Invalidate();
+                CanvasSelection.Invalidate();
             }
-            if (SearchMatches.Count > 0)
+            catch (Exception ex)
             {
-                Selection = new SelectionRange(new(SearchMatches[0].iChar, SearchMatches[0].iLine));
+                ErrorOccured?.Invoke(this, new ErrorEventArgs(ex));
             }
-            CanvasScrollbarMarkers.Invalidate();
-            CanvasSelection.Invalidate();
-        }
-
-        public class SearchMatch
-        {
-            public string Match { get; set; }
-            public int iChar { get; set; }
-            public int iLine { get; set; }
         }
 
         private void NormalArrowPointerEntered(object sender, PointerRoutedEventArgs e)
         {
-            Cursor = new CoreCursor( CoreCursorType.Arrow,1);
+            Cursor = new CoreCursor(CoreCursorType.Arrow, 1);
         }
 
         private float scrollbarSize { get => (float)Application.Current.Resources["ScrollBarSize"]; }
@@ -1773,62 +1796,136 @@ namespace CodeWriter_WinUI
 
         private void CanvasScrollbarMarkers_Draw(CanvasControl sender, CanvasDrawEventArgs args)
         {
-            if (ShowScrollbarMarkers)
+            try
             {
-                float width = (float)VerticalScroll.ActualWidth;
-                float height = (float)CanvasScrollbarMarkers.ActualHeight;
-
-                foreach (SearchMatch search in SearchMatches)
-                    args.DrawingSession.DrawLine(width / 3f, search.iLine / (float)Lines.Count * height, width * 2/3f, search.iLine / (float)Lines.Count * height, ActualTheme == ElementTheme.Light ? Colors.LightGray.ChangeColorBrightness(-0.3f) : Colors.LightGray, 4f);
-
-                foreach (Line line in Lines.Where(x=>x.IsUnsaved))
-                    args.DrawingSession.DrawLine(0, line.iLine / (float)Lines.Count * height, width * 1/3f, line.iLine / (float)Lines.Count * height, ActualTheme == ElementTheme.Light ? Color_UnsavedMarker.ChangeColorBrightness(-0.2f) : Color_UnsavedMarker, 4f);
-
-                foreach (SyntaxError error in SyntaxErrors)
+                if (ShowScrollbarMarkers)
                 {
-                    if (error.SyntaxErrorType == SyntaxErrorType.Error)
-                    {
-                        args.DrawingSession.DrawLine(width * 2/3f, error.iLine / (float)Lines.Count * height, width , error.iLine / (float)Lines.Count * height, ActualTheme == ElementTheme.Light ? Colors.Red.ChangeColorBrightness(-0.2f) : Colors.Red, 4f);
-                    }
-                    else if (error.SyntaxErrorType == SyntaxErrorType.Warning)
-                    {
-                        args.DrawingSession.DrawLine(width * 2 / 3f, error.iLine / (float)Lines.Count * height, width , error.iLine / (float)Lines.Count * height, ActualTheme == ElementTheme.Light ? Colors.Yellow.ChangeColorBrightness(-0.2f) : Colors.Yellow, 4f);
-                    }
-                }
+                    float width = (float)VerticalScroll.ActualWidth;
+                    float height = (float)CanvasScrollbarMarkers.ActualHeight;
 
-                float cursorY = CursorPlace.iLine / (float)Lines.Count * height;
-                args.DrawingSession.DrawLine(0, cursorY, width, cursorY, ActualTheme == ElementTheme.Light ? Color_Beam.InvertColorBrightness() : Color_Beam, 2f);
+                    foreach (SearchMatch search in SearchMatches)
+                        args.DrawingSession.DrawLine(width / 3f, search.iLine / (float)Lines.Count * height, width * 2 / 3f, search.iLine / (float)Lines.Count * height, ActualTheme == ElementTheme.Light ? Colors.LightGray.ChangeColorBrightness(-0.3f) : Colors.LightGray, 4f);
+
+                    foreach (Line line in Lines.Where(x => x.IsUnsaved))
+                        args.DrawingSession.DrawLine(0, line.iLine / (float)Lines.Count * height, width * 1 / 3f, line.iLine / (float)Lines.Count * height, ActualTheme == ElementTheme.Light ? Color_UnsavedMarker.ChangeColorBrightness(-0.2f) : Color_UnsavedMarker, 4f);
+
+                    foreach (SyntaxError error in SyntaxErrors)
+                    {
+                        if (error.SyntaxErrorType == SyntaxErrorType.Error)
+                        {
+                            args.DrawingSession.DrawLine(width * 2 / 3f, error.iLine / (float)Lines.Count * height, width, error.iLine / (float)Lines.Count * height, ActualTheme == ElementTheme.Light ? Colors.Red.ChangeColorBrightness(-0.2f) : Colors.Red, 4f);
+                        }
+                        else if (error.SyntaxErrorType == SyntaxErrorType.Warning)
+                        {
+                            args.DrawingSession.DrawLine(width * 2 / 3f, error.iLine / (float)Lines.Count * height, width, error.iLine / (float)Lines.Count * height, ActualTheme == ElementTheme.Light ? Colors.Yellow.ChangeColorBrightness(-0.2f) : Colors.Yellow, 4f);
+                        }
+                    }
+
+                    float cursorY = CursorPlace.iLine / (float)Lines.Count * height;
+                    args.DrawingSession.DrawLine(0, cursorY, width, cursorY, ActualTheme == ElementTheme.Light ? Color_Beam.InvertColorBrightness() : Color_Beam, 2f);
+                }
+            }
+            catch (Exception ex)
+            {
+                ErrorOccured?.Invoke(this, new ErrorEventArgs(ex));
             }
         }
 
         int searchindex = 0;
         private void Btn_SearchNext(object sender, RoutedEventArgs e)
         {
-            searchindex++;
-            if (searchindex >= SearchMatches.Count)
+            try
             {
-                searchindex = 0;
-            }
+                searchindex++;
+                if (searchindex >= SearchMatches.Count)
+                {
+                    searchindex = 0;
+                }
 
-            if (SearchMatches.Count > 0)
+                if (SearchMatches.Count > 0)
+                {
+                    SearchMatch sm = SearchMatches[searchindex];
+                    Selection = new(new(sm.iChar, sm.iLine));
+                }
+            }
+            catch (Exception ex)
             {
-                SearchMatch sm = SearchMatches[searchindex];
-                Selection = new(new(sm.iChar, sm.iLine));
+                ErrorOccured?.Invoke(this, new ErrorEventArgs(ex));
             }
-
         }
 
         private void TextControl_DragStarting(UIElement sender, DragStartingEventArgs args)
         {
-            Debug.WriteLine(args.Data.Properties.Count);
+            try
+            {
+                args.Data.SetText(SelectedText);
+                args.Data.RequestedOperation = DataPackageOperation.Move;
+                args.AllowedOperations = DataPackageOperation.Move;
+                args.DragUI.SetContentFromSoftwareBitmap(new Windows.Graphics.Imaging.SoftwareBitmap(Windows.Graphics.Imaging.BitmapPixelFormat.Rgba16, 1, 1));
+            }
+            catch (Exception ex)
+            {
+                ErrorOccured?.Invoke(this, new ErrorEventArgs(ex));
+            }
         }
 
         private void Tbx_Search_KeyDown(object sender, KeyRoutedEventArgs e)
         {
-            if (e.Key == VirtualKey.Enter)
+            try
             {
-                Btn_SearchNext(null,null);
-                e.Handled = true;
+                if (e.Key == VirtualKey.Enter)
+                {
+                    Btn_SearchNext(null, null);
+                    e.Handled = true;
+                }
+            }
+            catch (Exception ex)
+            {
+                ErrorOccured?.Invoke(this, new ErrorEventArgs(ex));
+            }
+        }
+
+        private async void TextControl_DragOver(object sender, DragEventArgs e)
+        {
+            try
+            {
+                Place place = PointerToPlace(e.GetPosition(TextControl));
+                if (!IsSelection)
+                {
+                    e.AcceptedOperation = DataPackageOperation.Move | DataPackageOperation.Copy;
+                    CursorPlace = place;
+                }
+                else
+                {
+                    if (place >= Selection.VisualStart && place < Selection.VisualEnd)
+                    {
+                        e.AcceptedOperation = DataPackageOperation.None;
+                        CursorPlace = Selection.End;
+                    }
+                    else
+                    {
+                        e.AcceptedOperation = DataPackageOperation.Move;
+                        CursorPlace = Selection.End;
+                        CursorPlace = place;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                ErrorOccured?.Invoke(this, new ErrorEventArgs(ex));
+            }
+        }
+
+        private async void TextControl_Drop(object sender, DragEventArgs e)
+        {
+            try
+            {
+                string text = await e.DataView.GetTextAsync();
+                TextAction_Paste(text, PointerToPlace(e.GetPosition(TextControl)));
+            }
+            catch (Exception ex)
+            {
+                ErrorOccured?.Invoke(this, new ErrorEventArgs(ex));
             }
         }
     }
