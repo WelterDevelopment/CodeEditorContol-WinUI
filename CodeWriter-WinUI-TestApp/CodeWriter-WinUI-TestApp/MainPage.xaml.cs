@@ -16,12 +16,15 @@ namespace CodeWriter_WinUI_TestApp
         public MainPage()
         {
             this.InitializeComponent();
+            VM.Text = VM.LastSavedText = File.ReadAllText(Path.Combine(Windows.ApplicationModel.Package.Current.InstalledLocation.Path, "ExampleText.lua"));
+            CW.Save();
         }
 
         private  void Btn_Load_Click(object sender, RoutedEventArgs e)
         {
             VM.Text = VM.LastSavedText = File.ReadAllText(Path.Combine(Windows.ApplicationModel.Package.Current.InstalledLocation.Path, "ExampleText.tex"));
             CW.Save();
+            
             Btn_Save.Visibility = Visibility.Visible;
             Btn_Load.Content = "Reload Textfile";
         }

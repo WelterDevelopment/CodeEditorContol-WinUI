@@ -46,6 +46,14 @@ namespace CodeWriter_WinUI
         public static readonly DependencyProperty ShowLineMarkersProperty = DependencyProperty.Register("ShowLineMarkers", typeof(bool), typeof(CodeWriter), new PropertyMetadata(true, (d, e) => ((CodeWriter)d).Invalidate()));
         public static readonly DependencyProperty IsFoldingEnabledProperty = DependencyProperty.Register("IsFoldingEnabled", typeof(bool), typeof(CodeWriter), new PropertyMetadata(true, (d, e) => ((CodeWriter)d).Invalidate()));
 
+        public static new readonly DependencyProperty LanguageProperty = DependencyProperty.Register("Language", typeof(Language), typeof(CodeWriter), new PropertyMetadata(new Language(), (d, e) => ((CodeWriter)d).LanguageChanged()));
+
+        private void LanguageChanged()
+        {
+            Lines.ForEach(x=>x.Language = Language);
+            Invalidate();
+        }
+
         private void OnTabLengthChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {
             Invalidate();
@@ -70,14 +78,19 @@ namespace CodeWriter_WinUI
         {
             { Token.Normal, Color.FromArgb(255, 220, 220, 220) },
             { Token.Command, Color.FromArgb(255, 50, 130, 210) },
+            { Token.Function, Color.FromArgb(255, 200, 120, 220) },
+            { Token.Keyword, Color.FromArgb(255, 50, 130, 210) },
             { Token.Environment, Color.FromArgb(255, 50, 190, 150) },
             { Token.Comment, Color.FromArgb(255, 40, 190, 90) },
             { Token.Key, Color.FromArgb(255, 150, 120, 200) },
-            { Token.Bracket, Color.FromArgb(255, 80, 40, 180) },
+            { Token.Bracket, Color.FromArgb(255, 100, 140, 220) },
             { Token.Reference, Color.FromArgb(255, 180, 140, 40) },
             { Token.Math, Color.FromArgb(255, 220, 160, 60) },
             { Token.Symbol, Color.FromArgb(255, 140, 200, 240) },
             { Token.Style, Color.FromArgb(255, 220, 130, 100) },
+            { Token.String, Color.FromArgb(255, 220, 130, 100) },
+            { Token.Special, Color.FromArgb(255, 50, 190, 150) },
+            { Token.Number, Color.FromArgb(255, 180, 220, 180) },
             { Token.Array, Color.FromArgb(255, 200, 100, 80) },
             { Token.Primitive, Color.FromArgb(255, 230, 120, 100) },
         };
@@ -114,13 +127,16 @@ namespace CodeWriter_WinUI
             Command_Cut = new RelayCommand(() => TextAction_Delete(true));
             Command_SelectAll = new RelayCommand(() => TextAction_SelectText());
             Command_Find = new RelayCommand(() => TextAction_Find());
-            Invalidate();
+            //Invalidate();
         }
 
         private void TextAction_Find()
         {
             IsFindPopupOpen = true;
+            if (!SelectedText.Contains("\n"))
+                Tbx_Search.Text = SelectedText;
             Tbx_Search.Focus(FocusState.Keyboard);
+            Tbx_Search.SelectionStart = Tbx_Search.Text.Length;
         }
 
         public void TextAction_SelectText(SelectionRange range = null)
@@ -210,6 +226,12 @@ namespace CodeWriter_WinUI
         }
 
         public Point CursorPoint { get => Get(new Point()); set => Set(value); }
+
+        public new Language Language
+        {
+            get => (Language)GetValue(LanguageProperty);
+            set { SetValue(LanguageProperty, value); }
+        }
 
         public new int FontSize
         {
@@ -905,7 +927,7 @@ namespace CodeWriter_WinUI
             int lineNumber = 1;
             foreach (string line in lines)
             {
-                Line l = new Line() { LineNumber = lineNumber, LineText = line, IsUnsaved = false };
+                Line l = new Line(Language) { LineNumber = lineNumber, LineText = line, IsUnsaved = false };
                 Lines.Add(l);
                 lineNumber++;
             }
@@ -1077,7 +1099,7 @@ namespace CodeWriter_WinUI
                                 storetext = Lines[CursorPlace.iLine].LineText.Substring(CursorPlace.iChar);
                                 Lines[CursorPlace.iLine].LineText = Lines[CursorPlace.iLine].LineText.Remove(CursorPlace.iChar);
                             }
-                            Lines.Insert(CursorPlace.iLine + 1, new Line() { LineNumber = CursorPlace.iLine, LineText = storetext, IsUnsaved = true });
+                            Lines.Insert(CursorPlace.iLine + 1, new Line(Language) { LineNumber = CursorPlace.iLine, LineText = storetext, IsUnsaved = true });
                             for (int i = CursorPlace.iLine + 1; i < Lines.Count; i++)
                                 Lines[i].LineNumber = i + 1;
                             Place newselect = CursorPlace;
@@ -1383,7 +1405,7 @@ namespace CodeWriter_WinUI
                     }
                     else
                     {
-                        Lines.Insert(place.iLine + i, new Line() { LineNumber = place.iLine + 1 + i, LineText = line, IsUnsaved = true });
+                        Lines.Insert(place.iLine + i, new Line(Language) { LineNumber = place.iLine + 1 + i, LineText = line, IsUnsaved = true });
                     }
                     i++;
                 }

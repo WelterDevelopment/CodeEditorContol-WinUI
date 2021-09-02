@@ -12,9 +12,13 @@
     <RunAnalyzersDuringBuild>true</RunAnalyzersDuringBuild>
   </PropertyGroup>
   <ItemGroup>
+    <None Remove="ExampleText.lua" />
     <None Remove="ExampleText.tex" />
   </ItemGroup>
   <ItemGroup>
+    <Content Include="ExampleText.lua">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
     <Content Include="ExampleText.tex">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
