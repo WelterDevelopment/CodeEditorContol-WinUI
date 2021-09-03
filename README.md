@@ -1,5 +1,5 @@
 
-# CodeWriter-WinUI
+# CodeEditorControl-WinUI
 Win2D-based code editor control for WinUI 3.
 
 At this stage, this is only a proof of concept. 
