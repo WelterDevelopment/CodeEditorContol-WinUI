@@ -474,10 +474,12 @@ namespace CodeEditorControl_WinUI
 
                     for (int i = 0; i < CursorPlace.iChar; i++)
                     {
-                        if (Lines[CursorPlace.iLine][i].C == '\t')
-                        {
-                            x += CharWidth * (TabLength - 1);
-                        }
+                        if (Lines.Count > CursorPlace.iLine)
+                            if (Lines[CursorPlace.iLine].Count > i)
+                                if (Lines[CursorPlace.iLine][i].C == '\t')
+                                {
+                                    x += CharWidth * (TabLength - 1);
+                                }
                     }
 
                     if (y <= TextControl.ActualHeight && y >= 0 && x <= TextControl.ActualWidth && x >= Width_Left)
@@ -947,8 +949,15 @@ namespace CodeEditorControl_WinUI
                 {
                     if (isCanvasLoaded)
                     {
-                        Invalidate();
-                        //Selection = new(new(0, 0));
+                        Range newSelection = new(Selection.VisualEnd);
+
+                        if (newSelection.VisualEnd.iLine > Lines.Count)
+                            newSelection = new(new(Lines.Last().Count-1, Lines.Count-1));
+                        else if (newSelection.VisualEnd.iChar > Lines[newSelection.VisualEnd.iLine].Count)
+                            newSelection = new(new(Lines[newSelection.VisualEnd.iLine].Count, newSelection.VisualEnd.iLine));
+
+                        Selection = newSelection;
+                        Invalidate();                        
                     }
                 });
             });
