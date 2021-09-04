@@ -49,6 +49,7 @@ namespace CodeEditor_WinUI_TestApp
         public string Log { get => Get(""); set => Set(value); }
         public ElementTheme RequestedTheme { get => Get(ElementTheme.Default); set => Set(value); }
         public bool ShowControlCharacters { get => Get(true); set => Set(value); }
+        public bool ShowHorizontalTicks { get => Get(true); set => Set(value); }
         public bool ShowLineMarkers { get => Get(true); set => Set(value); }
         public bool ShowLineNumbers { get => Get(true); set => Set(value); }
         public bool ShowScrollbarMarkers { get => Get(true); set => Set(value); }
