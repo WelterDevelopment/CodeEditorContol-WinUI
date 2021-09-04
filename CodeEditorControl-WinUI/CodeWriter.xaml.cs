@@ -4,6 +4,7 @@ using Microsoft.Graphics.Canvas.Geometry;
 using Microsoft.Graphics.Canvas.Text;
 using Microsoft.Graphics.Canvas.UI.Xaml;
 using Microsoft.UI;
+using Microsoft.UI.Input;
 using Microsoft.UI.Input.Experimental;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -19,6 +20,7 @@ using System.Linq;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 using System.Windows.Input;
 using Windows.ApplicationModel.DataTransfer;
 using Windows.Devices.Input;
@@ -27,7 +29,7 @@ using Windows.System;
 using Windows.UI;
 using Windows.UI.Core;
 
-namespace CodeWriter_WinUI
+namespace CodeEditorControl_WinUI
 {
     public partial class CodeWriter : UserControl, INotifyPropertyChanged
     {
@@ -48,10 +50,20 @@ namespace CodeWriter_WinUI
 
         public static new readonly DependencyProperty LanguageProperty = DependencyProperty.Register("Language", typeof(Language), typeof(CodeWriter), new PropertyMetadata(new Language(), (d, e) => ((CodeWriter)d).LanguageChanged()));
 
-        private void LanguageChanged()
+        private bool isBusy = false;
+
+        private async void LanguageChanged()
         {
-            Lines.ForEach(x=>x.Language = Language);
-            Invalidate();
+            Language lang = Language;
+            await Task.Run(
+                () =>
+            {
+                foreach (Line line in new List<Line>(Lines))
+                    line.Language = lang;
+                DispatcherQueue.TryEnqueue(() => { Invalidate(); });
+            });
+
+
         }
 
         private void OnTabLengthChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
@@ -99,7 +111,7 @@ namespace CodeWriter_WinUI
 
         private bool invoked = false;
 
-        private bool isCanvasLoaded = false;
+        private bool isCanvasLoaded { get => CanvasText.IsLoaded; }
 
         private bool IsSettingValue = false;
 
@@ -109,7 +121,6 @@ namespace CodeWriter_WinUI
 
         private int MinFontSize = 6;
 
-        private List<VirtualKey> Modifiers = new List<VirtualKey>();
 
         private Point previousPosition = new Point() { };
 
@@ -139,11 +150,11 @@ namespace CodeWriter_WinUI
             Tbx_Search.SelectionStart = Tbx_Search.Text.Length;
         }
 
-        public void TextAction_SelectText(SelectionRange range = null)
+        public void TextAction_SelectText(Range range = null)
         {
             if (range == null && Lines.Count > 0)
             {
-                Selection = new SelectionRange(new(0, 0), new(Lines.Last().Count, Lines.Count - 1));
+                Selection = new Range(new(0, 0), new(Lines.Last().Count, Lines.Count - 1));
             }
         }
 
@@ -171,7 +182,7 @@ namespace CodeWriter_WinUI
         public Color Color_WeakMarker { get => Get(Color.FromArgb(255, 40, 40, 40)); set => Set(value); }
         public Color Color_FoldingMarker { get => Get(Color.FromArgb(255, 140, 140, 140)); set => Set(value); }
         public Color Color_LeftBackground { get => Get(Color.FromArgb(255, 40, 40, 40)); set => Set(value); }
-        public Color Color_LineNumber { get => Get(Color.FromArgb(255, 100, 160, 200)); set => Set(value); }
+        public Color Color_LineNumber { get => Get(Color.FromArgb(255, 120, 180, 210)); set => Set(value); }
         public Color Color_Selection { get => Get(Color.FromArgb(255, 25, 50, 80)); set => Set(value); }
         public Color Color_Beam { get => Get(Color.FromArgb(255, 200, 200, 200)); set => Set(value); }
 
@@ -340,9 +351,9 @@ namespace CodeWriter_WinUI
             }
         }
 
-        public SelectionRange Selection
+        public Range Selection
         {
-            get => Get(new SelectionRange());
+            get => Get(new Range());
             set
             {
                 Set(value);
@@ -584,7 +595,7 @@ namespace CodeWriter_WinUI
 
                 CharHeight = (int)(size.Height * 1.03f);
                 CharWidth = (int)(sizew.Width * 1.31f);
-                isCanvasLoaded = true;
+                //isCanvasLoaded = true;
 
                 Invalidate();
                 Selection = new(new(0, 0));
@@ -595,9 +606,14 @@ namespace CodeWriter_WinUI
             }
         }
 
-        public void Save()
+        public async void Save()
         {
-            Lines.ForEach(x => x.IsUnsaved = false);
+            await Task.Run(() =>
+            {
+                foreach(Line line in new List<Line>(Lines))
+                line.IsUnsaved = false;
+            });
+
             CanvasText.Invalidate();
         }
 
@@ -732,12 +748,12 @@ namespace CodeWriter_WinUI
                         if (Selection.Start.iChar < Selection.End.iChar)
                         {
                             Lines[CursorPlace.iLine].LineText = Lines[CursorPlace.iLine].LineText.Remove(Selection.Start.iChar, Selection.End.iChar - Selection.Start.iChar);
-                            Selection = new SelectionRange(Selection.Start, Selection.Start);
+                            Selection = new Range(Selection.Start, Selection.Start);
                         }
                         else
                         {
                             Lines[CursorPlace.iLine].LineText = Lines[CursorPlace.iLine].LineText.Remove(Selection.End.iChar, Selection.Start.iChar - Selection.End.iChar);
-                            Selection = new SelectionRange(Selection.End, Selection.End);
+                            Selection = new Range(Selection.End, Selection.End);
                         }
 
 
@@ -839,7 +855,7 @@ namespace CodeWriter_WinUI
 
         public int CurrentLine = 0;
 
-        private void DrawText()
+        private async void DrawText()
         {
             if (isCanvasLoaded)
             {
@@ -848,21 +864,16 @@ namespace CodeWriter_WinUI
                     FontFamily = "Consolas",
                     FontSize = FontSize
                 };
-
                 Size size = MeasureTextSize(CanvasText.Device, "│", textFormat);
                 Size sizew = MeasureTextSize(CanvasText.Device, "–", textFormat);
-
                 CharHeight = (int)(size.Height * 1.03f);
                 CharWidth = (int)(sizew.Width * 1.31f);
             }
 
             if (VerticalScroll != null && HorizontalScroll != null && Lines != null)
             {
-
-
-                VerticalScroll.Maximum = (Lines.Count + 2) * CharHeight - Scroll.ActualHeight;
-                VerticalScroll.SmallChange = CharHeight;
-                VerticalScroll.LargeChange = 3 * CharHeight;
+                int StartLine = (int)(VerticalScroll.Value / CharHeight) + 1;
+                int EndLine = Math.Min((int)((VerticalScroll.Value + Scroll.ActualHeight) / CharHeight) + 1, Lines.Count);
 
                 maxchars = 0;
                 foreach (Line l in Lines)
@@ -870,15 +881,6 @@ namespace CodeWriter_WinUI
                     maxchars = l.Count > maxchars ? l.Count : maxchars;
                 }
 
-                HorizontalScroll.Maximum = (maxchars + 1) * CharWidth - Scroll.ActualWidth + Width_Left;
-                HorizontalScroll.SmallChange = CharWidth;
-                HorizontalScroll.LargeChange = 3 * CharWidth;
-
-                VerticalScroll.Visibility = Lines.Count * CharHeight > TextControl.ActualHeight ? Visibility.Visible : Visibility.Collapsed;
-                HorizontalScroll.Visibility = maxchars * CharHeight > TextControl.ActualWidth ? Visibility.Visible : Visibility.Collapsed;
-
-                int StartLine = (int)(VerticalScroll.Value / CharHeight) + 1;
-                int EndLine = Math.Min((int)((VerticalScroll.Value + Scroll.ActualHeight) / CharHeight) + 1, Lines.Count);
                 VisibleLines.Clear();
                 foreach (Line l in Lines)
                 {
@@ -888,13 +890,20 @@ namespace CodeWriter_WinUI
                     }
                 }
 
-
                 Width_LineNumber = ShowLineNumbers ? CharWidth * IntLength(Lines.Count) : 0;
                 Width_FoldingMarker = IsFoldingEnabled ? CharWidth : 0;
                 Width_ErrorMarker = ShowLineNumbers ? CharWidth / 2 : 0;
                 Width_WarningMarker = ShowLineNumbers ? CharWidth / 2 : 0;
 
+                VerticalScroll.Maximum = (Lines.Count + 2) * CharHeight - Scroll.ActualHeight;
+                VerticalScroll.SmallChange = CharHeight;
+                VerticalScroll.LargeChange = 3 * CharHeight;
 
+                HorizontalScroll.Maximum = (maxchars + 1) * CharWidth - Scroll.ActualWidth + Width_Left;
+                HorizontalScroll.SmallChange = CharWidth;
+                HorizontalScroll.LargeChange = 3 * CharWidth;
+                VerticalScroll.Visibility = Lines.Count * CharHeight > TextControl.ActualHeight ? Visibility.Visible : Visibility.Collapsed;
+                HorizontalScroll.Visibility = maxchars * CharHeight > TextControl.ActualWidth ? Visibility.Visible : Visibility.Collapsed;
 
                 CanvasBeam.Invalidate();
                 CanvasSelection.Invalidate();
@@ -909,10 +918,8 @@ namespace CodeWriter_WinUI
             if (e.NewValue == e.OldValue)
             {
                 return;
-            }
-
+            }                       
             int n = Math.Max((int)(e.NewValue / CharWidth) * CharWidth, 0);
-
             iCharOffset = (int)(n / CharWidth);
             HorizontalOffset = -n;
             CanvasBeam.Invalidate();
@@ -920,28 +927,35 @@ namespace CodeWriter_WinUI
             CanvasText.Invalidate();
         }
 
-        private void InitializeLines(string text)
+        private async Task InitializeLines(string text)
         {
+            VisibleLines.Clear();
             Lines.Clear();
-            string[] lines = text.Contains("\r\n") ? text.Split("\r\n", StringSplitOptions.None) : text.Split("\n", StringSplitOptions.None);
-            int lineNumber = 1;
-            foreach (string line in lines)
-            {
-                Line l = new Line(Language) { LineNumber = lineNumber, LineText = line, IsUnsaved = false };
-                Lines.Add(l);
-                lineNumber++;
-            }
-            if (isCanvasLoaded)
-            {
 
-                Invalidate();
-                Selection = new(new(0, 0));
-            }
+            Language lang = Language;
+            await Task.Run(() =>
+            {
+                string[] lines = text.Contains("\r\n") ? text.Split("\r\n", StringSplitOptions.None) : text.Split("\n", StringSplitOptions.None);
+                int lineNumber = 1;
+                foreach (string line in lines)
+                {
+                    Line l = new Line(lang) { LineNumber = lineNumber, LineText = line, IsUnsaved = false };
+                    Lines.Add(l);
+                    lineNumber++;
+                }
+                DispatcherQueue.TryEnqueue(() =>
+                {
+                    if (isCanvasLoaded)
+                    {
+                        Invalidate();
+                        //Selection = new(new(0, 0));
+                    }
+                });
+            });
         }
 
         private void KeyboardAccelerator_Invoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
         {
-            Modifiers.Clear();
             if (invoked)
             {
                 args.Handled = true;
@@ -1008,11 +1022,11 @@ namespace CodeWriter_WinUI
         {
         }
 
-        private void OnTextChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+        private async void OnTextChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {
             if (!(d as CodeWriter).IsSettingValue)
             {
-                InitializeLines((string)e.NewValue);
+               await InitializeLines((string)e.NewValue);
             }
             TextChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Text)));
         }
@@ -1050,10 +1064,6 @@ namespace CodeWriter_WinUI
             {
                 if (!isSelecting)
                 {
-                    if (e.Key == VirtualKey.Control)
-                    {
-                        Modifiers.Add(VirtualKey.Control);
-                    }
                     string storetext = "";
                     switch (e.Key)
                     {
@@ -1062,11 +1072,37 @@ namespace CodeWriter_WinUI
                             break;
 
                         case VirtualKey.Tab:
-                            Lines[CursorPlace.iLine].LineText = Lines[CursorPlace.iLine].LineText.Insert(CursorPlace.iChar, "\t");
-                            CursorPlace = new(CursorPlace.iChar + 1, CursorPlace.iLine);
+                            e.Handled = true;
+                            var shiftkey = KeyboardInput.GetKeyStateForCurrentThread(VirtualKey.Shift);
+                            if (IsSelection)
+                            {
+                                for (int iLine = Selection.VisualStart.iLine; iLine <= Selection.VisualEnd.iLine; iLine++)
+                                {
+                                    if (shiftkey == CoreVirtualKeyStates.Down)
+                                    {
+                                        if (Lines[iLine].LineText.StartsWith("\t"))
+                                            Lines[iLine].LineText = Lines[iLine].LineText.Remove(0, 1);
+                                    }
+                                    else
+                                    {
+                                        Lines[iLine].LineText = Lines[iLine].LineText.Insert(0, "\t");
+                                    }
+                                }
+                                CursorPlace = shiftkey == CoreVirtualKeyStates.Down ? new(CursorPlace.iChar - 1, CursorPlace.iLine) : new(CursorPlace.iChar + 1, CursorPlace.iLine);
+                            }
+                            else
+                            {
+                                if (shiftkey == CoreVirtualKeyStates.Down)
+                                {
+                                    if (Lines[CursorPlace.iLine].LineText.StartsWith("\t"))
+                                        Lines[CursorPlace.iLine].LineText = Lines[CursorPlace.iLine].LineText.Remove(0, 1);
+                                }
+                                else
+                                    Lines[CursorPlace.iLine].LineText = Lines[CursorPlace.iLine].LineText.Insert(CursorPlace.iChar, "\t");
+                            }
+                            
                             textChanged();
                             CanvasText.Invalidate();
-                            e.Handled = true;
                             break;
 
                         case VirtualKey.Enter:
@@ -1105,7 +1141,7 @@ namespace CodeWriter_WinUI
                             Place newselect = CursorPlace;
                             newselect.iLine++;
                             newselect.iChar = 0;
-                            Selection = new SelectionRange(newselect, newselect);
+                            Selection = new Range(newselect, newselect);
                             textChanged();
                             Invalidate();
                             e.Handled = true;
@@ -1144,7 +1180,7 @@ namespace CodeWriter_WinUI
                                     Lines.RemoveAt(CursorPlace.iLine);
                                     Place newplace = new(Lines[CursorPlace.iLine - 1].Count, CursorPlace.iLine - 1);
                                     Lines[newplace.iLine].LineText += storetext;
-                                    Selection = new SelectionRange(newplace);
+                                    Selection = new Range(newplace);
 
                                 }
                                 else
@@ -1156,7 +1192,7 @@ namespace CodeWriter_WinUI
                                     Lines[CursorPlace.iLine].LineText = Lines[CursorPlace.iLine].LineText.Remove(CursorPlace.iChar - 1, 1);
                                     Place newplace = CursorPlace;
                                     newplace.iChar--;
-                                    Selection = new SelectionRange(newplace);
+                                    Selection = new Range(newplace);
                                 }
                                 textChanged();
                                 Invalidate();
@@ -1249,19 +1285,19 @@ namespace CodeWriter_WinUI
             }
         }
 
-        private void Scroll_KeyUp(object sender, KeyRoutedEventArgs e)
-        {
-            if (e.Key == VirtualKey.Control)
-            {
-                Modifiers.Clear();
-            }
-        }
 
         private void Scroll_PointerWheelChanged(object sender, PointerRoutedEventArgs e)
         {
             ExpPointerPoint bla = e.GetCurrentPoint(Scroll);
             int mwd = bla.Properties.MouseWheelDelta;
-            if (!Modifiers.Contains(VirtualKey.Control))
+            
+             if (e.KeyModifiers == VirtualKeyModifiers.Control)
+            {
+                int newfontsize = FontSize + Math.Sign(mwd);
+                if (newfontsize >= MinFontSize && newfontsize <= MaxFontSize)
+                    SetValue(FontSizeProperty, newfontsize);
+            }
+            else
             {
                 mwd = Math.Sign(mwd) * (int)CharHeight;
                 if (!bla.Properties.IsHorizontalMouseWheel)
@@ -1272,12 +1308,6 @@ namespace CodeWriter_WinUI
                 {
                     HorizontalScroll.Value = Math.Max(HorizontalScroll.Value + mwd * 3, 0);
                 }
-            }
-            else if (e.KeyModifiers == VirtualKeyModifiers.Control)
-            {
-                int newfontsize = FontSize + Math.Sign(mwd);
-                if (newfontsize >= MinFontSize && newfontsize <= MaxFontSize)
-                    SetValue(FontSizeProperty, newfontsize);
             }
             e.Handled = true;
         }
@@ -1316,7 +1346,7 @@ namespace CodeWriter_WinUI
             }
         }
 
-        private void TextAction_Delete(bool cut = false)
+        private async void TextAction_Delete(bool cut = false)
         {
             try
             {
@@ -1326,41 +1356,43 @@ namespace CodeWriter_WinUI
                     {
                         TextAction_Copy();
                     }
-
                     Place start = Selection.VisualStart;
                     Place end = Selection.VisualEnd;
 
-                    string storetext = "";
-                    int removedlines = 0;
-                    for (int iLine = start.iLine; iLine <= end.iLine; iLine++)
+                    await Task.Run(() =>
                     {
-                        if (end.iLine == start.iLine)
+                        string storetext = "";
+                        int removedlines = 0;
+                        for (int iLine = start.iLine; iLine <= end.iLine; iLine++)
                         {
-                            Lines[iLine].LineText = Lines[iLine].LineText.Remove(start.iChar, end.iChar - start.iChar);
-                        }
-                        else if (iLine == start.iLine)
-                        {
-                            if (start.iChar < Lines[iLine].Count)
-                                Lines[iLine].LineText = Lines[iLine].LineText.Remove(start.iChar);
-                        }
-                        else if (iLine == end.iLine)
-                        {
-                            if (end.iChar == Lines[iLine - removedlines].Count - 1)
-                                Lines.RemoveAt(iLine - removedlines);
+                            if (end.iLine == start.iLine)
+                            {
+                                Lines[iLine].LineText = Lines[iLine].LineText.Remove(start.iChar, end.iChar - start.iChar);
+                            }
+                            else if (iLine == start.iLine)
+                            {
+                                if (start.iChar < Lines[iLine].Count)
+                                    Lines[iLine].LineText = Lines[iLine].LineText.Remove(start.iChar);
+                            }
+                            else if (iLine == end.iLine)
+                            {
+                                if (end.iChar == Lines[iLine - removedlines].Count - 1)
+                                    Lines.RemoveAt(iLine - removedlines);
+                                else
+                                {
+                                    storetext = Lines[iLine - removedlines].LineText.Substring(end.iChar);
+                                    Lines.RemoveAt(iLine - removedlines);
+                                }
+                            }
                             else
                             {
-                                storetext = Lines[iLine - removedlines].LineText.Substring(end.iChar);
                                 Lines.RemoveAt(iLine - removedlines);
+                                removedlines += 1;
                             }
                         }
-                        else
-                        {
-                            Lines.RemoveAt(iLine - removedlines);
-                            removedlines += 1;
-                        }
-                    }
 
-                    Lines[start.iLine].LineText += storetext;
+                        Lines[start.iLine].LineText += storetext;
+                    });
                     Selection = new(start);
                 }
             }
@@ -1395,20 +1427,23 @@ namespace CodeWriter_WinUI
                 }
 
                 Place place = placetopaste ?? CursorPlace;
-
                 int i = 0;
-                foreach (string line in text.Split('\n', StringSplitOptions.None))
+                Language lang = Language;
+                await Task.Run(() =>
                 {
-                    if (i == 0)
+                    foreach (string line in text.Split('\n', StringSplitOptions.None))
                     {
-                        Lines[place.iLine].LineText = Lines[place.iLine].LineText.Insert(place.iChar, line);
+                        if (i == 0)
+                        {
+                            Lines[place.iLine].LineText = Lines[place.iLine].LineText.Insert(place.iChar, line);
+                        }
+                        else
+                        {
+                            Lines.Insert(place.iLine + i, new Line(lang) { LineNumber = place.iLine + 1 + i, LineText = line, IsUnsaved = true });
+                        }
+                        i++;
                     }
-                    else
-                    {
-                        Lines.Insert(place.iLine + i, new Line(Language) { LineNumber = place.iLine + 1 + i, LineText = line, IsUnsaved = true });
-                    }
-                    i++;
-                }
+                });
 
                 Place end = new(i == 1 ? place.iChar + text.Length : Lines[place.iLine + i - 1].Count, place.iLine + i - 1);
                 Selection = new(end);
@@ -1462,13 +1497,13 @@ namespace CodeWriter_WinUI
                     {
                         if (!isLineSelect)
                         {
-                            Selection = new SelectionRange(Selection.Start, PointerToPlace(currentpoint.Position));
+                            Selection = new Range(Selection.Start, PointerToPlace(currentpoint.Position));
                         }
                         else
                         {
                             Place end = PointerToPlace(currentpoint.Position);
                             end.iChar = Lines[end.iLine].Count;
-                            Selection = new SelectionRange(Selection.Start, end);
+                            Selection = new Range(Selection.Start, end);
                         }
                     }
                     else if (isMiddleClickScrolling)
@@ -1610,11 +1645,11 @@ namespace CodeWriter_WinUI
                         {
                             if (rightpress <= start || rightpress >= end)
                             {
-                                Selection = new SelectionRange(rightpress);
+                                Selection = new Range(rightpress);
                             }
                         }
                         else
-                            Selection = new SelectionRange(rightpress);
+                            Selection = new Range(rightpress);
                         isMiddleClickScrolling = false;
                     }
 
@@ -1622,7 +1657,7 @@ namespace CodeWriter_WinUI
                     {
                         if (CursorPlaceHistory.Count > 1)
                         {
-                            Selection = new SelectionRange(CursorPlaceHistory[CursorPlaceHistory.Count - 2]);
+                            Selection = new Range(CursorPlaceHistory[CursorPlaceHistory.Count - 2]);
                             CursorPlaceHistory.Remove(CursorPlaceHistory.Last());
                         }
                     }
@@ -1702,7 +1737,7 @@ namespace CodeWriter_WinUI
             if (isDragging && place > Selection.VisualStart && place < Selection.VisualEnd)
             {
                 isDragging = false;
-                Selection = new SelectionRange(new(PointerToPlace(currentpoint.Position)));
+                Selection = new Range(new(PointerToPlace(currentpoint.Position)));
             }
         }
 
@@ -1722,7 +1757,7 @@ namespace CodeWriter_WinUI
         {
             try
             {
-                if (e.NewValue == e.OldValue)
+                if (e.NewValue == e.OldValue | VisibleLines == null | VisibleLines.Count == 0)
                 {
                     return;
                 }
@@ -1731,15 +1766,23 @@ namespace CodeWriter_WinUI
                 {
                     return;
                 }
+                Invalidate();
             }
             catch (Exception ex)
             {
                 ErrorOccured?.Invoke(this, new ErrorEventArgs(ex));
             }
-            Invalidate();
         }
 
-        public List<SyntaxError> SyntaxErrors { get => Get(new List<SyntaxError>()); set { Set(value); CanvasScrollbarMarkers.Invalidate(); CanvasText.Invalidate(); } }
+        public List<SyntaxError> SyntaxErrors { get => Get(new List<SyntaxError>()); set 
+            {
+                Set(value);
+                DispatcherQueue.TryEnqueue(() =>
+                {
+                    CanvasScrollbarMarkers.Invalidate(); CanvasText.Invalidate();
+                } );
+            } 
+        }
         public List<SearchMatch> SearchMatches { get => Get(new List<SearchMatch>()); set { Set(value); CanvasScrollbarMarkers.Invalidate(); } }
         private void Tbx_SearchChanged(object sender, TextChangedEventArgs e)
         {
@@ -1793,7 +1836,7 @@ namespace CodeWriter_WinUI
                 }
                 if (SearchMatches.Count > 0)
                 {
-                    Selection = new SelectionRange(new(SearchMatches[0].iChar, SearchMatches[0].iLine));
+                    Selection = new Range(new(SearchMatches[0].iChar, SearchMatches[0].iLine));
                 }
                 CanvasScrollbarMarkers.Invalidate();
                 CanvasSelection.Invalidate();

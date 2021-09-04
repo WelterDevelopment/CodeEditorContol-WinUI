@@ -1,7 +1,7 @@
 ﻿using Microsoft.UI.Xaml;
 
 
-namespace CodeWriter_WinUI_TestApp
+namespace CodeEditor_WinUI_TestApp
 {
     public partial class App : Application
     {

@@ -7,12 +7,12 @@
   IgnorableNamespaces="uap rescap">
 
   <Identity
-    Name="22ec72c2-50e1-4131-81e4-bf8eb248e639"
+    Name="CodeEditor-WinUI-TestApp"
     Publisher="CN=Welter"
     Version="1.0.0.0" />
 
   <Properties>
-    <DisplayName>CodeWriter-WinUI-TestApp (Package)</DisplayName>
+    <DisplayName>CodeEditor-WinUI-TestApp</DisplayName>
     <PublisherDisplayName>Welter</PublisherDisplayName>
     <Logo>Images\StoreLogo.png</Logo>
   </Properties>
@@ -31,7 +31,7 @@
       Executable="$targetnametoken$.exe"
       EntryPoint="$targetentrypoint$">
       <uap:VisualElements
-        DisplayName="CodeWriter-WinUI-TestApp (Package)"
+        DisplayName="CodeEditor Control (WinUI 3)"
         Description="CodeWriter-WinUI-TestApp (Package)"
         BackgroundColor="transparent"
         Square150x150Logo="Images\Square150x150Logo.png"

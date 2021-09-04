@@ -1,10 +1,10 @@
 ﻿<Page
-    x:Class="CodeWriter_WinUI_TestApp.MainPage"
+    x:Class="CodeEditor_WinUI_TestApp.MainPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
-    xmlns:codewriter="using:CodeWriter_WinUI"
+    xmlns:codewriter="using:CodeEditorControl_WinUI"
     mc:Ignorable="d" 
     DataContext="{x:Bind VM}" 
     RequestedTheme="{Binding RequestedTheme, Mode=OneWay}" 
@@ -52,7 +52,7 @@
             </StackPanel>
         </ScrollViewer>
 
-        <codewriter:CodeWriter x:Name="CW" Grid.Row="1" Text="{Binding Text, Mode=TwoWay}" Language="{Binding EditorLanguage}" TextChanged="CW_TextChanged" ErrorOccured="CW_ErrorOccured" FontSize="{Binding FontSize, Mode=TwoWay}" TabLength="{Binding TabLength}" RequestedTheme="{Binding RequestedTheme}" ShowControlCharacters="{Binding ShowControlCharacters}" ShowLineNumbers="{Binding ShowLineNumbers}" ShowLineMarkers="{Binding ShowLineMarkers}" IsFoldingEnabled="{Binding IsFoldingEnabled}" ShowScrollbarMarkers="{Binding ShowScrollbarMarkers}" />
+        <codewriter:CodeWriter x:Name="CW" Grid.Row="1" Language="{Binding EditorLanguage}" Text="{Binding Text, Mode=TwoWay}"  TextChanged="CW_TextChanged" ErrorOccured="CW_ErrorOccured" FontSize="{Binding FontSize, Mode=TwoWay}" TabLength="{Binding TabLength}" RequestedTheme="{Binding RequestedTheme}" ShowControlCharacters="{Binding ShowControlCharacters}" ShowLineNumbers="{Binding ShowLineNumbers}" ShowLineMarkers="{Binding ShowLineMarkers}" IsFoldingEnabled="{Binding IsFoldingEnabled}" ShowScrollbarMarkers="{Binding ShowScrollbarMarkers}" />
 
         <Grid Grid.Row="2">
             <Grid.RowDefinitions>
