@@ -20,6 +20,7 @@ Stuff that works:
 - Search and highlight
 - Drag and drop
 - Error/Warning/Message/SearchMatch markers on the line and on the vertical ScrollBar
+- Recource-intensive work does not block the UI thread: Setting the Text, Pasting large chunks of Lines, Changing the Code Language
 
 ![Screenshot 2021-09-02 164150](https://user-images.githubusercontent.com/13318246/131864308-d7810b6e-9831-4848-9a5e-fa75a291d6f1.jpg)
 
@@ -30,6 +31,7 @@ Stuff that works:
 - Line wrapping
 - Text folding
 - Text-wide instead of line-wise regexing (respectively lexer states for multiline-comment handling)
+- Incremental regexing when Text source changes (Regex and draw the VisibleLines immediately, then regex the rest in blocks)
 - IntelliSense for commands and arguments
 - Find and highlight matching bracket/parenthesis/braces pairs, auto-close pairs
 - Generalize the syntax highlighting and IntelliSense for more (user-definable) languages
