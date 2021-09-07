@@ -484,6 +484,7 @@ namespace CodeEditorControl_WinUI
 		{
 			try
 			{
+				
 				if (VisibleLines.Count > 0)
 				{
 					int x = (int)(Width_Left + HorizontalOffset + CursorPlace.iChar * CharWidth);
@@ -517,7 +518,7 @@ namespace CodeEditorControl_WinUI
 
 					if (Selection.Start == CursorPlace)
 					{
-						args.DrawingSession.DrawRoundedRectangle(Width_Left, y, (int)TextControl.ActualWidth - Width_Left, CharHeight, 2, 2, ActualTheme == ElementTheme.Light ? Color_FoldingMarker.InvertColorBrightness() : Color_FoldingMarker, 2);
+						args.DrawingSession.DrawRoundedRectangle(Width_Left, y, (int)TextControl.ActualWidth - Width_Left, CharHeight, 2, 2, ActualTheme == ElementTheme.Light ? Color_FoldingMarker.InvertColorBrightness() : Color_FoldingMarker, 2f);
 					}
 				}
 			}
@@ -533,24 +534,25 @@ namespace CodeEditorControl_WinUI
 			{
 				if (ShowScrollbarMarkers)
 				{
+					float markersize = (float)Math.Max(CharHeight / VerticalScroll.Maximum * CanvasScrollbarMarkers.ActualHeight, 4f);
 					float width = (float)VerticalScroll.ActualWidth;
 					float height = (float)CanvasScrollbarMarkers.ActualHeight;
 
 					foreach (SearchMatch search in SearchMatches)
-						args.DrawingSession.DrawLine(width / 3f, search.iLine / (float)Lines.Count * height, width * 2 / 3f, search.iLine / (float)Lines.Count * height, ActualTheme == ElementTheme.Light ? Colors.LightGray.ChangeColorBrightness(-0.3f) : Colors.LightGray, 4f);
+						args.DrawingSession.DrawLine(width / 3f, search.iLine / (float)Lines.Count * height, width * 2 / 3f, search.iLine / (float)Lines.Count * height, ActualTheme == ElementTheme.Light ? Colors.LightGray.ChangeColorBrightness(-0.3f) : Colors.LightGray, markersize);
 
 					foreach (Line line in Lines.Where(x => x.IsUnsaved))
-						args.DrawingSession.DrawLine(0, line.iLine / (float)Lines.Count * height, width * 1 / 3f, line.iLine / (float)Lines.Count * height, ActualTheme == ElementTheme.Light ? Color_UnsavedMarker.ChangeColorBrightness(-0.2f) : Color_UnsavedMarker, 4f);
+						args.DrawingSession.DrawLine(0, line.iLine / (float)Lines.Count * height, width * 1 / 3f, line.iLine / (float)Lines.Count * height, ActualTheme == ElementTheme.Light ? Color_UnsavedMarker.ChangeColorBrightness(-0.2f) : Color_UnsavedMarker, markersize);
 
 					foreach (SyntaxError error in SyntaxErrors)
 					{
 						if (error.SyntaxErrorType == SyntaxErrorType.Error)
 						{
-							args.DrawingSession.DrawLine(width * 2 / 3f, error.iLine / (float)Lines.Count * height, width, error.iLine / (float)Lines.Count * height, ActualTheme == ElementTheme.Light ? Colors.Red.ChangeColorBrightness(-0.2f) : Colors.Red, 4f);
+							args.DrawingSession.DrawLine(width * 2 / 3f, error.iLine / (float)Lines.Count * height, width, error.iLine / (float)Lines.Count * height, ActualTheme == ElementTheme.Light ? Colors.Red.ChangeColorBrightness(-0.2f) : Colors.Red, markersize);
 						}
 						else if (error.SyntaxErrorType == SyntaxErrorType.Warning)
 						{
-							args.DrawingSession.DrawLine(width * 2 / 3f, error.iLine / (float)Lines.Count * height, width, error.iLine / (float)Lines.Count * height, ActualTheme == ElementTheme.Light ? Colors.Yellow.ChangeColorBrightness(-0.2f) : Colors.Yellow, 4f);
+							args.DrawingSession.DrawLine(width * 2 / 3f, error.iLine / (float)Lines.Count * height, width, error.iLine / (float)Lines.Count * height, ActualTheme == ElementTheme.Light ? Colors.Yellow.ChangeColorBrightness(-0.2f) : Colors.Yellow, markersize);
 						}
 					}
 
@@ -870,11 +872,11 @@ namespace CodeEditorControl_WinUI
 
 				VerticalScroll.Maximum = (Lines.Count + 2) * CharHeight - Scroll.ActualHeight;
 				VerticalScroll.SmallChange = CharHeight;
-				VerticalScroll.LargeChange = 3 * CharHeight;
+				VerticalScroll.LargeChange = CharHeight;
 
 				HorizontalScroll.Maximum = (maxchars + 1) * CharWidth - Scroll.ActualWidth + Width_Left;
 				HorizontalScroll.SmallChange = CharWidth;
-				HorizontalScroll.LargeChange = 3 * CharWidth;
+				HorizontalScroll.LargeChange = CharWidth;
 				VerticalScroll.Visibility = Lines.Count * CharHeight > TextControl.ActualHeight ? Visibility.Visible : Visibility.Collapsed;
 				HorizontalScroll.Visibility = maxchars * CharHeight > TextControl.ActualWidth ? Visibility.Visible : Visibility.Collapsed;
 
@@ -1347,25 +1349,39 @@ namespace CodeEditorControl_WinUI
 
 		private void Scroll_PointerWheelChanged(object sender, PointerRoutedEventArgs e)
 		{
-			ExpPointerPoint bla = e.GetCurrentPoint(Scroll);
-			int mwd = bla.Properties.MouseWheelDelta;
-
+			ExpPointerPoint pointer = e.GetCurrentPoint(Scroll);
+			int mwd = pointer.Properties.MouseWheelDelta;
+		
 			if (e.KeyModifiers == VirtualKeyModifiers.Control)
 			{
 				int newfontsize = FontSize + Math.Sign(mwd);
 				if (newfontsize >= MinFontSize && newfontsize <= MaxFontSize)
 					SetValue(FontSizeProperty, newfontsize);
 			}
-			else
+			else 
 			{
-				mwd = Math.Sign(mwd) * (int)CharHeight;
-				if (!bla.Properties.IsHorizontalMouseWheel)
+				if (!pointer.Properties.IsHorizontalMouseWheel)
 				{
-					VerticalScroll.Value -= mwd * 3;
+					if (mwd % 120 == 0) // Mouse
+					{
+						VerticalScroll.Value -= 3 * mwd / 120 * CharHeight;
+					}
+					else // Trackpad
+					{
+						VerticalScroll.Value -= mwd;
+					}
+					
 				}
 				else
 				{
-					HorizontalScroll.Value = Math.Max(HorizontalScroll.Value + mwd * 3, 0);
+					if (pointer.Properties.MouseWheelDelta % 120 == 0) // Mouse
+					{
+						HorizontalScroll.Value += 3 * pointer.Properties.MouseWheelDelta / 120 * CharWidth;
+					}
+					else // Trackpad
+					{
+						HorizontalScroll.Value += pointer.Properties.MouseWheelDelta;
+					}
 				}
 			}
 			e.Handled = true;
@@ -2010,6 +2026,7 @@ namespace CodeEditorControl_WinUI
 		{
 			try
 			{
+				
 				if (e.NewValue == e.OldValue | VisibleLines == null | VisibleLines.Count == 0)
 				{
 					return;
@@ -2025,6 +2042,10 @@ namespace CodeEditorControl_WinUI
 			{
 				ErrorOccured?.Invoke(this, new ErrorEventArgs(ex));
 			}
+		}
+
+		private void VerticalScroll_Scroll(object sender, ScrollEventArgs e)
+		{
 		}
 	}
 }

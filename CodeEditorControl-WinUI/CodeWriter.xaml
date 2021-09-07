@@ -161,14 +161,15 @@
 
         
         <ScrollBar  x:Name="VerticalScroll" Grid.Column="1"  PointerEntered="VerticalScroll_PointerEntered"
-                                    Value="0" SmallChange="10" LargeChange="100" ValueChanged="VerticalScroll_ValueChanged" 
-                                    Maximum="500"  Orientation="Vertical" 
+                                    Value="0" SmallChange="10" LargeChange="10" ValueChanged="VerticalScroll_ValueChanged" IndicatorMode="MouseIndicator"
+                                    Maximum="500"  Orientation="Vertical"  Scroll="VerticalScroll_Scroll"
                                     ViewportSize="{Binding ElementName=TextControl, Path=ActualHeight}" 
                                     Visibility="Visible"  HorizontalAlignment="Right"/>
+			
         <xaml:CanvasControl Grid.Column="1" x:Name="CanvasScrollbarMarkers" Draw="CanvasScrollbarMarkers_Draw" IsHitTestVisible="False" Margin="{Binding Source={ThemeResource ScrollBarSize}, Converter={StaticResource WidthToThickness} }" />
 
         <ScrollBar x:Name="HorizontalScroll" PointerEntered="VerticalScroll_PointerEntered"
-                                    Orientation="Horizontal" SmallChange="10" LargeChange="100"  ValueChanged="HorizontalScroll_ValueChanged"
+                                    Orientation="Horizontal" SmallChange="10" LargeChange="100"  ValueChanged="HorizontalScroll_ValueChanged" IndicatorMode="MouseIndicator"
                                     Grid.Row="1"
                                     Grid.Column="0"
                                     Value="0"
