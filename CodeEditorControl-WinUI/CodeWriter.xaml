@@ -1,0 +1,204 @@
+﻿<UserControl
+    x:Class="CodeEditorControl_WinUI.CodeWriter"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:CodeEditorControl_WinUI"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+    xmlns:xaml="using:Microsoft.Graphics.Canvas.UI.Xaml"
+    mc:Ignorable="d"
+    FontFamily="Consolas" Background="{ThemeResource SystemControlAcrylicWindowBrush}" IsTextScaleFactorEnabled="False" TabIndex="0" AllowFocusOnInteraction="True"  IsFocusEngagementEnabled="True"
+    x:DefaultBindMode="OneWay" 
+    xmlns:animations="using:CommunityToolkit.WinUI.UI.Animations" CharacterReceived="CodeWriter_CharacterReceived"
+    >
+    <UserControl.Resources>
+        <local:WidthToThickness x:Key="WidthToThickness"></local:WidthToThickness>
+        <local:TokenToColor x:Key="TokenToColor"></local:TokenToColor>
+    </UserControl.Resources>
+    <FlyoutBase.AttachedFlyout>
+        <Flyout LightDismissOverlayMode="Off" Placement="Top">
+
+        </Flyout>
+    </FlyoutBase.AttachedFlyout>
+
+    <Grid  x:Name="Scroll" CanBeScrollAnchor="True" PointerWheelChanged="Scroll_PointerWheelChanged" SizeChanged="Scroll_SizeChanged" >
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="Auto"/>
+        </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <Grid Grid.Column="0" x:Name="ScrollContent" KeyDown="Scroll_KeyDown"  ManipulationMode="TranslateX,TranslateY,TranslateInertia,Scale" ManipulationStarted="ScrollContent_ManipulationStarted"  ManipulationDelta="ScrollContent_ManipulationDelta"  Background="{x:Bind Background}" >
+
+            <Grid x:Name="TextControl"    AllowDrop="True" CanDrag="True" DragStarting="TextControl_DragStarting" DragOver="TextControl_DragOver" Drop="TextControl_Drop" PointerMoved="TextControl_PointerMoved"  PointerPressed="TextControl_PointerPressed" PointerReleased="TextControl_PointerReleased" PointerCaptureLost="TextControl_PointerLost" PointerCanceled="TextControl_PointerLost" PointerExited="TextControl_PointerExited">
+                <Grid.ContextFlyout>
+                    <MenuFlyout x:Name="ContextMenu" >
+                        <MenuFlyoutItem Text="Copy" Command="{x:Bind Command_Copy}" IsEnabled="{x:Bind IsSelection}" >
+                            <MenuFlyoutItem.Icon>
+                                <SymbolIcon Symbol="Copy"></SymbolIcon>
+                            </MenuFlyoutItem.Icon>
+                            <MenuFlyoutItem.KeyboardAccelerators>
+                                <KeyboardAccelerator Modifiers="Control" Key="C"  Invoked="KeyboardAccelerator_Invoked"/>
+                            </MenuFlyoutItem.KeyboardAccelerators>
+                        </MenuFlyoutItem>
+                        <MenuFlyoutItem Text="Paste" Command="{x:Bind Command_Paste}" >
+                            <MenuFlyoutItem.Icon>
+                                <SymbolIcon Symbol="Paste"></SymbolIcon>
+                            </MenuFlyoutItem.Icon>
+                            <MenuFlyoutItem.KeyboardAccelerators>
+                                <KeyboardAccelerator Modifiers="Control" Key="V" Invoked="KeyboardAccelerator_Invoked" />
+                            </MenuFlyoutItem.KeyboardAccelerators>
+                        </MenuFlyoutItem>
+                        <MenuFlyoutItem Text="Cut" Command="{x:Bind Command_Cut}" IsEnabled="{x:Bind IsSelection}">
+                            <MenuFlyoutItem.Icon>
+                                <SymbolIcon Symbol="Cut"></SymbolIcon>
+                            </MenuFlyoutItem.Icon>
+                            <MenuFlyoutItem.KeyboardAccelerators>
+                                <KeyboardAccelerator Modifiers="Control" Key="X"  Invoked="KeyboardAccelerator_Invoked"/>
+                            </MenuFlyoutItem.KeyboardAccelerators>
+                        </MenuFlyoutItem>
+                        <MenuFlyoutItem Text="Select all" Command="{x:Bind Command_SelectAll}">
+                            <MenuFlyoutItem.Icon>
+                                <SymbolIcon Symbol="SelectAll"></SymbolIcon>
+                            </MenuFlyoutItem.Icon>
+                            <MenuFlyoutItem.KeyboardAccelerators>
+                                <KeyboardAccelerator Key="A" Modifiers="Control" Invoked="KeyboardAccelerator_Invoked" />
+                            </MenuFlyoutItem.KeyboardAccelerators>
+                        </MenuFlyoutItem>
+
+                        <MenuFlyoutSeparator />
+
+                        <MenuFlyoutItem Text="Find &amp; Replace" Command="{x:Bind Command_Find}">
+                            <MenuFlyoutItem.Icon>
+                                <SymbolIcon Symbol="Find"></SymbolIcon>
+                            </MenuFlyoutItem.Icon>
+                            <MenuFlyoutItem.KeyboardAccelerators>
+                                <KeyboardAccelerator Key="F" Modifiers="Control" Invoked="KeyboardAccelerator_Invoked" />
+                            </MenuFlyoutItem.KeyboardAccelerators>
+                        </MenuFlyoutItem>
+
+                        <MenuFlyoutSeparator />
+                    </MenuFlyout>
+                </Grid.ContextFlyout>
+
+                <xaml:CanvasControl HorizontalAlignment="Stretch" VerticalAlignment="Stretch" x:Name="CanvasSelection" Draw="CanvasSelection_Draw"></xaml:CanvasControl>
+                <xaml:CanvasControl HorizontalAlignment="Stretch" VerticalAlignment="Stretch"  x:Name="CanvasText" Draw="CanvasText_Draw" ></xaml:CanvasControl>
+                <xaml:CanvasControl HorizontalAlignment="Stretch" VerticalAlignment="Stretch" x:Name="CanvasBeam" Draw="CanvasBeam_Draw"></xaml:CanvasControl>
+                <ItemsControl></ItemsControl>
+            </Grid>
+
+            <Grid x:Name="Grd_Suggestions" Visibility="{x:Bind IsSuggesting}" HorizontalAlignment="Left" VerticalAlignment="Top" Background="{ThemeResource SystemControlAcrylicElementBrush}" CornerRadius="6" Height="200">
+                <Grid.RenderTransform>
+                    <TranslateTransform X="{x:Bind CursorPoint.X}" Y="{x:Bind CursorPoint.Y}"></TranslateTransform>
+                </Grid.RenderTransform>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="200" />
+                    <ColumnDefinition Width="200" />
+                </Grid.ColumnDefinitions>
+                <ListBox x:Name="Lbx_Suggestions" Grid.Column="0" PointerEntered="NormalArrowPointerEntered" SingleSelectionFollowsFocus="True" SelectionMode="Single" KeyDown="Lbx_Suggestions_KeyDown"   BorderThickness="1" BorderBrush="{ThemeResource ListBoxBorderThemeBrush}"   ItemsSource="{x:Bind Suggestions}" IsDoubleTapEnabled="True" DoubleTapped="Lbx_Suggestions_DoubleTapped" SelectedIndex="{x:Bind SuggestionIndex, Mode=TwoWay}" >
+                    <ListBox.ItemContainerStyle>
+                        <Style TargetType="ListBoxItem">
+                            <Setter Property="Margin" Value="0"></Setter>
+                            <Setter Property="Padding" Value="4"></Setter>
+                        </Style>
+                    </ListBox.ItemContainerStyle>
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <Grid>
+                                <TextBlock Text="{Binding Text}" FontFamily="Consolas" >
+                                    <TextBlock.Foreground>
+                                        <SolidColorBrush Color="{Binding Token, Converter={StaticResource TokenToColor}}"></SolidColorBrush>
+                                    </TextBlock.Foreground>
+                                </TextBlock>
+                            </Grid>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+                <Grid Grid.Column="1"  DataContext="{x:Bind SelectedSuggestion}" BorderThickness="1" BorderBrush="{ThemeResource ListBoxBorderThemeBrush}">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <TextBlock Text="{Binding Text}" Grid.Row="0">
+                        <TextBlock.Foreground>
+                            <SolidColorBrush Color="{Binding Token, Converter={StaticResource TokenToColor}}"></SolidColorBrush>
+                        </TextBlock.Foreground>
+                    </TextBlock>
+                    <ScrollViewer BorderThickness="0,1,0,0" BorderBrush="{ThemeResource ListBoxBorderThemeBrush}" VerticalContentAlignment="Top" Grid.Row="1" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Hidden">
+                        <TextBlock Text="{Binding Description}"></TextBlock>
+                    </ScrollViewer>
+                </Grid>
+            </Grid>
+            <Grid PointerEntered="NormalArrowPointerEntered" x:Name="FindPopup" Visibility="{x:Bind IsFindPopupOpen}" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,4,0,4">
+                <animations:Implicit.ShowAnimations>
+                    <animations:TranslationAnimation Duration="0:0:0.2" From="0, 20, 0" To="0"/>
+                    <animations:OpacityAnimation Duration="0:0:0.2" From="0" To="1.0"/>
+                </animations:Implicit.ShowAnimations>
+                <animations:Implicit.HideAnimations>
+                    <animations:TranslationAnimation Duration="0:0:0.2" From="0" To="0, 20, 0"/>
+                    <animations:OpacityAnimation Duration="0:0:0.2" From="1.0" To="0"/>
+                </animations:Implicit.HideAnimations>
+                <Border CornerRadius="4"  BorderThickness="1" BorderBrush="{ThemeResource SystemControlBackgroundBaseLowRevealBorderBrush}">
+                    <Grid Width="300" Background="{x:Bind Background}">
+                        <Grid Padding="6" RowSpacing="4" ColumnSpacing="4">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <Button Grid.Row="0" Grid.Column="3" Padding="4" HorizontalAlignment="Right" Click="Btn_SearchClose">
+                                <Button.Content>
+                                    <SymbolIcon Symbol="Cancel"></SymbolIcon>
+                                </Button.Content>
+                            </Button>
+
+                            <TextBox Grid.Row="1" x:Name="Tbx_Search" KeyDown="Tbx_Search_KeyDown" HorizontalAlignment="Stretch" PlaceholderText="Find..." TextChanged="Tbx_SearchChanged"></TextBox>
+                            <Button Grid.Row="1" Grid.Column="1" ToolTipService.ToolTip="Find next" Padding="4" Click="Btn_SearchNext">
+                                <SymbolIcon Symbol="Forward"></SymbolIcon>
+                            </Button>
+                            <ToggleButton Grid.Row="1" Grid.Column="2" ToolTipService.ToolTip="Match case" Padding="4"  IsChecked="{x:Bind IsMatchCase, Mode=TwoWay}">
+                                <SymbolIcon Symbol="FontColor"></SymbolIcon>
+                            </ToggleButton>
+                            <ToggleButton Grid.Row="1" Grid.Column="3" Content=".*" ToolTipService.ToolTip="Use Regex" Padding="4"  IsChecked="{x:Bind IsRegex, Mode=TwoWay}" HorizontalAlignment="Stretch" />
+
+                            <TextBox Grid.Row="2" x:Name="Tbx_Replace" Visibility="Visible" HorizontalAlignment="Stretch" PlaceholderText="Replace..." KeyDown="Tbx_Replace_KeyDown" ></TextBox>
+                            <Button Grid.Row="2" Grid.Column="1"  Padding="4" ToolTipService.ToolTip="Replace next" Click="Btn_ReplaceNext" >
+                                <SymbolIcon Symbol="Forward"></SymbolIcon>
+                            </Button>
+                            <Button Grid.Row="2" Grid.Column="2"  Padding="4" ToolTipService.ToolTip="Replace all" Click="Btn_ReplaceAll" >
+                                <SymbolIcon Symbol="ShowResults"></SymbolIcon>
+                            </Button>
+                        </Grid>
+                    </Grid>
+                </Border>
+            </Grid>
+        </Grid>
+
+
+        <ScrollBar  x:Name="VerticalScroll" Grid.Column="1"  PointerEntered="VerticalScroll_PointerEntered"
+                                    Value="0" SmallChange="10" LargeChange="10" ValueChanged="VerticalScroll_ValueChanged" IndicatorMode="MouseIndicator"
+                                    Maximum="500"  Orientation="Vertical"  Scroll="VerticalScroll_Scroll"
+                                    ViewportSize="100" Visibility="Visible" HorizontalAlignment="Right"/>
+
+        <xaml:CanvasControl Grid.Column="1" x:Name="CanvasScrollbarMarkers" Draw="CanvasScrollbarMarkers_Draw" IsHitTestVisible="False" Margin="{Binding Source={ThemeResource ScrollBarSize}, Converter={StaticResource WidthToThickness} }" />
+
+        <ScrollBar x:Name="HorizontalScroll" PointerEntered="VerticalScroll_PointerEntered"
+                                    Orientation="Horizontal" SmallChange="10" LargeChange="100"  ValueChanged="HorizontalScroll_ValueChanged" IndicatorMode="MouseIndicator"
+                                    Grid.Row="1"
+                                    Grid.Column="0"
+                                    Value="0"
+                                    Maximum="500"
+                                    ViewportSize="100"
+                                    Visibility="Visible"/>
+    </Grid>
+</UserControl>
