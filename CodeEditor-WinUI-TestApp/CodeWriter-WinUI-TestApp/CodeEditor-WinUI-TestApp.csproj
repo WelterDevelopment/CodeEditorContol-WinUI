@@ -25,13 +25,13 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.ProjectReunion" Version="0.8.2" />
-    <PackageReference Include="Microsoft.ProjectReunion.Foundation" Version="0.8.2" />
-    <PackageReference Include="Microsoft.ProjectReunion.WinUI" Version="0.8.2" />
+    <PackageReference Include="Microsoft.ProjectReunion" Version="0.8.5" />
+    <PackageReference Include="Microsoft.ProjectReunion.Foundation" Version="0.8.5" />
+    <PackageReference Include="Microsoft.ProjectReunion.WinUI" Version="0.8.5" />
     <Manifest Include="$(ApplicationManifest)" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\CodeEditorControl-WinUI\CodeEditorControl-WinUI.csproj" />
+    <ProjectReference Include="..\..\..\..\..\..\..\..\ConTeXt-IDE-WinUI\CodeEditorControl-WinUI\CodeEditorControl-WinUI.csproj" />
   </ItemGroup>
 </Project>

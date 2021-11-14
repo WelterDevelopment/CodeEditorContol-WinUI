@@ -10,60 +10,61 @@
     RequestedTheme="{Binding RequestedTheme, Mode=OneWay}" 
     Background="{ThemeResource SystemControlAcrylicWindowBrush}" 
     >
-    <Grid RowSpacing="12">
-        <Grid.ColumnDefinitions>
-            <ColumnDefinition  />
-        </Grid.ColumnDefinitions>
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"  />
-            <RowDefinition Height="*"  />
-            <RowDefinition Height="Auto"  />
-        </Grid.RowDefinitions>
-        <ScrollViewer Padding="12,12,0,0" HorizontalAlignment="Stretch" VerticalScrollBarVisibility="Disabled" HorizontalScrollMode="Enabled" HorizontalScrollBarVisibility="Hidden" >
-            <StackPanel  Orientation="Horizontal" Spacing="6" >
-                <Button x:Name="Btn_Load" Content="Load Textfile" Click="Btn_Load_Click"/>
-                <Button x:Name="Btn_Save" Visibility="Collapsed" Content="Save Text" Click="Btn_Save_Click"/>
-                <CheckBox  Content="Unsaved Changes" IsChecked="{Binding UnsavedChanges, Mode=OneWay}" IsHitTestVisible="False" />
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                    <TextBlock Text="Selection: "></TextBlock>
-                    <TextBlock Text="{Binding ElementName=CW, Path=Selection.Start}"></TextBlock>
-                    <TextBlock Text="-->"></TextBlock>
-                    <TextBlock Text="{Binding ElementName=CW, Path=Selection.End}"></TextBlock>
-                </StackPanel>
-                <ComboBox VerticalAlignment="Center" ItemsSource="{Binding ThemeOptions}" SelectedItem="{Binding Theme, Mode=TwoWay}"></ComboBox>
-                <Button Content="Add Action" Click="Btn_Add_Click"></Button>
-                <Button Content="Options">
-                    <Button.Flyout>
-                        <Flyout>
-                            <StackPanel>
-                                <Slider Width="150" Header="Font Size"  Value="{Binding FontSize, Mode=TwoWay}" Minimum="6" Maximum="64"/>
-                                <Slider Width="150" Header="Tab Length"  Value="{Binding TabLength, Mode=TwoWay}" Minimum="0" Maximum="5"/>
+	<Grid RowSpacing="12">
+		<Grid.ColumnDefinitions>
+			<ColumnDefinition  />
+		</Grid.ColumnDefinitions>
+		<Grid.RowDefinitions>
+			<RowDefinition Height="Auto"  />
+			<RowDefinition Height="*"  />
+			<RowDefinition Height="Auto"  />
+		</Grid.RowDefinitions>
+		<ScrollViewer Padding="12,12,0,0" HorizontalAlignment="Stretch" VerticalScrollBarVisibility="Disabled" HorizontalScrollMode="Enabled" HorizontalScrollBarVisibility="Hidden" >
+			<StackPanel  Orientation="Horizontal" Spacing="6" >
+				<Button x:Name="Btn_Load" Content="Load Textfile" Click="Btn_Load_Click"/>
+				<Button x:Name="Btn_Save" Visibility="Collapsed" Content="Save Text" Click="Btn_Save_Click"/>
+				<CheckBox  Content="Unsaved Changes" IsChecked="{Binding UnsavedChanges, Mode=OneWay}" IsHitTestVisible="False" />
+				<StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+					<TextBlock Text="Selection: "></TextBlock>
+					<TextBlock Text="{Binding ElementName=CW, Path=Selection.Start}"></TextBlock>
+					<TextBlock Text="-->"></TextBlock>
+					<TextBlock Text="{Binding ElementName=CW, Path=Selection.End}"></TextBlock>
+				</StackPanel>
+				<ComboBox VerticalAlignment="Center" ItemsSource="{Binding ThemeOptions}" SelectedItem="{Binding Theme, Mode=TwoWay}"></ComboBox>
+				<Button Content="Add Action" Click="Btn_Add_Click"></Button>
+				<Button Content="Options">
+					<Button.Flyout>
+						<Flyout>
+							<StackPanel>
+								<Slider Width="150" Header="Font Size"  Value="{Binding FontSize, Mode=TwoWay}" Minimum="6" Maximum="64"/>
+								<Slider Width="150" Header="Tab Length"  Value="{Binding TabLength, Mode=TwoWay}" Minimum="0" Maximum="5"/>
 
-                                <CheckBox Content="Enable code folding" IsChecked="{Binding IsFoldingEnabled, Mode=TwoWay}" />
-                                <CheckBox Content="Show line numbers" IsChecked="{Binding ShowLineNumbers, Mode=TwoWay}" />
-                                <CheckBox Content="Show tab/newline markers" IsChecked="{Binding ShowControlCharacters, Mode=TwoWay}" />
-                                <CheckBox Content="Show warning/error markers" IsChecked="{Binding ShowLineMarkers, Mode=TwoWay}" />
-                                <CheckBox Content="Show scrollbar markers" IsChecked="{Binding ShowScrollbarMarkers, Mode=TwoWay}" />
-                                <CheckBox Content="Show horizontal ticks (10 chars)" IsChecked="{Binding ShowHorizontalTicks, Mode=TwoWay}" />
-                            </StackPanel>
-                        </Flyout>
-                    </Button.Flyout>
-                </Button>
-                <ComboBox VerticalAlignment="Center" ItemsSource="{Binding LanguageOptions}" SelectedItem="{Binding Language, Mode=TwoWay}"/>
-            </StackPanel>
-        </ScrollViewer>
+								<CheckBox Content="Enable code folding" IsChecked="{Binding IsFoldingEnabled, Mode=TwoWay}" />
+								<CheckBox Content="Enable text wrapping" IsChecked="{Binding IsWrappingEnabled, Mode=TwoWay}" />
+								<CheckBox Content="Show line numbers" IsChecked="{Binding ShowLineNumbers, Mode=TwoWay}" />
+								<CheckBox Content="Show tab/newline markers" IsChecked="{Binding ShowControlCharacters, Mode=TwoWay}" />
+								<CheckBox Content="Show warning/error markers" IsChecked="{Binding ShowLineMarkers, Mode=TwoWay}" />
+								<CheckBox Content="Show scrollbar markers" IsChecked="{Binding ShowScrollbarMarkers, Mode=TwoWay}" />
+								<CheckBox Content="Show horizontal ticks (10 chars)" IsChecked="{Binding ShowHorizontalTicks, Mode=TwoWay}" />
+							</StackPanel>
+						</Flyout>
+					</Button.Flyout>
+				</Button>
+				<ComboBox VerticalAlignment="Center" ItemsSource="{Binding LanguageOptions}" SelectedItem="{Binding Language, Mode=TwoWay}"/>
+			</StackPanel>
+		</ScrollViewer>
 
-        <codewriter:CodeWriter x:Name="CW" Grid.Row="1" Language="{Binding EditorLanguage}" Text="{Binding Text, Mode=TwoWay}"  TextChanged="CW_TextChanged" ErrorOccured="CW_ErrorOccured" FontSize="{Binding FontSize, Mode=TwoWay}" TabLength="{Binding TabLength}" RequestedTheme="{Binding RequestedTheme}" ShowControlCharacters="{Binding ShowControlCharacters}" ShowLineNumbers="{Binding ShowLineNumbers}" ShowLineMarkers="{Binding ShowLineMarkers}" IsFoldingEnabled="{Binding IsFoldingEnabled}" ShowScrollbarMarkers="{Binding ShowScrollbarMarkers}" ShowHorizontalTicks="{Binding ShowHorizontalTicks}"/>
+		<codewriter:CodeWriter x:Name="CW" Grid.Row="1" Language="{Binding EditorLanguage}" Text="{Binding Text, Mode=TwoWay}"  TextChanged="CW_TextChanged" ErrorOccured="CW_ErrorOccured" FontSize="{Binding FontSize, Mode=TwoWay}" TabLength="{Binding TabLength}" RequestedTheme="{Binding RequestedTheme}" ShowControlCharacters="{Binding ShowControlCharacters}" ShowLineNumbers="{Binding ShowLineNumbers}" ShowLineMarkers="{Binding ShowLineMarkers}" IsFoldingEnabled="{Binding IsFoldingEnabled}" IsWrappingEnabled="{Binding IsWrappingEnabled}" ShowScrollbarMarkers="{Binding ShowScrollbarMarkers}" ShowHorizontalTicks="{Binding ShowHorizontalTicks}"/>
 
-        <Grid Grid.Row="2">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"  />
-                <RowDefinition Height="*"  />
-            </Grid.RowDefinitions>
-            <TextBlock Margin="12,0,0,0" Grid.Row="0" FontSize="16" Text="Error Log:"></TextBlock>
-            <ScrollViewer Grid.Row="1" MaxHeight="200" x:Name="LogScroll" VerticalScrollMode="Enabled" HorizontalScrollMode="Enabled" HorizontalScrollBarVisibility="Visible" >
-                <TextBlock  IsTextSelectionEnabled="True" TextWrapping="NoWrap" Text="{Binding Log}"></TextBlock>
-            </ScrollViewer>
-        </Grid>
-    </Grid>
+		<Grid Grid.Row="2">
+			<Grid.RowDefinitions>
+				<RowDefinition Height="Auto"  />
+				<RowDefinition Height="*"  />
+			</Grid.RowDefinitions>
+			<TextBlock Margin="12,0,0,0" Grid.Row="0" FontSize="16" Text="Error Log:"></TextBlock>
+			<ScrollViewer Grid.Row="1" MaxHeight="200" x:Name="LogScroll" VerticalScrollMode="Enabled" HorizontalScrollMode="Enabled" HorizontalScrollBarVisibility="Visible" >
+				<TextBlock  IsTextSelectionEnabled="True" TextWrapping="NoWrap" Text="{Binding Log}"></TextBlock>
+			</ScrollViewer>
+		</Grid>
+	</Grid>
 </Page>
