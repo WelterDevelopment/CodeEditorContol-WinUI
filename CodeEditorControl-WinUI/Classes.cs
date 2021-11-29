@@ -1,4 +1,5 @@
 ﻿using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Data;
 using System;
 using System.Collections.Generic;
@@ -18,7 +19,7 @@ namespace CodeEditorControl_WinUI
 {
     public enum EditActionType
     {
-        Remove, Add,
+        Delete, Paste, AddChar, RemoveChar
     }
 
     public enum IntelliSenseType
@@ -146,6 +147,32 @@ namespace CodeEditorControl_WinUI
             },
             CommandTriggerCharacters = new[] { '\\' },
         };
+        public static Language Lua = new("Lua")
+        {
+            FoldingPairs = new()
+            {
+                new() { RegexStart = /*language=regex*/ @"\bfunction\b", RegexEnd = /*language=regex*/ @"\bend\b" },
+                new() { RegexStart = /*language=regex*/ @"\bfor\b", RegexEnd = /*language=regex*/ @"\bend\b" },
+                new() { RegexStart = /*language=regex*/ @"\bwhile\b", RegexEnd = /*language=regex*/ @"\bend\b" },
+                new() { RegexStart = /*language=regex*/ @"\bif\b", RegexEnd = /*language=regex*/ @"\bend\b" },
+            },
+            RegexTokens = new()
+            {
+                { Token.Math, /*language=regex*/ @"\b(math)\.(pi|a?tan|atan2|tanh|a?cos|cosh|a?sin|sinh|max|pi|min|ceil|floor|(fr|le)?exp|pow|fmod|modf|random(seed)?|sqrt|log(10)?|deg|rad|abs)\b" },
+                { Token.Array, /*language=regex*/ @"\b((table)\.(insert|concat|sort|remove|maxn)|(string)\.(insert|sub|rep|reverse|format|len|find|byte|char|dump|lower|upper|g?match|g?sub|format|formatters))\b" },
+                { Token.Symbol, /*language=regex*/ @"[:=<>,.!?&%+\|\-*\/\^~;]" },
+                { Token.Bracket, /*language=regex*/ @"[\[\]\(\)\{\}]" },
+                { Token.Number, /*language=regex*/ @"0[xX][0-9a-fA-F]*|-?\d*\.\d+([eE][\-+]?\d+)?|-?\d+?" },
+                { Token.String, /*language=regex*/ "\\\".*?\\\"|'.*?'" },
+                { Token.Comment, /*language=regex*/ "\\\"[^\\\"]*\\\" | --.*?\\\n" },
+            },
+            WordTokens = new()
+            {
+                { Token.Keyword, new string[] { "local", "true", "false", "in", "else", "not", "or", "and", "then", "nil", "end", "do", "repeat", "goto", "until", "return", "break" } },
+                { Token.Environment, new string[] { "function", "end", "if", "elseif", "else", "while", "for", } },
+                { Token.Function, new string[] { "#", "assert", "collectgarbage", "dofile", "_G", "getfenv", "ipairs", "load", "loadstring", "pairs", "pcall", "print", "rawequal", "rawget", "rawset", "select", "setfenv", "_VERSION", "xpcall", "module", "require", "tostring", "tonumber", "type", "rawset", "setmetatable", "getmetatable", "error", "unpack", "next", } }
+            },
+        };
     }
 
     public static class EditorOptions
@@ -250,7 +277,8 @@ namespace CodeEditorControl_WinUI
     public class EditAction
     {
         public EditActionType EditActionType { get; set; }
-        public string InvolvedText { get; set; }
+        public string TextState { get; set; }
+        public string TextInvolved { get; set; }
         public Range Selection { get; set; }
     }
 
@@ -266,17 +294,57 @@ namespace CodeEditorControl_WinUI
         public Place Start { get; set; }
     }
 
-    public class IntelliSense
+    public class Suggestion : Bindable
+    {
+        public string Name { get; set; }
+
+        public Token Token { get; set; } = Token.Normal;
+        public IntelliSenseType IntelliSenseType { get; set; } = IntelliSenseType.Command;
+        public string Snippet { get; set; }
+        public string Description { get; set; }
+    }
+
+    public class IntelliSense : Suggestion
     {
         public IntelliSense(string text)
         {
-            Text = text;
+            Name = text;
+            Token = Token.Command;
         }
-        public string Description { get; set; }
-        public IntelliSenseType IntelliSenseType { get; set; } = IntelliSenseType.Command;
-        public string Text { get; set; }
-        public string Snippet { get; set; }
-        public Token Token { get; set; } = Token.Command;
+        
+        public List<Argument> ArgumentsList { get; set; } = new();
+    }
+
+
+    public class Argument : Suggestion
+    {
+        public int Number { get; set; }
+
+        public bool IsSelected { get => Get(false); set => Set(value); }
+
+        public string Optional { get; set; }
+
+        public string Delimiters { get; set; }
+
+        public string List { get; set; }
+
+        public List<Parameter> Parameters { get; set; }
+    }
+
+
+    public class Parameter : Suggestion
+    {
+        public List<Constant> Constant { get; set; }
+
+        
+    }
+    public class Constant
+    {
+        public string Type { get; set; }
+
+        public string Default { get; set; }
+
+        public string Value { get; set; }
     }
 
     public class Language
@@ -287,13 +355,17 @@ namespace CodeEditorControl_WinUI
         }
 
         public List<SyntaxFolding> FoldingPairs { get; set; }
+        public List<NestedLanguage> NestedLanguages { get; set; }
         public string Name { get; set; }
 
         public char[] CommandTriggerCharacters { get; set; } = new char[] { };
         public char[] OptionsTriggerCharacters { get; set; } = new char[] { };
         public Dictionary<Token, string> RegexTokens { get; set; }
         public Dictionary<Token, string[]> WordTokens { get; set; }
-        public List<IntelliSense> Commands {  get; set; }
+        public Dictionary<char, char> AutoClosingPairs { get; set; } = new();
+        public List<Suggestion> Commands {  get; set; }
+
+        public string LineComment { get; set; }
     }
 
     public class Line : Bindable
@@ -686,6 +758,13 @@ namespace CodeEditorControl_WinUI
         public string Title { get; set; } = "";
     }
 
+    public class NestedLanguage
+    {
+        public string InnerLanguage { get; set; }
+        public string RegexEnd { get; set; }
+        public string RegexStart { get; set; }
+    }
+
     public class SyntaxFolding
     {
         public string RegexEnd { get; set; }
@@ -710,13 +789,77 @@ namespace CodeEditorControl_WinUI
     {
         public object Convert(object value, Type targetType, object parameter, string culture)
         {
-            Token token = (Token)value;
-            return EditorOptions.TokenColors[token];
+            if (value is Token token)
+                return EditorOptions.TokenColors[token];
+            else return EditorOptions.TokenColors[Token.Normal];
         }
 
         public object ConvertBack(object value, Type targetType, object parameter, string culture)
         {
             return 0;
         }
+    }
+    public class FocusToVisibility : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, string culture)
+        {
+            FocusState state = (FocusState)value;
+            return state != FocusState.Unfocused ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, string culture)
+        {
+            return 0;
+        }
+    }
+    public class ArgumentsToString : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, string culture)
+        {
+            string argstring = "";
+            List<Argument> list = (List<Argument>)value;
+            foreach (var item in list)
+            {
+                string delstart = "";
+                string delend = "";
+                switch (item.Delimiters)
+                {
+                    case "parentheses ": delstart = "("; delend = ")"; break;
+                    case "braces": delstart = "{"; delend = "}"; break;
+                    case "anglebrackets": delstart = "<"; delend = ">"; break;
+                    case "none": delstart = ""; delend = ""; break;
+                    case "brackets": delstart = "["; delend = "]"; break;
+                    default: delstart = "["; delend = "]"; break;
+                }
+                argstring += " " + delstart + "..." + delend;
+            }
+            return argstring;
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, string culture)
+        {
+            return null;
+        }
+    }
+
+    public class SuggestionTemplateSelector : DataTemplateSelector
+    {
+        public DataTemplate IntelliSenseTemplate { get; set; }
+        public DataTemplate ArgumentTemplate { get; set; }
+
+        protected override DataTemplate SelectTemplateCore(object item, DependencyObject dependency)
+        {
+            if (item is IntelliSense)
+            {
+                return IntelliSenseTemplate;
+            }
+            else if (item is Parameter)
+            {
+                return ArgumentTemplate;
+            }
+            else
+                return null;
+        }
+
     }
 }

@@ -6,14 +6,37 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
     xmlns:xaml="using:Microsoft.Graphics.Canvas.UI.Xaml"
-    mc:Ignorable="d"
-    FontFamily="Consolas" Background="{ThemeResource SystemControlAcrylicWindowBrush}" IsTextScaleFactorEnabled="False" TabIndex="0" AllowFocusOnInteraction="True"  IsFocusEngagementEnabled="True"
-    x:DefaultBindMode="OneWay" 
-    xmlns:animations="using:CommunityToolkit.WinUI.UI.Animations" CharacterReceived="CodeWriter_CharacterReceived"
+    xmlns:controls="using:CommunityToolkit.WinUI.UI.Controls"
+    mc:Ignorable="d" 
+    FontFamily="Consolas" IsTextScaleFactorEnabled="False"  RasterizationScale="1" TabIndex="0" AllowFocusOnInteraction="True"  IsFocusEngagementEnabled="True"
+    x:DefaultBindMode="OneWay" GotFocus="UserControl_GotFocus" LostFocus="UserControl_LostFocus"
+    xmlns:animations="using:CommunityToolkit.WinUI.UI.Animations" CharacterReceived="CodeWriter_CharacterReceived" 
     >
     <UserControl.Resources>
         <local:WidthToThickness x:Key="WidthToThickness"></local:WidthToThickness>
         <local:TokenToColor x:Key="TokenToColor"></local:TokenToColor>
+        <local:FocusToVisibility x:Key="FocusToVisibility"></local:FocusToVisibility>
+        <local:ArgumentsToString x:Key="ArgumentsToString"></local:ArgumentsToString>
+        <DataTemplate x:Key="IntelliSenseTemplate" x:DataType="local:IntelliSense">
+            <Grid>
+                <TextBlock Text="{Binding Name}" FontFamily="Consolas" >
+                    <TextBlock.Foreground>
+                        <SolidColorBrush Color="{Binding Token, Converter={StaticResource TokenToColor}}"></SolidColorBrush>
+                    </TextBlock.Foreground>
+                </TextBlock>
+            </Grid>
+        </DataTemplate>
+        <DataTemplate x:Key="ArgumentTemplate" x:DataType="local:Parameter">
+            <Grid>
+                <TextBlock Text="{Binding Name}" FontFamily="Consolas" >
+                </TextBlock>
+            </Grid>
+        </DataTemplate>
+        <local:SuggestionTemplateSelector
+			x:Key="SuggestionTemplateSelector"
+			IntelliSenseTemplate="{StaticResource IntelliSenseTemplate}"
+			ArgumentTemplate="{StaticResource ArgumentTemplate}"
+			/>
     </UserControl.Resources>
     <FlyoutBase.AttachedFlyout>
         <Flyout LightDismissOverlayMode="Off" Placement="Top">
@@ -31,11 +54,11 @@
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <Grid Grid.Column="0" x:Name="ScrollContent" KeyDown="Scroll_KeyDown"  ManipulationMode="TranslateX,TranslateY,TranslateInertia,Scale" ManipulationStarted="ScrollContent_ManipulationStarted"  ManipulationDelta="ScrollContent_ManipulationDelta"  Background="{x:Bind Background}" >
+        <Grid Grid.Column="0" x:Name="ScrollContent" KeyDown="Scroll_KeyDown"  ManipulationMode="TranslateX,TranslateY,TranslateInertia,Scale" ManipulationStarted="ScrollContent_ManipulationStarted"  ManipulationDelta="ScrollContent_ManipulationDelta"  >
 
             <Grid x:Name="TextControl"    AllowDrop="True" CanDrag="True" DragStarting="TextControl_DragStarting" DragOver="TextControl_DragOver" Drop="TextControl_Drop" PointerMoved="TextControl_PointerMoved"  PointerPressed="TextControl_PointerPressed" PointerReleased="TextControl_PointerReleased" PointerCaptureLost="TextControl_PointerLost" PointerCanceled="TextControl_PointerLost" PointerExited="TextControl_PointerExited">
                 <Grid.ContextFlyout>
-                    <MenuFlyout x:Name="ContextMenu" >
+                    <MenuFlyout x:Name="ContextMenu" x:FieldModifier="public" >
                         <MenuFlyoutItem Text="Copy" Command="{x:Bind Command_Copy}" IsEnabled="{x:Bind IsSelection}" >
                             <MenuFlyoutItem.Icon>
                                 <SymbolIcon Symbol="Copy"></SymbolIcon>
@@ -71,6 +94,26 @@
 
                         <MenuFlyoutSeparator />
 
+                        <MenuFlyoutItem Visibility="{x:Bind CanToggleComment}" Text="Toggle Comment" Command="{x:Bind Command_ToggleComment}">
+                            <MenuFlyoutItem.Icon>
+                                <SymbolIcon Symbol="Comment"></SymbolIcon>
+                            </MenuFlyoutItem.Icon>
+                            <MenuFlyoutItem.KeyboardAccelerators>
+                                <KeyboardAccelerator Key="T" Modifiers="Control" Invoked="KeyboardAccelerator_Invoked" />
+                            </MenuFlyoutItem.KeyboardAccelerators>
+                        </MenuFlyoutItem>
+
+                        <MenuFlyoutItem IsEnabled="{x:Bind CanUndo}" Text="Undo" Command="{x:Bind Command_Undo}">
+                            <MenuFlyoutItem.Icon>
+                                <SymbolIcon Symbol="Undo"></SymbolIcon>
+                            </MenuFlyoutItem.Icon>
+                            <MenuFlyoutItem.KeyboardAccelerators>
+                                <KeyboardAccelerator Key="Z" Modifiers="Control" Invoked="KeyboardAccelerator_Invoked" />
+                            </MenuFlyoutItem.KeyboardAccelerators>
+                        </MenuFlyoutItem>
+
+                        <MenuFlyoutSeparator />
+
                         <MenuFlyoutItem Text="Find &amp; Replace" Command="{x:Bind Command_Find}">
                             <MenuFlyoutItem.Icon>
                                 <SymbolIcon Symbol="Find"></SymbolIcon>
@@ -86,11 +129,11 @@
 
                 <xaml:CanvasControl HorizontalAlignment="Stretch" VerticalAlignment="Stretch" x:Name="CanvasSelection" Draw="CanvasSelection_Draw"></xaml:CanvasControl>
                 <xaml:CanvasControl HorizontalAlignment="Stretch" VerticalAlignment="Stretch"  x:Name="CanvasText" Draw="CanvasText_Draw" ></xaml:CanvasControl>
-                <xaml:CanvasControl HorizontalAlignment="Stretch" VerticalAlignment="Stretch" x:Name="CanvasBeam" Draw="CanvasBeam_Draw"></xaml:CanvasControl>
+                <xaml:CanvasControl HorizontalAlignment="Stretch" VerticalAlignment="Stretch" x:Name="CanvasBeam" Draw="CanvasBeam_Draw" Visibility="{x:Bind IsFocused}"></xaml:CanvasControl>
                 <ItemsControl></ItemsControl>
             </Grid>
 
-            <Grid x:Name="Grd_Suggestions" Visibility="{x:Bind IsSuggesting}" HorizontalAlignment="Left" VerticalAlignment="Top" Background="{ThemeResource SystemControlAcrylicElementBrush}" CornerRadius="6" Height="200">
+            <Grid x:Name="Grd_Suggestions" Visibility="{x:Bind IsSuggesting}" HorizontalAlignment="Left" VerticalAlignment="Top" Background="{ThemeResource SystemControlAcrylicElementBrush}" CornerRadius="6" BorderThickness="1" BorderBrush="{ThemeResource SystemControlBackgroundBaseLowRevealBorderBrush}" Height="200">
                 <Grid.RenderTransform>
                     <TranslateTransform X="{x:Bind CursorPoint.X}" Y="{x:Bind CursorPoint.Y}"></TranslateTransform>
                 </Grid.RenderTransform>
@@ -98,37 +141,30 @@
                     <ColumnDefinition Width="200" />
                     <ColumnDefinition Width="200" />
                 </Grid.ColumnDefinitions>
-                <ListBox x:Name="Lbx_Suggestions" Grid.Column="0" PointerEntered="NormalArrowPointerEntered" SingleSelectionFollowsFocus="True" SelectionMode="Single" KeyDown="Lbx_Suggestions_KeyDown"   BorderThickness="1" BorderBrush="{ThemeResource ListBoxBorderThemeBrush}"   ItemsSource="{x:Bind Suggestions}" IsDoubleTapEnabled="True" DoubleTapped="Lbx_Suggestions_DoubleTapped" SelectedIndex="{x:Bind SuggestionIndex, Mode=TwoWay}" >
+                <ListBox x:Name="Lbx_Suggestions" Grid.Column="0" PointerEntered="NormalArrowPointerEntered" SingleSelectionFollowsFocus="True" SelectionMode="Single" KeyDown="Lbx_Suggestions_KeyDown"  ItemsSource="{x:Bind Suggestions}" ItemTemplateSelector="{StaticResource SuggestionTemplateSelector}" IsDoubleTapEnabled="True" DoubleTapped="Lbx_Suggestions_DoubleTapped" SelectedIndex="{x:Bind SuggestionIndex, Mode=TwoWay}" >
                     <ListBox.ItemContainerStyle>
                         <Style TargetType="ListBoxItem">
                             <Setter Property="Margin" Value="0"></Setter>
                             <Setter Property="Padding" Value="4"></Setter>
                         </Style>
                     </ListBox.ItemContainerStyle>
-                    <ListBox.ItemTemplate>
-                        <DataTemplate>
-                            <Grid>
-                                <TextBlock Text="{Binding Text}" FontFamily="Consolas" >
-                                    <TextBlock.Foreground>
-                                        <SolidColorBrush Color="{Binding Token, Converter={StaticResource TokenToColor}}"></SolidColorBrush>
-                                    </TextBlock.Foreground>
-                                </TextBlock>
-                            </Grid>
-                        </DataTemplate>
-                    </ListBox.ItemTemplate>
                 </ListBox>
-                <Grid Grid.Column="1"  DataContext="{x:Bind SelectedSuggestion}" BorderThickness="1" BorderBrush="{ThemeResource ListBoxBorderThemeBrush}">
+                <Grid Grid.Column="1" Padding="6" RowSpacing="6" DataContext="{x:Bind SelectedSuggestion}" >
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
-                    <TextBlock Text="{Binding Text}" Grid.Row="0">
+                    <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="0">
+                        <TextBlock Text="{Binding Name}" IsTextSelectionEnabled="True">
                         <TextBlock.Foreground>
                             <SolidColorBrush Color="{Binding Token, Converter={StaticResource TokenToColor}}"></SolidColorBrush>
                         </TextBlock.Foreground>
-                    </TextBlock>
-                    <ScrollViewer BorderThickness="0,1,0,0" BorderBrush="{ThemeResource ListBoxBorderThemeBrush}" VerticalContentAlignment="Top" Grid.Row="1" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Hidden">
-                        <TextBlock Text="{Binding Description}"></TextBlock>
+                        </TextBlock>
+                        <TextBlock Text="{Binding ArgumentsList, Converter={StaticResource ArgumentsToString}}" IsTextSelectionEnabled="True">
+                        </TextBlock>
+                    </StackPanel>
+                    <ScrollViewer BorderThickness="0,1,0,0" BorderBrush="{ThemeResource SystemControlBackgroundBaseLowRevealBorderBrush}" VerticalContentAlignment="Top" Grid.Row="1" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Hidden">
+                        <controls:MarkdownTextBlock Background="Transparent" Text="{Binding Description}" IsTextSelectionEnabled="True"></controls:MarkdownTextBlock>
                     </ScrollViewer>
                 </Grid>
             </Grid>
@@ -185,7 +221,7 @@
         </Grid>
 
 
-        <ScrollBar  x:Name="VerticalScroll" Grid.Column="1"  PointerEntered="VerticalScroll_PointerEntered"
+        <ScrollBar  x:Name="VerticalScroll" Grid.Column="1"  PointerEntered="VerticalScroll_PointerEntered" Background="Transparent"
                                     Value="0" SmallChange="10" LargeChange="10" ValueChanged="VerticalScroll_ValueChanged" IndicatorMode="MouseIndicator"
                                     Maximum="500"  Orientation="Vertical"  Scroll="VerticalScroll_Scroll"
                                     ViewportSize="100" Visibility="Visible" HorizontalAlignment="Right"/>
