@@ -8,7 +8,7 @@
     xmlns:xaml="using:Microsoft.Graphics.Canvas.UI.Xaml"
     xmlns:controls="using:CommunityToolkit.WinUI.UI.Controls"
     mc:Ignorable="d" 
-    FontFamily="Consolas" IsTextScaleFactorEnabled="False"  RasterizationScale="1" TabIndex="0" AllowFocusOnInteraction="True"  IsFocusEngagementEnabled="True"
+    FontFamily="Consolas" IsTextScaleFactorEnabled="False"  TabIndex="0" AllowFocusOnInteraction="True"  IsFocusEngagementEnabled="True"
     x:DefaultBindMode="OneWay" GotFocus="UserControl_GotFocus" LostFocus="UserControl_LostFocus"
     xmlns:animations="using:CommunityToolkit.WinUI.UI.Animations" CharacterReceived="CodeWriter_CharacterReceived" 
     >
