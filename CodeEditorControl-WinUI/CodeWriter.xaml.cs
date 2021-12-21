@@ -54,6 +54,7 @@ namespace CodeEditorControl_WinUI
 		private new ElementTheme ActualTheme = ElementTheme.Dark;
 		private List<Place> CursorPlaceHistory = new();
 		public ObservableCollection<EditAction> EditActionHistory { get => Get(new ObservableCollection<EditAction>()); set => Set(value); }
+		public ObservableCollection<EditAction> InvertedEditActionHistory { get => Get(new ObservableCollection<EditAction>()); set => Set(value); }
 		private int iCharOffset = 0;
 		private int iVisibleChars = 0;
 		private bool invoked = false;
@@ -103,11 +104,13 @@ namespace CodeEditorControl_WinUI
 		private void EditActionHistory_CollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
 		{
 			CanUndo = EditActionHistory.Count > 0;
+			InvertedEditActionHistory = new(EditActionHistory.Reverse());
 		}
 
 		public event ErrorEventHandler ErrorOccured;
 
 		public event PropertyChangedEventHandler TextChanged;
+		public event PropertyChangedEventHandler LinesChanged;
 		public event PropertyChangedEventHandler CursorPlaceChanged;
 
 		public enum ScrollOrientation
@@ -843,7 +846,7 @@ namespace CodeEditorControl_WinUI
 					if (IsSelection)
 					{
 						TextAction_Delete();
-						Selection = new(Selection.VisualStart);
+						CursorPlace = Selection.VisualStart;
 					}
 
 					if (Language.CommandTriggerCharacters.Contains(args.Character))
@@ -856,10 +859,15 @@ namespace CodeEditorControl_WinUI
 						IsSuggestingOptions = false;
 						Lbx_Suggestions.ScrollIntoView(Suggestions.FirstOrDefault());
 					}
+					else if (!char.IsLetter(args.Character))
+					{
+						IsSuggesting = false;
+						IsSuggestingOptions = false;
+					}
 
 					if (args.Character == ' ')
 					{
-						EditActionHistory.Add(new() { EditActionType = EditActionType.AddChar, TextInvolved = " ", Selection = Selection, TextState = Text });
+						EditActionHistory.Add(new() { EditActionType = EditActionType.Add, TextInvolved = " ", Selection = Selection, TextState = Text });
 						if (!IsSuggestingOptions)
                         {
 							IsSuggesting = false;
@@ -871,23 +879,24 @@ namespace CodeEditorControl_WinUI
 						if (EditActionHistory.Count > 0)
 						{
 							EditAction last = EditActionHistory.Last();
-							if (last.EditActionType == EditActionType.AddChar)
+							if (last.EditActionType == EditActionType.Add)
 							{
 								last.TextInvolved += args.Character.ToString();
 							}
 							else
 							{
-								EditActionHistory.Add(new() { TextInvolved = args.Character.ToString(), TextState = Text, EditActionType = EditActionType.AddChar, Selection = Selection });
+								EditActionHistory.Add(new() { TextInvolved = args.Character.ToString(), TextState = Text, EditActionType = EditActionType.Add, Selection = Selection });
 							}
 						}
 						else
 						{
-							EditActionHistory.Add(new() { TextInvolved = args.Character.ToString(), TextState = Text, EditActionType = EditActionType.AddChar, Selection = Selection });
+							EditActionHistory.Add(new() { TextInvolved = args.Character.ToString(), TextState = Text, EditActionType = EditActionType.Add, Selection = Selection });
 						}
 					}
 
 					Lines[CursorPlace.iLine].LineText = Lines[CursorPlace.iLine].LineText.Insert(CursorPlace.iChar, args.Character.ToString());
 
+					
 					if (((args.Character == ',' | args.Character == ' ') && IsInsideBrackets(CursorPlace)) | Language.OptionsTriggerCharacters.Contains(args.Character))
 					{
 						IsSuggestingOptions = true;
@@ -913,7 +922,7 @@ namespace CodeEditorControl_WinUI
 							Lines[CursorPlace.iLine].LineText = Lines[CursorPlace.iLine].LineText.Insert(CursorPlace.iChar + 1, Language.AutoClosingPairs[args.Character].ToString());
 					}
 
-					Selection = new(new(CursorPlace.iChar + 1, CursorPlace.iLine));
+					Selection = new(Selection.VisualStart+1);
 					FilterSuggestions();
 					textChanged();
 					CanvasText.Invalidate();
@@ -1377,17 +1386,20 @@ namespace CodeEditorControl_WinUI
 		private void insertSuggestion()
 		{
 			TextControl.Focus(FocusState.Keyboard);
-			EditActionHistory.Add(new() { TextState = Text, Selection = Selection, TextInvolved = Suggestions[SuggestionIndex].Name, EditActionType = EditActionType.Paste });
+			
 			if (Suggestions[SuggestionIndex].IntelliSenseType == IntelliSenseType.Command)
 			{
 				Lines[CursorPlace.iLine].LineText = Lines[CursorPlace.iLine].LineText.Remove(SuggestionStart.iChar, CursorPlace.iChar - SuggestionStart.iChar);
 
+				EditActionHistory.Remove(EditActionHistory.LastOrDefault());
+				//EditActionHistory.Add(new() { TextState = Text, Selection = Selection, TextInvolved = Suggestions[SuggestionIndex].Name, EditActionType = EditActionType.Paste });
 				TextAction_Paste(Suggestions[SuggestionIndex].Name + Suggestions[SuggestionIndex].Snippet, SuggestionStart);
 
 				Selection = new(new(SuggestionStart.iChar + Suggestions[SuggestionIndex].Name.Length, CursorPlace.iLine));
 			}
 			else
 			{
+				EditActionHistory.Add(new() { TextState = Text, Selection = Selection, TextInvolved = Suggestions[SuggestionIndex].Name, EditActionType = EditActionType.Paste });
 				Lines[CursorPlace.iLine].LineText = Lines[CursorPlace.iLine].LineText.Remove(SuggestionStart.iChar + 1, CursorPlace.iChar - (SuggestionStart.iChar + 1));
 				Lines[CursorPlace.iLine].LineText = Lines[CursorPlace.iLine].LineText.Insert(SuggestionStart.iChar + 1, Suggestions[SuggestionIndex].Name);
 				Selection = new(new(SuggestionStart.iChar + 1 + Suggestions[SuggestionIndex].Name.Length, CursorPlace.iLine));
@@ -1431,7 +1443,7 @@ namespace CodeEditorControl_WinUI
 								break;
 							}
 
-							EditActionHistory.Add(new() { TextState = Text, Selection = Selection, TextInvolved = "\\t", EditActionType = EditActionType.AddChar });
+							EditActionHistory.Add(new() { TextState = Text, Selection = Selection, TextInvolved = @"\t", EditActionType = EditActionType.Add });
 
 							if (IsSelection)
 							{
@@ -1494,8 +1506,8 @@ namespace CodeEditorControl_WinUI
 							{
 								TextAction_Delete();
 							}
-                            EditActionHistory.Add(new() { TextState = Text, Selection = new(Selection.VisualStart), TextInvolved = "\\n", EditActionType = EditActionType.AddChar});
-							if (CursorPlace.iChar < Lines[CursorPlace.iLine].Count - 1)
+                            EditActionHistory.Add(new() { TextState = Text, Selection = new(Selection.VisualStart), TextInvolved = @"\n", EditActionType = EditActionType.Add});
+							if (CursorPlace.iChar < Lines[CursorPlace.iLine].Count )
 							{
 								storetext = Lines[CursorPlace.iLine].LineText.Substring(CursorPlace.iChar);
 								Lines[CursorPlace.iLine].LineText = Lines[CursorPlace.iLine].LineText.Remove(CursorPlace.iChar);
@@ -1518,7 +1530,7 @@ namespace CodeEditorControl_WinUI
 							{
 								if (CursorPlace.iChar == Lines[CursorPlace.iLine].Count && CursorPlace.iLine < Lines.Count - 1)
 								{
-									EditActionHistory.Add(new() { TextState = Text, Selection = Selection, EditActionType = EditActionType.RemoveChar, TextInvolved = "\\n" });
+									EditActionHistory.Add(new() { TextState = Text, Selection = Selection, EditActionType = EditActionType.Remove, TextInvolved = @"\n" });
 									storetext = Lines[CursorPlace.iLine + 1].LineText;
 									Lines.RemoveAt(CursorPlace.iLine + 1);
 									Lines[CursorPlace.iLine].LineText += storetext;
@@ -1527,7 +1539,7 @@ namespace CodeEditorControl_WinUI
 								}
 								else if (CursorPlace.iChar < Lines[CursorPlace.iLine].Count)
 								{
-                                    EditActionHistory.Add(new() { TextState = Text, Selection = Selection, EditActionType = EditActionType.RemoveChar, TextInvolved = Lines[CursorPlace.iLine].LineText[CursorPlace.iChar].ToString() });
+                                    EditActionHistory.Add(new() { TextState = Text, Selection = Selection, EditActionType = EditActionType.Remove, TextInvolved = Lines[CursorPlace.iLine].LineText[CursorPlace.iChar].ToString().Replace("\t",@"\t") });
 									Lines[CursorPlace.iLine].LineText = Lines[CursorPlace.iLine].LineText.Remove(CursorPlace.iChar, 1);
 									textChanged();
 									CanvasText.Invalidate();
@@ -1548,18 +1560,18 @@ namespace CodeEditorControl_WinUI
 									if (EditActionHistory.Count > 0)
 									{
 										EditAction last = EditActionHistory.Last();
-										if (last.EditActionType == EditActionType.RemoveChar)
+										if (last.EditActionType == EditActionType.Remove)
 										{
-											last.TextInvolved += "\\n";
+											last.TextInvolved += @"\n";
 										}
                                         else
                                         {
-											EditActionHistory.Add(new() { TextInvolved = "\\n", TextState = Text, EditActionType = EditActionType.RemoveChar, Selection = Selection });
+											EditActionHistory.Add(new() { TextInvolved = @"\n", TextState = Text, EditActionType = EditActionType.Remove, Selection = Selection });
 										}
 									}
                                     else
                                     {
-										EditActionHistory.Add(new() { TextInvolved = "\\n", TextState = Text, EditActionType = EditActionType.RemoveChar, Selection = Selection });
+										EditActionHistory.Add(new() { TextInvolved = @"\n", TextState = Text, EditActionType = EditActionType.Remove, Selection = Selection });
 									}
 									storetext = Lines[CursorPlace.iLine].LineText;
 									Lines.RemoveAt(CursorPlace.iLine);
@@ -1578,18 +1590,18 @@ namespace CodeEditorControl_WinUI
 									if (EditActionHistory.Count > 0)
 									{
 										EditAction last = EditActionHistory.Last();
-										if (last.EditActionType == EditActionType.RemoveChar)
+										if (last.EditActionType == EditActionType.Remove)
 										{
 											last.TextInvolved += texttoremove;
 										}
 										else
 										{
-											EditActionHistory.Add(new() { TextInvolved = texttoremove, TextState = Text, EditActionType = EditActionType.RemoveChar, Selection = Selection });
+											EditActionHistory.Add(new() { TextInvolved = texttoremove, TextState = Text, EditActionType = EditActionType.Remove, Selection = Selection });
 										}
 									}
 									else
 									{
-										EditActionHistory.Add(new() { TextInvolved = texttoremove, TextState = Text, EditActionType = EditActionType.RemoveChar, Selection = Selection });
+										EditActionHistory.Add(new() { TextInvolved = texttoremove, TextState = Text, EditActionType = EditActionType.Remove, Selection = Selection });
 									}
 
 									Lines[CursorPlace.iLine].LineText = Lines[CursorPlace.iLine].LineText.Remove(CursorPlace.iChar - 1, 1);
@@ -1928,14 +1940,35 @@ namespace CodeEditorControl_WinUI
 			}
 		}
 
-		public void TextAction_Undo()
+		public void TextAction_Undo(EditAction action = null)
 		{
-			if (EditActionHistory.Count > 0)
+			try
+			{
+				if (EditActionHistory.Count > 0)
+				{
+					if (action == null)
+					{
+						EditAction last = EditActionHistory.Last();
+						Text = last.TextState;
+						Selection = last.Selection;
+						EditActionHistory.Remove(last);
+					}
+					else
+					{
+						int index = EditActionHistory.IndexOf(action);
+						int end = EditActionHistory.Count - 1;
+						for (int i = end; i >= index; i--)
+						{
+							EditActionHistory.RemoveAt(i);
+						}
+						Text = action.TextState;
+						Selection = action.Selection;
+					}
+				}
+			}
+			catch (Exception ex)
             {
-				EditAction last = EditActionHistory.Last();
-				Text = last.TextState;
-				Selection = last.Selection;
-				EditActionHistory.Remove(last);
+				ErrorOccured?.Invoke(this, new ErrorEventArgs(ex));
 			}
 		}
 
@@ -1954,6 +1987,7 @@ namespace CodeEditorControl_WinUI
 			textChanged();
 			CanvasText.Invalidate();
 			CanvasScrollbarMarkers.Invalidate();
+			LinesChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Lines)));
 		}
 
 		private async void TextAction_Delete(bool cut = false)
@@ -1970,6 +2004,7 @@ namespace CodeEditorControl_WinUI
 					}
 					Place start = Selection.VisualStart;
 					Place end = Selection.VisualEnd;
+					//Selection = new(start);
 
 					await Task.Run(() =>
 					{
@@ -2005,7 +2040,7 @@ namespace CodeEditorControl_WinUI
 
 						Lines[start.iLine].LineText += storetext;
 					});
-					Selection = new(start);
+					
 				}
 			}
 			catch (Exception ex)
@@ -2059,7 +2094,7 @@ namespace CodeEditorControl_WinUI
 		{
 			try
 			{
-                EditActionHistory.Add(new() { TextState = Text, EditActionType = EditActionType.Paste, Selection = Selection, TextInvolved = SelectedText});
+				if (texttopaste != null) EditActionHistory.Add(new() { TextState = Text, EditActionType = EditActionType.Paste, Selection = Selection, TextInvolved = texttopaste?.Replace("\t", @"\t")?.Replace("\n",@"\n") }) ;
 				if (IsSelection && dragDropModifiers != DragDropModifiers.Control)
 				{
 					TextAction_Delete();
@@ -2132,6 +2167,7 @@ namespace CodeEditorControl_WinUI
 					HorizontalScroll.Visibility = maxchars * CharHeight > TextControl.ActualWidth ? Visibility.Visible : Visibility.Collapsed;
 				}
 				IsSettingValue = false;
+				TextChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Text)));
 			}
 			catch (Exception ex)
 			{
@@ -2509,11 +2545,13 @@ namespace CodeEditorControl_WinUI
 
 		public void ScrollToLine(int iLine)
 		{
-			VerticalScroll.Value = iLine * CharHeight - TextControl.ActualHeight / 2;
+			VerticalScroll.Value = (iLine+1) * CharHeight - TextControl.ActualHeight / 2;
 		}
 		public void CenterView()
         {
-			VerticalScroll.Value = Selection.VisualStart.iLine * CharHeight - TextControl.ActualHeight / 2;
+			HorizontalScroll.Value = 0;
+			VerticalScroll.Value = (Selection.VisualStart.iLine+1) * CharHeight - TextControl.ActualHeight / 2;
+			Focus(FocusState.Keyboard);
         }
 
 		private void TextControl_PointerReleased(object sender, PointerRoutedEventArgs e)
