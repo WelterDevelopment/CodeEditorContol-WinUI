@@ -10,7 +10,6 @@ namespace CodeEditor_WinUI_TestApp
   {
     public List<Language> LanguageList = new()
     {
-      Languages.ConTeXt,
       new("Lua")
       {
         FoldingPairs = new()
@@ -39,7 +38,7 @@ namespace CodeEditor_WinUI_TestApp
       }
     };
 
-    public Language EditorLanguage { get => Get(LanguageList[1]); set { Set(value); } }
+    public Language EditorLanguage { get => Get(LanguageList[0]); set { Set(value); } }
     public int FontSize { get => Get(20); set => Set(value); }
     public bool IsFoldingEnabled { get => Get(true); set => Set(value); }
     public bool IsWrappingEnabled { get => Get(true); set => Set(value); }

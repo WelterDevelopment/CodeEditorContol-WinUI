@@ -39,6 +39,7 @@ namespace CodeEditorControl_WinUI
 		public static new readonly DependencyProperty FontSizeProperty = DependencyProperty.Register("FontSize", typeof(int), typeof(CodeWriter), new PropertyMetadata(12, (d, e) => ((CodeWriter)d).FontSizeChanged(d, e)));
 		public static readonly DependencyProperty IsFoldingEnabledProperty = DependencyProperty.Register("IsFoldingEnabled", typeof(bool), typeof(CodeWriter), new PropertyMetadata(true, (d, e) => ((CodeWriter)d).Invalidate()));
 		public static readonly DependencyProperty IsWrappingEnabledProperty = DependencyProperty.Register("IsWrappingEnabled", typeof(bool), typeof(CodeWriter), new PropertyMetadata(true, (d, e) => ((CodeWriter)d).Invalidate()));
+		public static readonly DependencyProperty WrappingLengthProperty = DependencyProperty.Register("WrappingLength", typeof(int), typeof(CodeWriter), new PropertyMetadata(1, (d, e) => ((CodeWriter)d).Invalidate()));
 		public static new readonly DependencyProperty LanguageProperty = DependencyProperty.Register("Language", typeof(Language), typeof(CodeWriter), new PropertyMetadata(new Language("ConTeXt"), (d, e) => ((CodeWriter)d).LanguageChanged()));
 		public static new readonly DependencyProperty RequestedThemeProperty = DependencyProperty.Register("RequestedTheme", typeof(ElementTheme), typeof(CodeWriter), new PropertyMetadata(12, (d, e) => ((CodeWriter)d).RequestedThemeChanged(d, e)));
 		public static readonly DependencyProperty ScrollPositionProperty = DependencyProperty.Register("ScrollPosition", typeof(Place), typeof(CodeWriter), new PropertyMetadata(new Place(), (d, e) => ((CodeWriter)d).OnScrollPositionChanged(d, e)));
@@ -51,15 +52,19 @@ namespace CodeEditorControl_WinUI
 		public static readonly DependencyProperty TextProperty = DependencyProperty.Register("Text", typeof(string), typeof(CodeWriter), new PropertyMetadata(null, (d, e) => ((CodeWriter)d).OnTextChanged(d, e)));
 		public static readonly DependencyProperty CurrentLineProperty = DependencyProperty.Register("CurrentLine", typeof(Place), typeof(CodeWriter), new PropertyMetadata(new Place(0, 0), (d, e) => ((CodeWriter)d).CurrentLineChanged(d, e)));
 
+		public static CodeWriter Current;
+
 		private new ElementTheme ActualTheme = ElementTheme.Dark;
 		private List<Place> CursorPlaceHistory = new();
 		public ObservableCollection<EditAction> EditActionHistory { get => Get(new ObservableCollection<EditAction>()); set => Set(value); }
 		public ObservableCollection<EditAction> InvertedEditActionHistory { get => Get(new ObservableCollection<EditAction>()); set => Set(value); }
 		private int iCharOffset = 0;
-		private int iVisibleChars = 0;
+		private int iVisibleChars { get => (int)(((int)TextControl.ActualWidth - Width_Left) / CharWidth); }
 		private bool invoked = false;
 
 		private bool isDragging = false;
+		private string draggedText = "";
+		private Range draggedSelection;
 
 		private bool IsSettingValue = false;
 
@@ -87,8 +92,8 @@ namespace CodeEditorControl_WinUI
 			InitializeComponent();
 			Command_Copy = new RelayCommand(() => TextAction_Copy());
 			Command_Paste = new RelayCommand(() => { TextAction_Paste(); });
-			Command_Delete = new RelayCommand(() => TextAction_Delete());
-			Command_Cut = new RelayCommand(() => TextAction_Delete(true));
+			Command_Delete = new RelayCommand(() => TextAction_Delete(Selection));
+			Command_Cut = new RelayCommand(() => { TextAction_Delete(Selection, true); Selection = new(Selection.VisualStart); });
 			Command_SelectAll = new RelayCommand(() => TextAction_SelectText());
 			Command_Find = new RelayCommand(() => TextAction_Find());
 
@@ -96,6 +101,7 @@ namespace CodeEditorControl_WinUI
 			Command_ToggleComment = new RelayCommand(() => TextAction_ToggleComment());
 
 			EditActionHistory.CollectionChanged += EditActionHistory_CollectionChanged;
+			Current = this;
 		}
 
 		public bool CanUndo { get => Get(false); set => Set(value); }
@@ -108,6 +114,9 @@ namespace CodeEditorControl_WinUI
 		}
 
 		public event ErrorEventHandler ErrorOccured;
+
+		public event EventHandler<string> InfoMessage;
+		public event EventHandler DoubleClicked;
 
 		public event PropertyChangedEventHandler TextChanged;
 		public event PropertyChangedEventHandler LinesChanged;
@@ -137,7 +146,7 @@ namespace CodeEditorControl_WinUI
 
 		public Color Color_UnsavedMarker { get => Get(Color.FromArgb(255, 80, 190, 230)); set => Set(value); }
 
-		public Color Color_WeakMarker { get => Get(Color.FromArgb(255, 40, 40, 40)); set => Set(value); }
+		public Color Color_WeakMarker { get => Get(Color.FromArgb(255, 60, 60, 60)); set => Set(value); }
 
 		public ICommand Command_Copy { get; set; }
 
@@ -199,22 +208,16 @@ namespace CodeEditorControl_WinUI
 
 		public Point CursorPoint { get => Get(new Point()); set => Set(value); }
 
-		public new int FontSize
-		{
-			get => (int)GetValue(FontSizeProperty);
-			set { SetValue(FontSizeProperty, value); }
-		}
-		public Place CurrentLine
-		{
-			get => (Place)GetValue(CurrentLineProperty);
-			set { SetValue(CurrentLineProperty, value); }
-		}
+		public new int FontSize { get => (int)GetValue(FontSizeProperty); set { SetValue(FontSizeProperty, value); } }
+		public Place CurrentLine { get => (Place)GetValue(CurrentLineProperty); set { SetValue(CurrentLineProperty, value); } }
 		public int HorizontalOffset { get => Get(0); set { Set(value); } }
 
 		public bool IsFindPopupOpen { get => Get(false); set { Set(value); if (!value) { Tbx_Search.Text = ""; TextControl.Focus(FocusState.Keyboard); } } }
 
 		public bool IsFoldingEnabled { get => (bool)GetValue(IsFoldingEnabledProperty); set { SetValue(IsFoldingEnabledProperty, value); } }
 		public bool IsWrappingEnabled { get => (bool)GetValue(IsWrappingEnabledProperty); set { SetValue(IsWrappingEnabledProperty, value); } }
+
+		public int WrappingLength { get => (int)GetValue(WrappingLengthProperty); set { SetValue(WrappingLengthProperty, value); } }
 
 		public bool IsMatchCase { get => Get(false); set { Set(value); Tbx_SearchChanged(null, null); } }
 
@@ -449,6 +452,18 @@ namespace CodeEditorControl_WinUI
 			ContextMenu.Items.Remove(item);
 		}
 
+
+		public void RedrawText()
+		{
+			try
+			{
+				CanvasText.Invalidate();
+			}
+			catch (Exception ex)
+			{
+				ErrorOccured?.Invoke(this, new ErrorEventArgs(ex));
+			}
+		}
 		public void Invalidate()
 		{
 			try
@@ -502,7 +517,7 @@ namespace CodeEditorControl_WinUI
 				if (SearchMatches.Count > 0)
 				{
 					SearchMatch sm = SearchMatches[searchindex];
-					Selection = new(new(sm.iChar, sm.iLine));
+					Selection = new(new Place(sm.iChar, sm.iLine));
 				}
 			}
 			catch (Exception ex)
@@ -579,6 +594,9 @@ namespace CodeEditorControl_WinUI
 						args.DrawingSession.DrawRoundedRectangle(Width_Left, y, (int)TextControl.ActualWidth - Width_Left, CharHeight, 2, 2, ActualTheme == ElementTheme.Light ? Color_FoldingMarker.InvertColorBrightness() : Color_FoldingMarker, 2f);
 					}
 
+					Point point = PlaceToPoint(CursorPlace);
+					y = (int)point.Y;
+					x = (int)point.X;
 					if (y <= TextControl.ActualHeight && y >= 0 && x <= TextControl.ActualWidth && x >= Width_Left)
 						args.DrawingSession.DrawLine(new Vector2(x, y), new Vector2(x, y + CharHeight), ActualTheme == ElementTheme.Light ? Color_Beam.InvertColorBrightness() : Color_Beam, 2f);
 
@@ -750,6 +768,8 @@ namespace CodeEditorControl_WinUI
 
 						int textWrappingLines = Lines[iLine].Count / ((int)Scroll.ActualWidth - Width_Left);
 						int linewraps = 0;
+						int wrapindent = 0;
+						int iWrappingChar = 0;
 						for (int iChar = 0; iChar < lastChar; iChar++)
 						{
 							Char c = Lines[iLine][iChar];
@@ -788,20 +808,37 @@ namespace CodeEditorControl_WinUI
 								if (IsWrappingEnabled)
 								{
 									int maxchar = iVisibleChars;
-									if (iChar + indents * (TabLength - 1) - iCharOffset <= maxchar)
+									//if (iChar + indents * (TabLength - 1) - iCharOffset < maxchar)
+									//{
+									//	x = Width_Left + CharWidth * (iChar + indents * (TabLength - 1) - iCharOffset);
+									//}
+									//else
+									//{
+									int iWrappingEndPosition = (linewraps + 1) * maxchar - (3 * linewraps) - (indents * (TabLength - 1) * (linewraps + 1));
+
+									if (iChar > 0 && iChar < iWrappingEndPosition)
+										iWrappingChar++;
+
+									if (iChar == iWrappingEndPosition)
 									{
-										x = Width_Left + CharWidth * (iChar + indents * (TabLength - 1) - iCharOffset);
+										y += CharHeight;
+										iWrappingChar = 3;
+										totalwraps++;
+										linewraps++;
+										args.DrawingSession.FillRectangle(0, y, Width_Left - Width_TextIndent, CharHeight, Color_LeftBackground);
+										//wrapindent = 1;
 									}
-									else
-									{
-										if ((iChar + indents * (TabLength - 1) - iCharOffset) % (maxchar + 1) == 0)
-										{
-											y += CharHeight;
-											totalwraps++;
-											linewraps++;
-										}
-										x = Width_Left + CharWidth * (iChar - (maxchar + 1) * linewraps + indents * (TabLength - 1) - iCharOffset);
-									}
+
+									//if (iChar > 0)
+									//	if ((iChar + indents * (TabLength - 1) - iCharOffset) % (maxchar) == 0)
+									//	{
+									//		y += CharHeight;
+									//		totalwraps++;
+									//		linewraps++;
+									//		wrapindent = 1;
+									//	}
+									x = Width_Left + CharWidth * (iWrappingChar - iCharOffset + indents * (TabLength - 1));
+									//}
 
 									args.DrawingSession.DrawText(c.C.ToString(), x, y, ActualTheme == ElementTheme.Light ? EditorOptions.TokenColors[c.T].InvertColorBrightness() : EditorOptions.TokenColors[c.T], new CanvasTextFormat() { FontFamily = "Consolas", FontSize = FontSize });
 								}
@@ -845,7 +882,7 @@ namespace CodeEditorControl_WinUI
 				{
 					if (IsSelection)
 					{
-						TextAction_Delete();
+						TextAction_Delete(Selection);
 						CursorPlace = Selection.VisualStart;
 					}
 
@@ -854,7 +891,7 @@ namespace CodeEditorControl_WinUI
 						SuggestionStart = CursorPlace;
 						//Suggestions = Commands;
 						SuggestionIndex = -1;
-						
+
 						IsSuggesting = true;
 						IsSuggestingOptions = false;
 						Lbx_Suggestions.ScrollIntoView(Suggestions.FirstOrDefault());
@@ -869,10 +906,10 @@ namespace CodeEditorControl_WinUI
 					{
 						EditActionHistory.Add(new() { EditActionType = EditActionType.Add, TextInvolved = " ", Selection = Selection, TextState = Text });
 						if (!IsSuggestingOptions)
-                        {
+						{
 							IsSuggesting = false;
 							IsSuggestingOptions = false;
-                        }
+						}
 					}
 					else
 					{
@@ -896,7 +933,7 @@ namespace CodeEditorControl_WinUI
 
 					Lines[CursorPlace.iLine].LineText = Lines[CursorPlace.iLine].LineText.Insert(CursorPlace.iChar, args.Character.ToString());
 
-					
+
 					if (((args.Character == ',' | args.Character == ' ') && IsInsideBrackets(CursorPlace)) | Language.OptionsTriggerCharacters.Contains(args.Character))
 					{
 						IsSuggestingOptions = true;
@@ -922,7 +959,7 @@ namespace CodeEditorControl_WinUI
 							Lines[CursorPlace.iLine].LineText = Lines[CursorPlace.iLine].LineText.Insert(CursorPlace.iChar + 1, Language.AutoClosingPairs[args.Character].ToString());
 					}
 
-					Selection = new(Selection.VisualStart+1);
+					Selection = new(Selection.VisualStart + 1);
 					FilterSuggestions();
 					textChanged();
 					CanvasText.Invalidate();
@@ -942,35 +979,35 @@ namespace CodeEditorControl_WinUI
 			{
 				try
 				{
-					string searchString = Lines[SuggestionStart.iLine].LineText.Substring(SuggestionStart.iChar, CursorPlace.iChar  - SuggestionStart.iChar);
+					string searchString = Lines[SuggestionStart.iLine].LineText.Substring(SuggestionStart.iChar, CursorPlace.iChar - SuggestionStart.iChar);
 					if (!IsSuggestingOptions)
 					{
 						var matchingSuggestions = AllSuggestions
-							   .Where(m => m.Name.Contains(searchString))
-							   .OrderBy(m => m.Name)
-							   .ToList();
+										.Where(m => m.Name.Contains(searchString))
+										.OrderBy(m => m.Name)
+										.ToList();
 						Suggestions = matchingSuggestions;
 					}
 					else
 					{
 						var matchingSuggestions = AllOptions
-							   .Where(m => m.Name.Contains(searchString))
-							   .OrderBy(m => m.Name)
-							   .ToList();
+										.Where(m => m.Name.Contains(searchString))
+										.OrderBy(m => m.Name)
+										.ToList();
 						Suggestions = matchingSuggestions;
 					}
 				}
-                catch
-                {
+				catch
+				{
 
-                }
+				}
 			}
 		}
 
 		private IntelliSense GetCommandFromPlace(Place place)
-        {
+		{
 			Place start = place;
-			Place end = new Place(start.iChar+1, start.iLine);
+			Place end = new Place(start.iChar + 1, start.iLine);
 			var matches = Regex.Matches(Lines[start.iLine].LineText, @"(\\.+?)(\s*?)(\[)");
 			string command = "";
 			foreach (Match match in matches)
@@ -978,7 +1015,7 @@ namespace CodeEditorControl_WinUI
 				command = match?.Groups[1]?.Value;
 			}
 			if (!string.IsNullOrEmpty(command))
-				return AllSuggestions.FirstOrDefault(x=>x.Name == command ) as IntelliSense;
+				return AllSuggestions.FirstOrDefault(x => x.Name == command) as IntelliSense;
 			else return null;
 		}
 
@@ -1022,16 +1059,16 @@ namespace CodeEditorControl_WinUI
 
 		private void DrawText()
 		{
-				CanvasTextFormat textFormat = new CanvasTextFormat
-				{
-					FontFamily = "Consolas",
-					FontSize = FontSize
-				};
-				Size size = MeasureTextSize(CanvasDevice.GetSharedDevice(), "M", textFormat);
-				Size sizew = MeasureTextSize(CanvasDevice.GetSharedDevice(), "M", textFormat);
-				CharHeight = (int)(size.Height * 2f);
-				CharWidth = (int)(sizew.Width * 1.1f);
-			
+			CanvasTextFormat textFormat = new CanvasTextFormat
+			{
+				FontFamily = "Consolas",
+				FontSize = FontSize
+			};
+			Size size = MeasureTextSize(CanvasDevice.GetSharedDevice(), "M", textFormat);
+			Size sizew = MeasureTextSize(CanvasDevice.GetSharedDevice(), "M", textFormat);
+			CharHeight = (int)(size.Height * 2f);
+			CharWidth = (int)(sizew.Width * 1.1f);
+
 
 			if (VerticalScroll != null && HorizontalScroll != null && Lines != null)
 			{
@@ -1041,7 +1078,7 @@ namespace CodeEditorControl_WinUI
 				maxchars = 0;
 				foreach (Line l in new List<Line>(Lines))
 				{
-					maxchars = Math.Max(l.Count + l.Indents * (TabLength - 1)+1, maxchars);
+					maxchars = Math.Max(l.Count + l.Indents * (TabLength - 1) + 1, maxchars);
 				}
 
 				VisibleLines.Clear();
@@ -1053,23 +1090,32 @@ namespace CodeEditorControl_WinUI
 					}
 				}
 
-				iVisibleChars = (int)(((int)TextControl.ActualWidth - Width_Left) / CharWidth);
+				//iVisibleChars = (int)(((int)TextControl.ActualWidth - Width_Left) / CharWidth);
 
 				Width_LeftMargin = ShowLineNumbers ? CharWidth / 2 : 0;
 				Width_LineNumber = ShowLineNumbers ? CharWidth * IntLength(Lines.Count) : 0;
 				Width_FoldingMarker = IsFoldingEnabled ? CharWidth : 0;
-				Width_ErrorMarker = ShowLineMarkers ? CharWidth / 2 : 0;
+				Width_ErrorMarker = CharWidth / 2 ;
 				Width_WarningMarker = ShowLineMarkers ? CharWidth / 2 : 0;
 
 				VerticalScroll.Maximum = (Lines.Count + 2) * CharHeight - Scroll.ActualHeight;
 				VerticalScroll.SmallChange = CharHeight;
 				VerticalScroll.LargeChange = CharHeight;
+				VerticalScroll.Visibility = Lines.Count * CharHeight > TextControl.ActualHeight ? Visibility.Visible : Visibility.Collapsed;
 
-				HorizontalScroll.Maximum = (maxchars + 1) * CharWidth - Scroll.ActualWidth + Width_Left;
 				HorizontalScroll.SmallChange = CharWidth;
 				HorizontalScroll.LargeChange = CharWidth;
-				VerticalScroll.Visibility = Lines.Count * CharHeight > TextControl.ActualHeight ? Visibility.Visible : Visibility.Collapsed;
-				HorizontalScroll.Visibility = maxchars * CharHeight > TextControl.ActualWidth ? Visibility.Visible : Visibility.Collapsed;
+
+				if (!IsWrappingEnabled)
+				{
+					HorizontalScroll.Maximum = (maxchars + 1) * CharWidth - Scroll.ActualWidth + Width_Left;
+					HorizontalScroll.Visibility = maxchars * CharWidth > TextControl.ActualWidth ? Visibility.Visible : Visibility.Collapsed;
+				}
+				else
+				{
+					HorizontalScroll.Maximum = 0;
+					HorizontalScroll.Visibility = Visibility.Collapsed;
+				}
 
 				VerticalScroll.ViewportSize = TextControl.ActualHeight;
 				HorizontalScroll.ViewportSize = TextControl.ActualWidth;
@@ -1175,7 +1221,7 @@ namespace CodeEditorControl_WinUI
 					{
 						innerLang = true;
 					}
-					
+
 
 					Line l = new Line(lg) { LineNumber = lineNumber, LineText = line, IsUnsaved = false };
 					Lines.Add(l);
@@ -1196,9 +1242,9 @@ namespace CodeEditorControl_WinUI
 									Range newSelection = new(Selection.VisualEnd);
 
 									if (newSelection.VisualEnd.iLine > Lines.Count)
-										newSelection = new(new(Lines.Last().Count - 1, Lines.Count - 1));
+										newSelection = new(new Place(Lines.Last().Count - 1, Lines.Count - 1));
 									else if (newSelection.VisualEnd.iChar > Lines[newSelection.VisualEnd.iLine].Count)
-										newSelection = new(new(Lines[newSelection.VisualEnd.iLine].Count, newSelection.VisualEnd.iLine));
+										newSelection = new(new Place(Lines[newSelection.VisualEnd.iLine].Count, newSelection.VisualEnd.iLine));
 
 									Selection = newSelection;
 									Invalidate();
@@ -1239,7 +1285,7 @@ namespace CodeEditorControl_WinUI
 			}
 		}
 
-		private  void CurrentLineChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+		private void CurrentLineChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
 		{
 			if (!(d as CodeWriter).IsSettingValue)
 			{
@@ -1317,16 +1363,75 @@ namespace CodeEditorControl_WinUI
 			TextChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Text)));
 		}
 
-		private Place PointerToPlace(Point currentpoint)
+		private Point PlaceToPoint(Place currentplace)
+		{
+			if (Lines?.Count == 0)
+				return new Point(0,0);
+
+			//int y = 0;
+			int ivisualline = currentplace.iLine - VisibleLines[0].iLine;
+			//int x = 0;
+			int ivisualchar = currentplace.iChar;
+
+
+			int x = (int)(Width_Left + HorizontalOffset + CursorPlace.iChar * CharWidth);
+			int y = (int)((currentplace.iLine - VisibleLines[0].iLine) * CharHeight - 1 / 2 * CharHeight);
+
+			for (int i = 0; i < CursorPlace.iChar; i++)
+			{
+				if (Lines.Count > CursorPlace.iLine)
+					if (Lines[CursorPlace.iLine].Count > i)
+						if (Lines[CursorPlace.iLine][i].C == '\t')
+						{
+							x += CharWidth * (TabLength - 1);
+						}
+			}
+
+			int ilineoffset = 0;
+			if (IsWrappingEnabled)
+				for (int ivisibleline = 0; ivisibleline < ivisualline; ivisibleline++)
+				{
+					ilineoffset += VisibleLines[ivisibleline].GetLineWraps(iVisibleChars, TabLength, WrappingLength);
+				
+				}
+
+			int icharoffset = 0;
+			//int linewraps = Lines[currentplace.iLine].GetLineWraps(iVisibleChars,TabLength,WrappingLength);
+
+			y += ilineoffset * CharHeight;
+			x -= icharoffset * CharWidth;
+
+			//y = (int)(ivisualline * CharHeight);
+			//x = (int)(ivisualchar * CharWidth);
+			return new Point(x, y);
+		}
+
+		private Place PointToPlace(Point currentpoint)
 		{
 			if (VisibleLines?.Count == 0)
-				return new Place(0,0);
+				return new Place(0, 0);
 
-			int iline = Math.Min((int)(currentpoint.Y / CharHeight) + VisibleLines[0].iLine, Lines.Count - 1);
+			int ivisualline = Math.Max(Math.Min((int)(currentpoint.Y / CharHeight), Lines.Count - 1), 0);
+			int ilineoffset = 0;
+			int icharoffset = 0;
+			if (IsWrappingEnabled)
+			{
+				for (int ivisibleline = 0; ivisibleline < ivisualline; ivisibleline++)
+				{
+					ilineoffset += VisibleLines[ivisibleline].GetLineWraps(iVisibleChars, TabLength, WrappingLength);
+					if (ivisibleline + ilineoffset >= ivisualline)
+					{
+						ilineoffset = Math.Min(ilineoffset, ivisualline - ivisibleline);
+						break;
+					}
+				}
+				icharoffset = ilineoffset * (iVisibleChars - (TabLength + WrappingLength));
+			}
+			int iline = ivisualline + VisibleLines[0].iLine - ilineoffset;
 			int ichar = 0;
 			if ((int)currentpoint.X - Width_Left - HorizontalOffset > 0)
 			{
-				int visualcharplace = (int)((currentpoint.X - Width_Left - HorizontalOffset + CharWidth * 2 / 3) / CharWidth);
+				int visualcharplace = (int)((currentpoint.X - Width_Left - HorizontalOffset + CharWidth * 1 / 2) / CharWidth);
 				int currentvisibleplace = 0;
 				int actualcharplace = visualcharplace;
 				for (int i = 0; i < Math.Min(Lines[iline].Count, visualcharplace); i++)
@@ -1342,6 +1447,7 @@ namespace CodeEditorControl_WinUI
 							currentvisibleplace += 1;
 						}
 				}
+				actualcharplace += icharoffset;
 				ichar = Math.Min(actualcharplace, Lines[iline].Count);
 			}
 			return new Place(ichar, iline);
@@ -1386,7 +1492,7 @@ namespace CodeEditorControl_WinUI
 		private void insertSuggestion()
 		{
 			TextControl.Focus(FocusState.Keyboard);
-			
+
 			if (Suggestions[SuggestionIndex].IntelliSenseType == IntelliSenseType.Command)
 			{
 				Lines[CursorPlace.iLine].LineText = Lines[CursorPlace.iLine].LineText.Remove(SuggestionStart.iChar, CursorPlace.iChar - SuggestionStart.iChar);
@@ -1395,14 +1501,14 @@ namespace CodeEditorControl_WinUI
 				//EditActionHistory.Add(new() { TextState = Text, Selection = Selection, TextInvolved = Suggestions[SuggestionIndex].Name, EditActionType = EditActionType.Paste });
 				TextAction_Paste(Suggestions[SuggestionIndex].Name + Suggestions[SuggestionIndex].Snippet, SuggestionStart);
 
-				Selection = new(new(SuggestionStart.iChar + Suggestions[SuggestionIndex].Name.Length, CursorPlace.iLine));
+				Selection = new(new Place(SuggestionStart.iChar + Suggestions[SuggestionIndex].Name.Length, CursorPlace.iLine));
 			}
 			else
 			{
 				EditActionHistory.Add(new() { TextState = Text, Selection = Selection, TextInvolved = Suggestions[SuggestionIndex].Name, EditActionType = EditActionType.Paste });
 				Lines[CursorPlace.iLine].LineText = Lines[CursorPlace.iLine].LineText.Remove(SuggestionStart.iChar + 1, CursorPlace.iChar - (SuggestionStart.iChar + 1));
 				Lines[CursorPlace.iLine].LineText = Lines[CursorPlace.iLine].LineText.Insert(SuggestionStart.iChar + 1, Suggestions[SuggestionIndex].Name);
-				Selection = new(new(SuggestionStart.iChar + 1 + Suggestions[SuggestionIndex].Name.Length, CursorPlace.iLine));
+				Selection = new(new Place(SuggestionStart.iChar + 1 + Suggestions[SuggestionIndex].Name.Length, CursorPlace.iLine));
 			}
 
 			IsSuggesting = false;
@@ -1414,10 +1520,10 @@ namespace CodeEditorControl_WinUI
 			try
 			{
 				if (e.Key == VirtualKey.Shift | e.Key == VirtualKey.Control)
-                {
+				{
 					return;
-                }
-				
+				}
+
 				var shiftkey = InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Shift);
 				bool shiftdown = (shiftkey == CoreVirtualKeyStates.Down) | (shiftkey == (CoreVirtualKeyStates.Locked | CoreVirtualKeyStates.Down));
 				var controlkey = InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Control);
@@ -1460,11 +1566,11 @@ namespace CodeEditorControl_WinUI
 									}
 								}
 								if (shiftkey != CoreVirtualKeyStates.None)
-                                {
-									Selection = new(Selection.Start - 1,Selection.End-1);
-                                }
-                                else
-                                {
+								{
+									Selection = new(Selection.Start - 1, Selection.End - 1);
+								}
+								else
+								{
 									Selection = new(Selection.Start + 1, Selection.End + 1);
 								}
 								//CursorPlace = shiftkey == CoreVirtualKeyStates.Down ? new(CursorPlace.iChar - 1, CursorPlace.iLine) : new(CursorPlace.iChar + 1, CursorPlace.iLine);
@@ -1479,7 +1585,7 @@ namespace CodeEditorControl_WinUI
 								else
 								{
 									Lines[CursorPlace.iLine].LineText = Lines[CursorPlace.iLine].LineText.Insert(CursorPlace.iChar, "\t");
-                                    CursorPlace = new(CursorPlace.iChar + 1, CursorPlace.iLine);
+									Selection = new(CursorPlace + 1);
 								}
 							}
 
@@ -1504,10 +1610,10 @@ namespace CodeEditorControl_WinUI
 							}
 							if (IsSelection)
 							{
-								TextAction_Delete();
+								TextAction_Delete(Selection);
 							}
-                            EditActionHistory.Add(new() { TextState = Text, Selection = new(Selection.VisualStart), TextInvolved = @"\n", EditActionType = EditActionType.Add});
-							if (CursorPlace.iChar < Lines[CursorPlace.iLine].Count )
+							EditActionHistory.Add(new() { TextState = Text, Selection = new(Selection.VisualStart), TextInvolved = @"\n", EditActionType = EditActionType.Add });
+							if (CursorPlace.iChar < Lines[CursorPlace.iLine].Count)
 							{
 								storetext = Lines[CursorPlace.iLine].LineText.Substring(CursorPlace.iChar);
 								Lines[CursorPlace.iLine].LineText = Lines[CursorPlace.iLine].LineText.Remove(CursorPlace.iChar);
@@ -1539,7 +1645,7 @@ namespace CodeEditorControl_WinUI
 								}
 								else if (CursorPlace.iChar < Lines[CursorPlace.iLine].Count)
 								{
-                                    EditActionHistory.Add(new() { TextState = Text, Selection = Selection, EditActionType = EditActionType.Remove, TextInvolved = Lines[CursorPlace.iLine].LineText[CursorPlace.iChar].ToString().Replace("\t",@"\t") });
+									EditActionHistory.Add(new() { TextState = Text, Selection = Selection, EditActionType = EditActionType.Remove, TextInvolved = Lines[CursorPlace.iLine].LineText[CursorPlace.iChar].ToString().Replace("\t", @"\t") });
 									Lines[CursorPlace.iLine].LineText = Lines[CursorPlace.iLine].LineText.Remove(CursorPlace.iChar, 1);
 									textChanged();
 									CanvasText.Invalidate();
@@ -1547,7 +1653,7 @@ namespace CodeEditorControl_WinUI
 							}
 							else
 							{
-								TextAction_Delete();
+								TextAction_Delete(Selection);
 								Selection = new(Selection.VisualStart);
 							}
 							break;
@@ -1564,13 +1670,13 @@ namespace CodeEditorControl_WinUI
 										{
 											last.TextInvolved += @"\n";
 										}
-                                        else
-                                        {
+										else
+										{
 											EditActionHistory.Add(new() { TextInvolved = @"\n", TextState = Text, EditActionType = EditActionType.Remove, Selection = Selection });
 										}
 									}
-                                    else
-                                    {
+									else
+									{
 										EditActionHistory.Add(new() { TextInvolved = @"\n", TextState = Text, EditActionType = EditActionType.Remove, Selection = Selection });
 									}
 									storetext = Lines[CursorPlace.iLine].LineText;
@@ -1605,7 +1711,7 @@ namespace CodeEditorControl_WinUI
 									}
 
 									Lines[CursorPlace.iLine].LineText = Lines[CursorPlace.iLine].LineText.Remove(CursorPlace.iChar - 1, 1);
-									
+
 									newplace.iChar--;
 									Selection = new Range(newplace);
 								}
@@ -1615,19 +1721,19 @@ namespace CodeEditorControl_WinUI
 							}
 							else
 							{
-								TextAction_Delete();
+								TextAction_Delete(Selection);
 								Selection = new(Selection.VisualStart);
 							}
 							break;
 
 						case VirtualKey.Home:
-							
+
 							newplace.iChar = newplace.iChar == Lines[newplace.iLine].Indents ? 0 : Lines[newplace.iLine].Indents;
 							Selection = new(newplace);
 							break;
 
 						case VirtualKey.End:
-							
+
 							newplace.iChar = Lines[newplace.iLine].Count;
 							Selection = new(newplace);
 							break;
@@ -1644,7 +1750,7 @@ namespace CodeEditorControl_WinUI
 
 							if (CursorPlace.iLine > 0)
 							{
-								
+
 								newplace.iLine--;
 								newplace.iChar = Math.Min(Lines[newplace.iLine].Count, newplace.iChar);
 								if (shiftdown)
@@ -1671,7 +1777,7 @@ namespace CodeEditorControl_WinUI
 
 							if (CursorPlace.iLine < Lines.Count - 1)
 							{
-								
+
 								newplace.iLine++;
 								newplace.iChar = Math.Min(Lines[newplace.iLine].Count, newplace.iChar);
 								if (shiftdown)
@@ -1703,7 +1809,7 @@ namespace CodeEditorControl_WinUI
 							if (shiftdown)
 							{
 								Selection = new(Selection.Start, newplace);
-								
+
 							}
 							else
 							{
@@ -1720,7 +1826,7 @@ namespace CodeEditorControl_WinUI
 							}
 							else if (CursorPlace.iLine < Lines.Count - 1)
 							{
-								
+
 								newplace.iLine++;
 								newplace.iChar = 0;
 							}
@@ -1918,7 +2024,7 @@ namespace CodeEditorControl_WinUI
 				}
 				if (SearchMatches.Count > 0)
 				{
-					Selection = new Range(new(SearchMatches[0].iChar, SearchMatches[0].iLine));
+					Selection = new Range(new Place(SearchMatches[0].iChar, SearchMatches[0].iLine));
 				}
 				CanvasScrollbarMarkers.Invalidate();
 				CanvasSelection.Invalidate();
@@ -1967,7 +2073,7 @@ namespace CodeEditorControl_WinUI
 				}
 			}
 			catch (Exception ex)
-            {
+			{
 				ErrorOccured?.Invoke(this, new ErrorEventArgs(ex));
 			}
 		}
@@ -1976,34 +2082,34 @@ namespace CodeEditorControl_WinUI
 		{
 			EditActionHistory.Add(new() { EditActionType = EditActionType.Paste, Selection = Selection, TextState = Text, TextInvolved = Language.LineComment });
 			foreach (Line line in SelectedLines)
-            {
+			{
 				if (line.LineText.StartsWith("%"))
-					line.LineText = line.LineText.Remove(0,1);
+					line.LineText = line.LineText.Remove(0, 1);
 				else if (line.LineText.StartsWith(string.Concat(Enumerable.Repeat("\t", line.Indents)) + "%"))
 					line.LineText = line.LineText.Remove(line.Indents, 1);
 				else
 					line.LineText = line.LineText.Insert(line.Indents, Language.LineComment);
-            }
+			}
 			textChanged();
 			CanvasText.Invalidate();
 			CanvasScrollbarMarkers.Invalidate();
 			LinesChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Lines)));
 		}
 
-		private async void TextAction_Delete(bool cut = false)
+		private async void TextAction_Delete(Range selection, bool cut = false)
 		{
 			try
 			{
 				if (IsSelection)
 				{
-                    EditActionHistory.Add(new() { EditActionType = EditActionType.Delete, Selection = Selection, TextState = Text, TextInvolved = SelectedText});
+					EditActionHistory.Add(new() { EditActionType = EditActionType.Delete, Selection = selection, TextState = Text, TextInvolved = SelectedText });
 
 					if (cut)
 					{
 						TextAction_Copy();
 					}
-					Place start = Selection.VisualStart;
-					Place end = Selection.VisualEnd;
+					Place start = selection.VisualStart;
+					Place end = selection.VisualEnd;
 					//Selection = new(start);
 
 					await Task.Run(() =>
@@ -2040,7 +2146,7 @@ namespace CodeEditorControl_WinUI
 
 						Lines[start.iLine].LineText += storetext;
 					});
-					
+
 				}
 			}
 			catch (Exception ex)
@@ -2094,11 +2200,6 @@ namespace CodeEditorControl_WinUI
 		{
 			try
 			{
-				if (texttopaste != null) EditActionHistory.Add(new() { TextState = Text, EditActionType = EditActionType.Paste, Selection = Selection, TextInvolved = texttopaste?.Replace("\t", @"\t")?.Replace("\n",@"\n") }) ;
-				if (IsSelection && dragDropModifiers != DragDropModifiers.Control)
-				{
-					TextAction_Delete();
-				}
 				string text = "";
 				if (texttopaste == null)
 				{
@@ -2113,21 +2214,32 @@ namespace CodeEditorControl_WinUI
 					text = texttopaste;
 				}
 
+				EditActionHistory.Add(new() { TextState = Text, EditActionType = EditActionType.Paste, Selection = Selection, TextInvolved = text?.Replace("\t", @"\t")?.Replace("\n", @"\n") });
+
 				Place place = placetopaste ?? CursorPlace;
-				int i = 0;
+
+				if (IsSelection && place < Selection.VisualStart && dragDropModifiers != DragDropModifiers.Control)
+				{
+					TextAction_Delete(Selection);
+				}
+
 				Language lang = Language;
+				int i = 0;
 				await Task.Run(() =>
 				{
 					int tabcount = Lines[place.iLine].Indents;
 					string stringtomove = "";
 					foreach (string line in text.Split('\n', StringSplitOptions.None))
 					{
-						if (i == 0 && text.Count(x => x=='\n')  == 0)
+						if (i == 0 && text.Count(x => x == '\n') == 0)
 						{
-							Lines[place.iLine].LineText = Lines[place.iLine].LineText.Insert(place.iChar, line);
+							if (place.iChar < Lines[place.iLine].LineText.Length)
+								Lines[place.iLine].LineText = Lines[place.iLine].LineText.Insert(place.iChar, line);
+							else
+								Lines[place.iLine].LineText += line;
 						}
 						else if (i == 0)
-                        {
+						{
 							stringtomove = Lines[place.iLine].LineText.Substring(place.iChar);
 							Lines[place.iLine].LineText = Lines[place.iLine].LineText.Remove(place.iChar) + line;
 						}
@@ -2139,6 +2251,11 @@ namespace CodeEditorControl_WinUI
 					}
 					Lines[place.iLine + i].LineText += stringtomove;
 				});
+
+				if (IsSelection && place >= Selection.VisualEnd && dragDropModifiers != DragDropModifiers.Control)
+				{
+					TextAction_Delete(Selection);
+				}
 
 				Place end = new(i == 1 ? place.iChar + text.Length : Lines[place.iLine + i - 1].Count, place.iLine + i - 1);
 				Selection = new(end);
@@ -2162,7 +2279,7 @@ namespace CodeEditorControl_WinUI
 				if (Lines[CursorPlace.iLine].LineText.Length > maxchars)
 				{
 					maxchars = Lines[CursorPlace.iLine].LineText.Length;
-					HorizontalScroll.Maximum = (maxchars + 2 + Lines[CursorPlace.iLine].Indents*TabLength) * CharWidth - Scroll.ActualWidth + Width_Left;
+					HorizontalScroll.Maximum = (maxchars + 2 + Lines[CursorPlace.iLine].Indents * TabLength) * CharWidth - Scroll.ActualWidth + Width_Left;
 					VerticalScroll.Visibility = Lines.Count * CharHeight > TextControl.ActualHeight ? Visibility.Visible : Visibility.Collapsed;
 					HorizontalScroll.Visibility = maxchars * CharHeight > TextControl.ActualWidth ? Visibility.Visible : Visibility.Collapsed;
 				}
@@ -2174,16 +2291,23 @@ namespace CodeEditorControl_WinUI
 				ErrorOccured?.Invoke(this, new ErrorEventArgs(ex));
 			}
 		}
-
+		bool tempFocus = false;
 		private async void TextControl_DragOver(object sender, DragEventArgs e)
 		{
 			try
 			{
-				Focus( FocusState.Pointer);
-				Place place = PointerToPlace(e.GetPosition(TextControl));
+				Place place = PointToPlace(e.GetPosition(TextControl));
 				e.DragUIOverride.IsCaptionVisible = false;
 				e.DragUIOverride.IsGlyphVisible = false;
 				e.DragUIOverride.IsContentVisible = false;
+
+
+				if (!IsFocused)
+				{
+					IsFocused = true;
+					tempFocus = true;
+				}
+
 				if (!IsSelection)
 				{
 					e.AcceptedOperation = DataPackageOperation.Move | DataPackageOperation.Copy;
@@ -2199,22 +2323,27 @@ namespace CodeEditorControl_WinUI
 					}
 					else
 					{
-						if (e.Modifiers == Windows.ApplicationModel.DataTransfer.DragDrop.DragDropModifiers.Control)
-                        {
-							e.AcceptedOperation = DataPackageOperation.Copy | DataPackageOperation.Move;
-							e.DragUIOverride.Caption = "Copy";
 
-						}
-                        else
-                        {
-							e.AcceptedOperation = DataPackageOperation.Move;
-							e.DragUIOverride.Caption = "Move";
-						}
-						
+						//InfoMessage?.Invoke(this, "Mod: " + e.Modifiers);
+						//InfoMessage?.Invoke(this, "Orig: " + e.OriginalSource);
+						e.AcceptedOperation = DataPackageOperation.Copy | DataPackageOperation.Move;
+						//if (e.Modifiers == DragDropModifiers.Control)
+						//{
+
+						//	e.DragUIOverride.Caption = "Copy";
+
+						//}
+						//else
+						//{
+						//	e.AcceptedOperation = DataPackageOperation.Move;
+						//	e.DragUIOverride.Caption = "Move";
+						//}
+
 						//CursorPlace = Selection.End;
 						CursorPlace = place;
 					}
 				}
+
 				e.Handled = true;
 			}
 			catch (Exception ex)
@@ -2230,7 +2359,9 @@ namespace CodeEditorControl_WinUI
 				args.Data.SetText(SelectedText);
 				args.Data.RequestedOperation = DataPackageOperation.Move;
 				args.AllowedOperations = DataPackageOperation.Move;
-				args.DragUI.SetContentFromSoftwareBitmap(new Windows.Graphics.Imaging.SoftwareBitmap(Windows.Graphics.Imaging.BitmapPixelFormat.Rgba16, 1, 1));
+				args.DragUI.SetContentFromDataPackage();
+				Focus(FocusState.Pointer);
+				//args.DragUI.SetContentFromSoftwareBitmap(new Windows.Graphics.Imaging.SoftwareBitmap(Windows.Graphics.Imaging.BitmapPixelFormat.Rgba16, 1, 1));
 			}
 			catch (Exception ex)
 			{
@@ -2242,8 +2373,19 @@ namespace CodeEditorControl_WinUI
 		{
 			try
 			{
+
 				string text = await e.DataView.GetTextAsync();
-				TextAction_Paste(text, PointerToPlace(e.GetPosition(TextControl)), e.Modifiers);
+				TextAction_Paste(text, PointToPlace(e.GetPosition(TextControl)), e.Modifiers);
+				e.Handled = true;
+				if (tempFocus)
+				{
+					tempFocus = false;
+					IsFocused = false;
+				}
+				else
+				{
+					Focus(FocusState.Pointer);
+				}
 			}
 			catch (Exception ex)
 			{
@@ -2256,18 +2398,20 @@ namespace CodeEditorControl_WinUI
 			try
 			{
 				PointerPoint point = e.GetCurrentPoint(TextControl);
-				if (point.Properties.IsLeftButtonPressed)
+				if (point.Properties.IsLeftButtonPressed && isSelecting)
+				{
 					if (point.Position.Y < 0)
 					{
 						DispatcherTimer Timer = new DispatcherTimer() { Interval = TimeSpan.FromMilliseconds(100) };
 						Timer.Tick += (a, b) =>
 						{
 							PointerPoint pointup = e.GetCurrentPoint(TextControl);
-							if (pointup.Position.Y > 0)
+							if (pointup.Position.Y > 0 | !pointup.Properties.IsLeftButtonPressed)
 							{
 								((DispatcherTimer)a).Stop();
 							}
 							VerticalScroll.Value += pointup.Position.Y;
+							Selection = new(Selection.Start, PointToPlace(pointup.Position));
 						};
 						Timer.Start();
 					}
@@ -2277,14 +2421,47 @@ namespace CodeEditorControl_WinUI
 						Timer.Tick += (a, b) =>
 						{
 							PointerPoint pointdown = e.GetCurrentPoint(TextControl);
-							if (pointdown.Position.Y < Scroll.ActualHeight)
+							if (pointdown.Position.Y < Scroll.ActualHeight | !pointdown.Properties.IsLeftButtonPressed)
 							{
 								((DispatcherTimer)a).Stop();
 							}
 							VerticalScroll.Value += pointdown.Position.Y - Scroll.ActualHeight;
+							Selection = new(Selection.Start, PointToPlace(pointdown.Position));
 						};
 						Timer.Start();
 					}
+
+					if (point.Position.X < 0)
+					{
+						DispatcherTimer Timer = new DispatcherTimer() { Interval = TimeSpan.FromMilliseconds(100) };
+						Timer.Tick += (a, b) =>
+						{
+							PointerPoint pointleft = e.GetCurrentPoint(TextControl);
+							if (pointleft.Position.X > 0 | !pointleft.Properties.IsLeftButtonPressed)
+							{
+								((DispatcherTimer)a).Stop();
+							}
+							HorizontalScroll.Value += pointleft.Position.X;
+							Selection = new(Selection.Start, PointToPlace(pointleft.Position));
+						};
+						Timer.Start();
+					}
+					else if (point.Position.X >= Scroll.ActualWidth - 2 * CharWidth)
+					{
+						DispatcherTimer Timer = new DispatcherTimer() { Interval = TimeSpan.FromMilliseconds(100) };
+						Timer.Tick += (a, b) =>
+						{
+							PointerPoint pointright = e.GetCurrentPoint(TextControl);
+							if (pointright.Position.X < Scroll.ActualWidth | !pointright.Properties.IsLeftButtonPressed)
+							{
+								((DispatcherTimer)a).Stop();
+							}
+							HorizontalScroll.Value += pointright.Position.X - Scroll.ActualWidth;
+							Selection = new(Selection.Start, PointToPlace(pointright.Position));
+						};
+						Timer.Start();
+					}
+				}
 			}
 			catch (Exception ex)
 			{
@@ -2296,6 +2473,8 @@ namespace CodeEditorControl_WinUI
 		{
 			isSelecting = false;
 			isLineSelect = false;
+			isDragging = false;
+			tempFocus = false;
 		}
 
 		private void TextControl_PointerMoved(object sender, PointerRoutedEventArgs e)
@@ -2304,55 +2483,63 @@ namespace CodeEditorControl_WinUI
 			{
 				PointerPoint currentpoint = e.GetCurrentPoint(TextControl);
 
-				if (e.Pointer.PointerDeviceType == Microsoft.UI.Input.PointerDeviceType.Mouse | e.Pointer.PointerDeviceType == Microsoft.UI.Input.PointerDeviceType.Pen)
-				{
-					if (isSelecting && currentpoint.Properties.IsLeftButtonPressed)
+				if (!isDragging)
+					if (e.Pointer.PointerDeviceType == Microsoft.UI.Input.PointerDeviceType.Mouse | e.Pointer.PointerDeviceType == Microsoft.UI.Input.PointerDeviceType.Pen)
 					{
-						if (!isLineSelect)
+						Place place = PointToPlace(currentpoint.Position);
+						if (isSelecting && currentpoint.Properties.IsLeftButtonPressed)
 						{
-							Selection = new Range(Selection.Start, PointerToPlace(currentpoint.Position));
-						}
-						else
-						{
-							Place end = PointerToPlace(currentpoint.Position);
-							end.iChar = Lines[end.iLine].Count;
-							Selection = new Range(Selection.Start, end);
-						}
-					}
-					else if (isMiddleClickScrolling)
-					{
-						middleClickScrollingEndPoint = currentpoint.Position;
-					}
-					else
-					{
-						if (currentpoint.Position.X < Width_Left)
-						{
-							ProtectedCursor =  InputSystemCursor.Create(InputSystemCursorShape.Arrow);
-							//Cursor = new CoreCursor(CoreCursorType.Arrow, 1);
-						}
-						else if (IsSelection)
-						{
-							Place rightpress = PointerToPlace(currentpoint.Position);
-
-							Place start = Selection.VisualStart;
-							Place end = Selection.VisualEnd;
-							if (IsSelection)
+							if (!isLineSelect)
 							{
-								if (rightpress <= start || rightpress >= end)
-								{
-									ProtectedCursor = InputSystemCursor.Create(InputSystemCursorShape.IBeam);
-									//Cursor = new CoreCursor(CoreCursorType.IBeam, 1);
-								}
-								else
-									ProtectedCursor = InputSystemCursor.Create(InputSystemCursorShape.Arrow);
-								//Cursor = new CoreCursor(CoreCursorType.Arrow, 1);
+								Selection = new Range(Selection.Start, PointToPlace(currentpoint.Position));
+							}
+							else
+							{
+
+								place.iChar = Lines[place.iLine].Count;
+								Selection = new Range(Selection.Start, place);
 							}
 						}
+						else if (isMiddleClickScrolling)
+						{
+							middleClickScrollingEndPoint = currentpoint.Position;
+						}
 						else
-							ProtectedCursor = InputSystemCursor.Create(InputSystemCursorShape.IBeam);
-						//Cursor = new CoreCursor(CoreCursorType.IBeam, 1);
+						{
+							if (currentpoint.Position.X < Width_Left)
+							{
+								ProtectedCursor = InputSystemCursor.Create(InputSystemCursorShape.Arrow);
+								//Cursor = new CoreCursor(CoreCursorType.Arrow, 1);
+							}
+							else if (IsSelection)
+							{
+
+								Place start = Selection.VisualStart;
+								Place end = Selection.VisualEnd;
+
+								if (place < start || place >= end)
+									ProtectedCursor = InputSystemCursor.Create(InputSystemCursorShape.IBeam);
+								else
+								{
+									if (place.iChar < Lines[place.iLine].Count)
+										ProtectedCursor = InputSystemCursor.Create(InputSystemCursorShape.Arrow);
+									else
+										ProtectedCursor = InputSystemCursor.Create(InputSystemCursorShape.IBeam);
+								}
+								//if (place.iChar < Lines[place.iChar].Count)
+								//		ProtectedCursor = InputSystemCursor.Create(InputSystemCursorShape.Arrow);
+								//	else
+								//		ProtectedCursor = InputSystemCursor.Create(InputSystemCursorShape.IBeam);
+								
+									
+
+							}
+							else
+								ProtectedCursor = InputSystemCursor.Create(InputSystemCursorShape.IBeam);
+							//Cursor = new CoreCursor(CoreCursorType.IBeam, 1);
+						}
+						e.Handled = true;
 					}
-				}
 			}
 			catch (Exception ex)
 			{
@@ -2363,13 +2550,13 @@ namespace CodeEditorControl_WinUI
 		private void TextControl_PointerPressed(object sender, PointerRoutedEventArgs e)
 		{
 			IsSuggesting = false;
-			bool hasfocus = TextControl.Focus(FocusState.Keyboard);
+			bool hasfocus = Focus(FocusState.Pointer);
 			PointerPoint currentpoint = e.GetCurrentPoint(TextControl);
 			try
 			{
 				if (e.Pointer.PointerDeviceType == Microsoft.UI.Input.PointerDeviceType.Touch)
 				{
-					Place start = PointerToPlace(currentpoint.Position);
+					Place start = PointToPlace(currentpoint.Position);
 					Place end = new Place(start.iChar, start.iLine);
 					var matches = Regex.Matches(Lines[start.iLine].LineText, @"\b\w+?\b");
 					foreach (Match match in matches)
@@ -2390,10 +2577,13 @@ namespace CodeEditorControl_WinUI
 					{
 						if (IsSelection)
 						{
-							Place pos = PointerToPlace(currentpoint.Position);
+							Place pos = PointToPlace(currentpoint.Position);
 							if (pos > Selection.VisualStart && pos <= Selection.VisualEnd)
 							{
 								isDragging = true;
+								draggedText = SelectedText;
+								draggedSelection = new(Selection);
+								e.Handled = true;
 								return;
 							}
 						}
@@ -2404,8 +2594,8 @@ namespace CodeEditorControl_WinUI
 						{
 							if (previousPosition != currentpoint.Position)
 							{
-								Place start = PointerToPlace(currentpoint.Position);
-								Place end = PointerToPlace(currentpoint.Position);
+								Place start = PointToPlace(currentpoint.Position);
+								Place end = PointToPlace(currentpoint.Position);
 								Selection = new(start, end);
 								if (CursorPlaceHistory.Count > 0)
 								{
@@ -2419,7 +2609,7 @@ namespace CodeEditorControl_WinUI
 							}
 							else
 							{
-								Place start = PointerToPlace(previousPosition);
+								Place start = PointToPlace(previousPosition);
 								Place end = new Place(start.iChar, start.iLine);
 								var matches = Regex.Matches(Lines[start.iLine].LineText, @"\b\w+?\b");
 								foreach (Match match in matches)
@@ -2433,12 +2623,14 @@ namespace CodeEditorControl_WinUI
 									}
 								}
 								Selection = new(start, end);
+
+								DoubleClicked?.Invoke(this, new());
 							}
 							previousPosition = currentpoint.Position;
 						}
 						else
 						{
-							Place start = PointerToPlace(currentpoint.Position);
+							Place start = PointToPlace(currentpoint.Position);
 							SelectLine(start);
 						}
 						isMiddleClickScrolling = false;
@@ -2446,7 +2638,7 @@ namespace CodeEditorControl_WinUI
 					}
 					else if (currentpoint.Properties.IsRightButtonPressed)
 					{
-						Place rightpress = PointerToPlace(currentpoint.Position);
+						Place rightpress = PointToPlace(currentpoint.Position);
 
 						Place start = Selection.VisualStart;
 						Place end = Selection.VisualEnd;
@@ -2538,35 +2730,40 @@ namespace CodeEditorControl_WinUI
 		}
 
 		public void SelectLine(Place start)
-        {
+		{
 			Place end = new(Lines[start.iLine].Count, start.iLine);
 			Selection = new(start, end);
 		}
 
 		public void ScrollToLine(int iLine)
 		{
-			VerticalScroll.Value = (iLine+1) * CharHeight - TextControl.ActualHeight / 2;
+			VerticalScroll.Value = (iLine + 1) * CharHeight - TextControl.ActualHeight / 2;
 		}
 		public void CenterView()
-        {
+		{
 			HorizontalScroll.Value = 0;
-			VerticalScroll.Value = (Selection.VisualStart.iLine+1) * CharHeight - TextControl.ActualHeight / 2;
+			VerticalScroll.Value = (Selection.VisualStart.iLine + 1) * CharHeight - TextControl.ActualHeight / 2;
 			Focus(FocusState.Keyboard);
-        }
+		}
 
 		private void TextControl_PointerReleased(object sender, PointerRoutedEventArgs e)
 		{
 			try
 			{
 				PointerPoint currentpoint = e.GetCurrentPoint(TextControl);
-				Place place = PointerToPlace(currentpoint.Position);
+				Place place = PointToPlace(currentpoint.Position);
 				isSelecting = false;
 				isLineSelect = false;
-				if (isDragging && place > Selection.VisualStart && place < Selection.VisualEnd)
+				if (isDragging && place > Selection.VisualStart && place <= Selection.VisualEnd)
 				{
-					isDragging = false;
-					Selection = new Range(new(PointerToPlace(currentpoint.Position)));
+					Selection = new Range(place);
+					TextControl.Focus(FocusState.Keyboard);
 				}
+				else if (isDragging)
+				{
+					Focus(FocusState.Pointer);
+				}
+				isDragging = false;
 			}
 			catch (Exception ex)
 			{
@@ -2632,14 +2829,15 @@ namespace CodeEditorControl_WinUI
 			catch { }
 		}
 
-        private void UserControl_GotFocus(object sender, RoutedEventArgs e)
-        {
+		private void UserControl_GotFocus(object sender, RoutedEventArgs e)
+		{
 			IsFocused = true;
-        }
+		}
 
-        private void UserControl_LostFocus(object sender, RoutedEventArgs e)
-        {
+		private void UserControl_LostFocus(object sender, RoutedEventArgs e)
+		{
 			IsFocused = false;
-        }
-    }
+			//IsSuggesting = false;
+		}
+	}
 }
