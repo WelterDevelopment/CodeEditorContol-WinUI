@@ -1410,47 +1410,55 @@ namespace CodeEditorControl_WinUI
 		{
 			if (VisibleLines?.Count == 0)
 				return new Place(0, 0);
-
-			int ivisualline = Math.Max(Math.Min((int)(currentpoint.Y / CharHeight), Lines.Count - 1), 0);
-			int ilineoffset = 0;
-			int icharoffset = 0;
-			if (IsWrappingEnabled)
+			try
 			{
-				for (int ivisibleline = 0; ivisibleline < ivisualline; ivisibleline++)
+				int ivisualline = Math.Max(Math.Min((int)(currentpoint.Y / CharHeight), Lines.Count - 1), 0);
+				int ilineoffset = 0;
+				int icharoffset = 0;
+				if (IsWrappingEnabled)
 				{
-					ilineoffset += VisibleLines[ivisibleline].GetLineWraps(iVisibleChars, TabLength, WrappingLength);
-					if (ivisibleline + ilineoffset >= ivisualline)
+					for (int ivisibleline = 0; ivisibleline < ivisualline; ivisibleline++)
 					{
-						ilineoffset = Math.Min(ilineoffset, ivisualline - ivisibleline);
-						break;
+						if (VisibleLines.Count! < ivisibleline)
+							ilineoffset += VisibleLines[ivisibleline].GetLineWraps(iVisibleChars, TabLength, WrappingLength);
+						if (ivisibleline + ilineoffset >= ivisualline)
+						{
+							ilineoffset = Math.Min(ilineoffset, ivisualline - ivisibleline);
+							break;
+						}
 					}
+					icharoffset = ilineoffset * (iVisibleChars - (TabLength + WrappingLength));
 				}
-				icharoffset = ilineoffset * (iVisibleChars - (TabLength + WrappingLength));
-			}
-			int iline = ivisualline + VisibleLines[0].iLine - ilineoffset;
-			int ichar = 0;
-			if ((int)currentpoint.X - Width_Left - HorizontalOffset > 0)
-			{
-				int visualcharplace = (int)((currentpoint.X - Width_Left - HorizontalOffset + CharWidth * 1 / 2) / CharWidth);
-				int currentvisibleplace = 0;
-				int actualcharplace = visualcharplace;
-				for (int i = 0; i < Math.Min(Lines[iline].Count, visualcharplace); i++)
+				int iline = ivisualline + VisibleLines[0].iLine - ilineoffset;
+				int ichar = 0;
+				if ((int)currentpoint.X - Width_Left - HorizontalOffset > 0)
 				{
-					if (currentvisibleplace < visualcharplace)
-						if (Lines[iline][i].C == '\t')
-						{
-							actualcharplace -= TabLength - 1;
-							currentvisibleplace += TabLength;
-						}
-						else
-						{
-							currentvisibleplace += 1;
-						}
+					int visualcharplace = (int)((currentpoint.X - Width_Left - HorizontalOffset + CharWidth * 1 / 2) / CharWidth);
+					int currentvisibleplace = 0;
+					int actualcharplace = visualcharplace;
+					for (int i = 0; i < Math.Min(Lines[iline].Count, visualcharplace); i++)
+					{
+						if (currentvisibleplace < visualcharplace && i < Lines[iline].Count)
+							if (Lines[iline][i].C == '\t')
+							{
+								actualcharplace -= TabLength - 1;
+								currentvisibleplace += TabLength;
+							}
+							else
+							{
+								currentvisibleplace += 1;
+							}
+					}
+					actualcharplace += icharoffset;
+					ichar = Math.Min(actualcharplace, Lines[iline].Count);
 				}
-				actualcharplace += icharoffset;
-				ichar = Math.Min(actualcharplace, Lines[iline].Count);
+				return new Place(ichar, iline);
 			}
-			return new Place(ichar, iline);
+			catch
+			{
+				return new Place(0, 0);
+			}
+			
 		}
 
 		private void RecalcLineNumbers()
