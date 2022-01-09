@@ -122,6 +122,8 @@ namespace CodeEditorControl_WinUI
 		public event PropertyChangedEventHandler LinesChanged;
 		public event PropertyChangedEventHandler CursorPlaceChanged;
 
+		public event EventHandler Initialized;
+
 		public enum ScrollOrientation
 		{
 			VerticalScroll,
@@ -486,6 +488,9 @@ namespace CodeEditorControl_WinUI
 				}
 				SyntaxErrors.Clear();
 			});
+
+			IsSuggesting = false;
+			IsSuggestingOptions = false;
 
 			CanvasText.Invalidate();
 			CanvasScrollbarMarkers.Invalidate();
@@ -963,6 +968,7 @@ namespace CodeEditorControl_WinUI
 					FilterSuggestions();
 					textChanged();
 					CanvasText.Invalidate();
+					IsFindPopupOpen = false;
 					args.Handled = true;
 				}
 			}
@@ -980,22 +986,28 @@ namespace CodeEditorControl_WinUI
 				try
 				{
 					string searchString = Lines[SuggestionStart.iLine].LineText.Substring(SuggestionStart.iChar, CursorPlace.iChar - SuggestionStart.iChar);
+					List<Suggestion> matchingSuggestions;
 					if (!IsSuggestingOptions)
 					{
-						var matchingSuggestions = AllSuggestions
+						matchingSuggestions = AllSuggestions
 										.Where(m => m.Name.Contains(searchString))
 										.OrderBy(m => m.Name)
 										.ToList();
-						Suggestions = matchingSuggestions;
 					}
 					else
 					{
-						var matchingSuggestions = AllOptions
-										.Where(m => m.Name.Contains(searchString))
-										.OrderBy(m => m.Name)
-										.ToList();
-						Suggestions = matchingSuggestions;
+						matchingSuggestions = AllOptions
+									.Where(m => m.Name.Contains(searchString))
+									.OrderBy(m => m.Name)
+									.ToList();
 					}
+					if (matchingSuggestions.Count > 0)
+					{
+						Suggestions = matchingSuggestions;
+						SuggestionIndex = 0;
+					}
+					else
+						SuggestionIndex = -1;
 				}
 				catch
 				{
@@ -1095,7 +1107,7 @@ namespace CodeEditorControl_WinUI
 				Width_LeftMargin = ShowLineNumbers ? CharWidth / 2 : 0;
 				Width_LineNumber = ShowLineNumbers ? CharWidth * IntLength(Lines.Count) : 0;
 				Width_FoldingMarker = IsFoldingEnabled ? CharWidth : 0;
-				Width_ErrorMarker = CharWidth / 2 ;
+				Width_ErrorMarker = CharWidth / 2;
 				Width_WarningMarker = ShowLineMarkers ? CharWidth / 2 : 0;
 
 				VerticalScroll.Maximum = (Lines.Count + 2) * CharHeight - Scroll.ActualHeight;
@@ -1248,7 +1260,11 @@ namespace CodeEditorControl_WinUI
 
 									Selection = newSelection;
 									Invalidate();
-									IsInitialized = true;
+									if (!IsInitialized)
+									{
+										IsInitialized = true;
+										Initialized?.Invoke(this, null);
+									}
 								}
 							});
 			});
@@ -1290,6 +1306,7 @@ namespace CodeEditorControl_WinUI
 			if (!(d as CodeWriter).IsSettingValue)
 			{
 				Selection = new(CurrentLine);
+				CenterView();
 			}
 		}
 
@@ -1366,7 +1383,7 @@ namespace CodeEditorControl_WinUI
 		private Point PlaceToPoint(Place currentplace)
 		{
 			if (Lines?.Count == 0)
-				return new Point(0,0);
+				return new Point(0, 0);
 
 			//int y = 0;
 			int ivisualline = currentplace.iLine - VisibleLines[0].iLine;
@@ -1392,7 +1409,7 @@ namespace CodeEditorControl_WinUI
 				for (int ivisibleline = 0; ivisibleline < ivisualline; ivisibleline++)
 				{
 					ilineoffset += VisibleLines[ivisibleline].GetLineWraps(iVisibleChars, TabLength, WrappingLength);
-				
+
 				}
 
 			int icharoffset = 0;
@@ -1458,7 +1475,7 @@ namespace CodeEditorControl_WinUI
 			{
 				return new Place(0, 0);
 			}
-			
+
 		}
 
 		private void RecalcLineNumbers()
@@ -1605,9 +1622,16 @@ namespace CodeEditorControl_WinUI
 						case VirtualKey.Enter:
 							if (IsSuggesting)
 							{
-								insertSuggestion();
-								textChanged();
-								CanvasText.Invalidate();
+								if (SuggestionIndex == -1)
+								{
+									IsSuggesting = false;
+								}
+								else
+								{
+									insertSuggestion();
+									textChanged();
+									CanvasText.Invalidate();
+								}
 								e.Handled = true;
 								break;
 							}
@@ -2089,15 +2113,39 @@ namespace CodeEditorControl_WinUI
 		public void TextAction_ToggleComment()
 		{
 			EditActionHistory.Add(new() { EditActionType = EditActionType.Paste, Selection = Selection, TextState = Text, TextInvolved = Language.LineComment });
-			foreach (Line line in SelectedLines)
+
+			Place start = Selection.Start;
+			Place end = Selection.End;
+
+			for (int iline = 0; iline < SelectedLines.Count; iline++)
 			{
-				if (line.LineText.StartsWith("%"))
-					line.LineText = line.LineText.Remove(0, 1);
-				else if (line.LineText.StartsWith(string.Concat(Enumerable.Repeat("\t", line.Indents)) + "%"))
-					line.LineText = line.LineText.Remove(line.Indents, 1);
+				if (SelectedLines[iline].LineText.StartsWith(Language.LineComment))
+				{
+					SelectedLines[iline].LineText = SelectedLines[iline].LineText.Remove(0, 1);
+					if (iline == 0)
+						start = start - 1;
+					if (iline == SelectedLines.Count - 1)
+						end = end - 1;
+				}
+				else if (SelectedLines[iline].LineText.StartsWith(string.Concat(Enumerable.Repeat("\t", SelectedLines[iline].Indents)) + Language.LineComment))
+				{
+					SelectedLines[iline].LineText = SelectedLines[iline].LineText.Remove(SelectedLines[iline].Indents, 1);
+					if (iline == 0)
+						start = start - 1;
+					if (iline == SelectedLines.Count - 1)
+						end = end - 1;
+				}
 				else
-					line.LineText = line.LineText.Insert(line.Indents, Language.LineComment);
+				{
+					SelectedLines[iline].LineText = SelectedLines[iline].LineText.Insert(SelectedLines[iline].Indents, Language.LineComment);
+					if (iline == 0)
+						start = start + 1;
+					if (iline == SelectedLines.Count - 1)
+						end = end + 1;
+				}
 			}
+
+			Selection = new(start, end);
 			textChanged();
 			CanvasText.Invalidate();
 			CanvasScrollbarMarkers.Invalidate();
@@ -2538,8 +2586,8 @@ namespace CodeEditorControl_WinUI
 								//		ProtectedCursor = InputSystemCursor.Create(InputSystemCursorShape.Arrow);
 								//	else
 								//		ProtectedCursor = InputSystemCursor.Create(InputSystemCursorShape.IBeam);
-								
-									
+
+
 
 							}
 							else
@@ -2684,10 +2732,14 @@ namespace CodeEditorControl_WinUI
 								{
 									if (!isMiddleClickScrolling)
 									{
+										ProtectedCursor = InputSystemCursor.Create(InputSystemCursorShape.IBeam);
 										((DispatcherTimer)a).Stop();
 									}
-									VerticalScroll.Value += middleClickScrollingEndPoint.Y - middleClickScrollingStartPoint.Y;
-									HorizontalScroll.Value += middleClickScrollingEndPoint.X - middleClickScrollingStartPoint.X;
+									else
+									{
+										VerticalScroll.Value += middleClickScrollingEndPoint.Y - middleClickScrollingStartPoint.Y;
+										HorizontalScroll.Value += middleClickScrollingEndPoint.X - middleClickScrollingStartPoint.X;
+									}
 								};
 								Timer.Start();
 							}
@@ -2702,9 +2754,11 @@ namespace CodeEditorControl_WinUI
 								{
 									if (!isMiddleClickScrolling)
 									{
+										ProtectedCursor = InputSystemCursor.Create(InputSystemCursorShape.IBeam);
 										((DispatcherTimer)a).Stop();
 									}
-									VerticalScroll.Value += middleClickScrollingEndPoint.Y - middleClickScrollingStartPoint.Y;
+									else
+										VerticalScroll.Value += middleClickScrollingEndPoint.Y - middleClickScrollingStartPoint.Y;
 								};
 								Timer.Start();
 							}
@@ -2719,9 +2773,11 @@ namespace CodeEditorControl_WinUI
 								{
 									if (!isMiddleClickScrolling)
 									{
+										ProtectedCursor = InputSystemCursor.Create(InputSystemCursorShape.IBeam);
 										((DispatcherTimer)a).Stop();
 									}
-									HorizontalScroll.Value += middleClickScrollingEndPoint.X - middleClickScrollingStartPoint.X;
+									else
+										HorizontalScroll.Value += middleClickScrollingEndPoint.X - middleClickScrollingStartPoint.X;
 								};
 								Timer.Start();
 							}
@@ -2746,6 +2802,7 @@ namespace CodeEditorControl_WinUI
 		public void ScrollToLine(int iLine)
 		{
 			VerticalScroll.Value = (iLine + 1) * CharHeight - TextControl.ActualHeight / 2;
+
 		}
 		public void CenterView()
 		{

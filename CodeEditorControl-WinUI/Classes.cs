@@ -764,6 +764,15 @@ namespace CodeEditorControl_WinUI
 		{
 		}
 
+		public static Range operator +(Range p1, int c2)
+		{
+			return new Range(p1.Start+c2, p1.End+c2);
+		}
+		public static Range operator -(Range p1, int c2)
+		{
+			return new Range(p1.Start - c2, p1.End - c2);
+		}
+
 		public Place End { get => Get(new Place()); set => Set(value); }
 		public Place Start { get => Get(new Place()); set => Set(value); }
 
