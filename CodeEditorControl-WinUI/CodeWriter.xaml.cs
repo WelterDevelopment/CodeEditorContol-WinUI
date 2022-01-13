@@ -2822,7 +2822,8 @@ namespace CodeEditorControl_WinUI
 				if (isDragging && place > Selection.VisualStart && place <= Selection.VisualEnd)
 				{
 					Selection = new Range(place);
-					TextControl.Focus(FocusState.Keyboard);
+					ProtectedCursor = InputSystemCursor.Create(InputSystemCursorShape.IBeam);
+					Focus(FocusState.Keyboard);
 				}
 				else if (isDragging)
 				{
