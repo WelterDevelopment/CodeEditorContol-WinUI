@@ -85,6 +85,14 @@ namespace CodeEditorControl_WinUI
 
 		private int startFontsize = 16;
 
+		private float scale
+		{
+			get
+			{
+				return XamlRoot != null && XamlRoot?.RasterizationScale != null ? (float)XamlRoot.RasterizationScale : 1.0f;
+			}
+		}
+
 		private Place SuggestionStart = new Place();
 
 		public CodeWriter()
@@ -211,6 +219,8 @@ namespace CodeEditorControl_WinUI
 		public Point CursorPoint { get => Get(new Point()); set => Set(value); }
 
 		public new int FontSize { get => (int)GetValue(FontSizeProperty); set { SetValue(FontSizeProperty, value); } }
+		public int ScaledFontSize { get => (int)((float)FontSize * scale); }
+
 		public Place CurrentLine { get => (Place)GetValue(CurrentLineProperty); set { SetValue(CurrentLineProperty, value); } }
 		public int HorizontalOffset { get => Get(0); set { Set(value); } }
 
@@ -466,11 +476,12 @@ namespace CodeEditorControl_WinUI
 				ErrorOccured?.Invoke(this, new ErrorEventArgs(ex));
 			}
 		}
-		public void Invalidate()
+
+		public void Invalidate(bool sizechanged = true)
 		{
 			try
 			{
-				DrawText();
+				DrawText(sizechanged);
 			}
 			catch (Exception ex)
 			{
@@ -717,6 +728,10 @@ namespace CodeEditorControl_WinUI
 		{
 			try
 			{
+				sender.DpiScale = XamlRoot.RasterizationScale > 1.0 ? 1.15f : 1.0f; // The text was shaking around on text input at Scale factors > 1. Setting DpiScale seems to prevent this.
+				//args.DrawingSession.Antialiasing = CanvasAntialiasing.Antialiased;
+				//args.DrawingSession.Blend = CanvasBlend.Add;
+				//args.DrawingSession.TextAntialiasing = CanvasTextAntialiasing.ClearType;
 				if (VisibleLines.Count > 0)
 				{
 					int foldPos = Width_LeftMargin + Width_LineNumber + Width_ErrorMarker + Width_WarningMarker;
@@ -726,13 +741,12 @@ namespace CodeEditorControl_WinUI
 
 					for (int iLine = VisibleLines[0].iLine; iLine < VisibleLines.Last().LineNumber; iLine++)
 					{
-						float y = CharHeight * (iLine - VisibleLines[0].LineNumber + 1 + totalwraps);
-						float x = 0;
+						int y = CharHeight * (iLine - VisibleLines[0].LineNumber + 1 + totalwraps);
+						int x = 0;
 						args.DrawingSession.FillRectangle(0, y, Width_Left - Width_TextIndent, CharHeight, Color_LeftBackground);
 
 						if (ShowLineNumbers)
-							args.DrawingSession.DrawText((iLine + 1).ToString(), CharWidth * IntLength(Lines.Count) + Width_LeftMargin, y, ActualTheme == ElementTheme.Light ? Color_LineNumber.InvertColorBrightness() : Color_LineNumber, new CanvasTextFormat() { FontFamily = "Consolas", FontSize = FontSize, HorizontalAlignment = CanvasHorizontalAlignment.Right });
-
+							args.DrawingSession.DrawText((iLine + 1).ToString(), CharWidth * IntLength(Lines.Count) + Width_LeftMargin, y, ActualTheme == ElementTheme.Light ? Color_LineNumber.InvertColorBrightness() : Color_LineNumber, new CanvasTextFormat() { FontFamily = "Consolas", FontSize = ScaledFontSize, HorizontalAlignment = CanvasHorizontalAlignment.Right });
 						if (IsFoldingEnabled)
 							if (Lines[iLine].IsFoldStart)
 							{
@@ -807,7 +821,7 @@ namespace CodeEditorControl_WinUI
 								if (!IsWrappingEnabled && iChar < iCharOffset - indents * (TabLength - 1) + iVisibleChars)
 								{
 									x = Width_Left + CharWidth * (iChar + indents * (TabLength - 1) - iCharOffset);
-									args.DrawingSession.DrawText(c.C.ToString(), x, y, ActualTheme == ElementTheme.Light ? EditorOptions.TokenColors[c.T].InvertColorBrightness() : EditorOptions.TokenColors[c.T], new CanvasTextFormat() { FontFamily = "Consolas", FontSize = FontSize });
+									args.DrawingSession.DrawText(c.C.ToString(), x, y, ActualTheme == ElementTheme.Light ? EditorOptions.TokenColors[c.T].InvertColorBrightness() : EditorOptions.TokenColors[c.T], CanvasTextFormat);
 								}
 
 								if (IsWrappingEnabled)
@@ -845,7 +859,7 @@ namespace CodeEditorControl_WinUI
 									x = Width_Left + CharWidth * (iWrappingChar - iCharOffset + indents * (TabLength - 1));
 									//}
 
-									args.DrawingSession.DrawText(c.C.ToString(), x, y, ActualTheme == ElementTheme.Light ? EditorOptions.TokenColors[c.T].InvertColorBrightness() : EditorOptions.TokenColors[c.T], new CanvasTextFormat() { FontFamily = "Consolas", FontSize = FontSize });
+									args.DrawingSession.DrawText(c.C.ToString(), x, y, ActualTheme == ElementTheme.Light ? EditorOptions.TokenColors[c.T].InvertColorBrightness() : EditorOptions.TokenColors[c.T], new CanvasTextFormat() { FontFamily = "Consolas", FontSize = ScaledFontSize });
 								}
 
 							}
@@ -855,14 +869,14 @@ namespace CodeEditorControl_WinUI
 							x = Width_Left + CharWidth * (lastChar + indents * (TabLength - 1) - iCharOffset);
 							CanvasPathBuilder enterpath = new CanvasPathBuilder(sender);
 
-							enterpath.BeginFigure(CharWidth * 0.2f, CharHeight * 2 / 4);
-							enterpath.AddLine(CharWidth * 0.5f, CharHeight * 2 / 4);
-							enterpath.AddLine(CharWidth * 0.5f, CharHeight * 4 / 4);
+							enterpath.BeginFigure(CharWidth * 0.9f, CharHeight * 1 / 3);
+							enterpath.AddLine(CharWidth * 0.9f, CharHeight * 3 / 4);
+							enterpath.AddLine(CharWidth * 0.0f, CharHeight * 3 / 4);
 							enterpath.EndFigure(CanvasFigureLoop.Open);
 
-							enterpath.BeginFigure(CharWidth * 0.2f, CharHeight * 3 / 4);
-							enterpath.AddLine(CharWidth * 0.5f, CharHeight * 4 / 4);
-							enterpath.AddLine(CharWidth * 0.8f, CharHeight * 3 / 4);
+							enterpath.BeginFigure(CharWidth * 0.4f, CharHeight * 2 / 4);
+							enterpath.AddLine(CharWidth * 0.1f, CharHeight * 3 / 4);
+							enterpath.AddLine(CharWidth * 0.4f, CharHeight * 4 / 4);
 							enterpath.EndFigure(CanvasFigureLoop.Open);
 
 							CanvasGeometry enter = CanvasGeometry.CreatePath(enterpath);
@@ -1069,17 +1083,20 @@ namespace CodeEditorControl_WinUI
 			session.FillRectangle(x, y, CharWidth * w + 1, CharHeight + 1, ActualTheme == ElementTheme.Light ? color.InvertColorBrightness() : color);
 		}
 
-		private void DrawText()
+		private void DrawText(bool sizechanged = false)
 		{
-			CanvasTextFormat textFormat = new CanvasTextFormat
+			if (sizechanged)
 			{
-				FontFamily = "Consolas",
-				FontSize = FontSize
-			};
-			Size size = MeasureTextSize(CanvasDevice.GetSharedDevice(), "M", textFormat);
-			Size sizew = MeasureTextSize(CanvasDevice.GetSharedDevice(), "M", textFormat);
-			CharHeight = (int)(size.Height * 2f);
-			CharWidth = (int)(sizew.Width * 1.1f);
+				CanvasTextFormat = new CanvasTextFormat
+				{
+					FontFamily = "Consolas",
+					FontSize = ScaledFontSize
+				};
+				Size size = MeasureTextSize(CanvasDevice.GetSharedDevice(), "M", CanvasTextFormat);
+				Size sizew = MeasureTextSize(CanvasDevice.GetSharedDevice(), "M", CanvasTextFormat);
+				CharHeight = (int)(size.Height * 2f);
+				CharWidth = (int)(sizew.Width * 1.1f);
+			}
 
 
 			if (VerticalScroll != null && HorizontalScroll != null && Lines != null)
@@ -1104,7 +1121,7 @@ namespace CodeEditorControl_WinUI
 
 				//iVisibleChars = (int)(((int)TextControl.ActualWidth - Width_Left) / CharWidth);
 
-				Width_LeftMargin = ShowLineNumbers ? CharWidth / 2 : 0;
+				Width_LeftMargin = ShowLineNumbers ? CharWidth : 0;
 				Width_LineNumber = ShowLineNumbers ? CharWidth * IntLength(Lines.Count) : 0;
 				Width_FoldingMarker = IsFoldingEnabled ? CharWidth : 0;
 				Width_ErrorMarker = CharWidth / 2;
@@ -1162,14 +1179,16 @@ namespace CodeEditorControl_WinUI
 			return closePos;
 		}
 
+		private CanvasTextFormat CanvasTextFormat { get; set;  } = new CanvasTextFormat();
 		private void FontSizeChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
 		{
 			int currline = 0;
+			
 			if (VerticalScroll != null)
 			{
 				currline = (int)VerticalScroll.Value / CharHeight;
 			}
-			Invalidate();
+			Invalidate(true);
 			if (VerticalScroll != null)
 			{
 				VerticalScroll.Value = currline * CharHeight;
@@ -1243,7 +1262,7 @@ namespace CodeEditorControl_WinUI
 					{
 						DispatcherQueue.TryEnqueue(() =>
 									{
-										Invalidate();
+										Invalidate(true);
 									});
 					}
 				}
@@ -1259,7 +1278,7 @@ namespace CodeEditorControl_WinUI
 										newSelection = new(new Place(Lines[newSelection.VisualEnd.iLine].Count, newSelection.VisualEnd.iLine));
 
 									Selection = newSelection;
-									Invalidate();
+									Invalidate(true);
 									if (!IsInitialized)
 									{
 										IsInitialized = true;
@@ -1374,7 +1393,6 @@ namespace CodeEditorControl_WinUI
 			{
 				while (!CanvasText.IsLoaded | !CanvasBeam.IsLoaded | !CanvasSelection.IsLoaded | !CanvasScrollbarMarkers.IsLoaded) // ToDo: Very ugly workaround, logic needs to be overthought
 					await Task.Delay(10);
-				CanvasText.DpiScale = 1.0f;
 				await InitializeLines((string)e.NewValue);
 			}
 			TextChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Text)));
@@ -1500,11 +1518,13 @@ namespace CodeEditorControl_WinUI
 				{
 					Background = new SolidColorBrush(Color.FromArgb(255, 240, 240, 240));
 					Color_LeftBackground = Color.FromArgb(255, 220, 220, 220);
+					//Color_LineNumber = Color.FromArgb(255, 120, 160, 180).InvertColorBrightness;
 				}
 				else
 				{
 					Background = new SolidColorBrush(Color.FromArgb(255, 30, 30, 30));
 					Color_LeftBackground = Color.FromArgb(255, 25, 25, 25);
+					//Color_LineNumber = Color.FromArgb(255, 120, 160, 180);
 				}
 			}
 			catch (Exception ex)
@@ -2305,7 +2325,8 @@ namespace CodeEditorControl_WinUI
 						}
 						i++;
 					}
-					Lines[place.iLine + i].LineText += stringtomove;
+					if (!string.IsNullOrEmpty(stringtomove))
+						Lines[place.iLine + i].LineText += stringtomove;
 				});
 
 				if (IsSelection && place >= Selection.VisualEnd && dragDropModifiers != DragDropModifiers.Control)
@@ -2639,7 +2660,7 @@ namespace CodeEditorControl_WinUI
 								isDragging = true;
 								draggedText = SelectedText;
 								draggedSelection = new(Selection);
-								e.Handled = true;
+								//e.Handled = true;
 								return;
 							}
 						}
@@ -2821,6 +2842,7 @@ namespace CodeEditorControl_WinUI
 				isLineSelect = false;
 				if (isDragging && place > Selection.VisualStart && place <= Selection.VisualEnd)
 				{
+					e.Handled = true;
 					Selection = new Range(place);
 					ProtectedCursor = InputSystemCursor.Create(InputSystemCursorShape.IBeam);
 					Focus(FocusState.Keyboard);
