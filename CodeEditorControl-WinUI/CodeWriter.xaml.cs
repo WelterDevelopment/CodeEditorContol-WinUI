@@ -1283,7 +1283,6 @@ namespace CodeEditorControl_WinUI
 					pairs.Add(new BracketPair(new Place(open, place.iLine), new Place(close, place.iLine)));
 				}
 			}
-			Debug.WriteLine(string.Join("\n", pairs.Select(x => x.iOpen.ToString())));
 
 			return pairs.Any(x => x.iClose >= place && x.iOpen < place);
 		}
