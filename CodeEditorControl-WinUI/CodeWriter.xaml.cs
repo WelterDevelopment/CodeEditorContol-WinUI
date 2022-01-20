@@ -2383,7 +2383,16 @@ namespace CodeEditorControl_WinUI
 					e.DragUIOverride.IsContentVisible = false;
 
 
-					if (!IsFocused)
+				if (!IsSelection)
+				{
+					e.AcceptedOperation = DataPackageOperation.Move | DataPackageOperation.Copy;
+					e.DragUIOverride.IsCaptionVisible = true; 
+					e.DragUIOverride.Caption = $"Paste: {await e.DataView.GetTextAsync()}";
+					CursorPlace = place;
+				}
+				else
+				{
+					if (place >= Selection.VisualStart && place < Selection.VisualEnd)
 					{
 						IsFocused = true;
 						tempFocus = true;
