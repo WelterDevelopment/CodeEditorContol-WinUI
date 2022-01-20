@@ -27,6 +27,7 @@ using Windows.ApplicationModel.DataTransfer;
 using Windows.ApplicationModel.DataTransfer.DragDrop;
 using Windows.Devices.Input;
 using Windows.Foundation;
+using Windows.Graphics.Imaging;
 using Windows.System;
 using Windows.UI;
 using Windows.UI.Core;
@@ -2368,58 +2369,67 @@ namespace CodeEditorControl_WinUI
 			}
 		}
 		bool tempFocus = false;
-		private async void TextControl_DragOver(object sender, DragEventArgs e)
+		private async void TextControl_DragEnter(object sender, DragEventArgs e)
 		{
 			try
 			{
-				Place place = PointToPlace(e.GetPosition(TextControl));
-				e.DragUIOverride.IsCaptionVisible = false;
-				e.DragUIOverride.IsGlyphVisible = false;
-				e.DragUIOverride.IsContentVisible = false;
+				if (e.DataView.Contains(StandardDataFormats.Text))
+				{
+					Place place = PointToPlace(e.GetPosition(TextControl));
+					e.DragUIOverride.IsCaptionVisible = true;
+					e.DragUIOverride.IsGlyphVisible = false;
+
+					//e.DragUIOverride.SetContentFromSoftwareBitmap(SoftwareBitmap.);
+					e.DragUIOverride.IsContentVisible = false;
 
 
-				if (!IsFocused)
-				{
-					IsFocused = true;
-					tempFocus = true;
-				}
-
-				if (!IsSelection)
-				{
-					e.AcceptedOperation = DataPackageOperation.Move | DataPackageOperation.Copy;
-					e.DragUIOverride.Caption = "Paste";
-					CursorPlace = place;
-				}
-				else
-				{
-					if (place >= Selection.VisualStart && place < Selection.VisualEnd)
+					if (!IsFocused)
 					{
-						e.AcceptedOperation = DataPackageOperation.None;
-						CursorPlace = Selection.End;
+						IsFocused = true;
+						tempFocus = true;
+					}
+
+					if (!IsSelection)
+					{
+						e.AcceptedOperation = DataPackageOperation.Move | DataPackageOperation.Copy;
+						//e.DragUIOverride.IsCaptionVisible = true;
+						e.DragUIOverride.Caption = "Paste: " + await e.DataView.GetTextAsync();
+						CursorPlace = place;
 					}
 					else
 					{
+						if (place >= Selection.VisualStart && place < Selection.VisualEnd)
+						{
+							e.AcceptedOperation = DataPackageOperation.None;
+							CursorPlace = Selection.End;
+						}
+						else
+						{
 
-						//InfoMessage?.Invoke(this, "Mod: " + e.Modifiers);
-						//InfoMessage?.Invoke(this, "Orig: " + e.OriginalSource);
-						e.AcceptedOperation = DataPackageOperation.Copy | DataPackageOperation.Move;
-						//if (e.Modifiers == DragDropModifiers.Control)
-						//{
+							//InfoMessage?.Invoke(this, "Mod: " + e.Modifiers);
+							//InfoMessage?.Invoke(this, "Orig: " + e.OriginalSource);
+							e.AcceptedOperation = DataPackageOperation.Copy | DataPackageOperation.Move;
+							//if (e.Modifiers == DragDropModifiers.Control)
+							//{
 
-						//	e.DragUIOverride.Caption = "Copy";
+							//	e.DragUIOverride.Caption = "Copy";
 
-						//}
-						//else
-						//{
-						//	e.AcceptedOperation = DataPackageOperation.Move;
-						//	e.DragUIOverride.Caption = "Move";
-						//}
+							//}
+							//else
+							//{
+							//	e.AcceptedOperation = DataPackageOperation.Move;
+							//	e.DragUIOverride.Caption = "Move";
+							//}
 
-						//CursorPlace = Selection.End;
-						CursorPlace = place;
-					}
+							//CursorPlace = Selection.End;
+							CursorPlace = place;
+						}
+					}					
 				}
-
+				else
+				{
+					e.AcceptedOperation = DataPackageOperation.None;
+				}
 				e.Handled = true;
 			}
 			catch (Exception ex)
@@ -2427,7 +2437,22 @@ namespace CodeEditorControl_WinUI
 				ErrorOccured?.Invoke(this, new ErrorEventArgs(ex));
 			}
 		}
-
+		private async void TextControl_DragOver(object sender, DragEventArgs e)
+		{
+			try
+			{
+				if (e.AcceptedOperation != DataPackageOperation.None)
+				{
+					Place place = PointToPlace(e.GetPosition(TextControl));
+					CursorPlace = place;					
+				}
+				e.Handled = true;
+			}
+			catch (Exception ex)
+			{
+				ErrorOccured?.Invoke(this, new ErrorEventArgs(ex));
+			}
+		}
 		private void TextControl_DragStarting(UIElement sender, DragStartingEventArgs args)
 		{
 			try
@@ -2449,18 +2474,21 @@ namespace CodeEditorControl_WinUI
 		{
 			try
 			{
+				if (e.DataView.Contains(StandardDataFormats.Text))
+				{
+					string text = await e.DataView.GetTextAsync();
 
-				string text = await e.DataView.GetTextAsync();
-				TextAction_Paste(text, PointToPlace(e.GetPosition(TextControl)), e.Modifiers);
-				e.Handled = true;
-				if (tempFocus)
-				{
-					tempFocus = false;
-					IsFocused = false;
-				}
-				else
-				{
-					Focus(FocusState.Pointer);
+					TextAction_Paste(text, PointToPlace(e.GetPosition(TextControl)), e.Modifiers);
+					e.Handled = true;
+					if (tempFocus)
+					{
+						tempFocus = false;
+						IsFocused = false;
+					}
+					else
+					{
+						Focus(FocusState.Pointer);
+					}
 				}
 			}
 			catch (Exception ex)

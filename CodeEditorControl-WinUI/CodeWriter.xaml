@@ -56,7 +56,7 @@
 
 		<Grid Grid.Column="0" x:Name="ScrollContent" KeyDown="Scroll_KeyDown"  ManipulationMode="TranslateX,TranslateY,TranslateInertia,Scale" ManipulationStarted="ScrollContent_ManipulationStarted"  ManipulationDelta="ScrollContent_ManipulationDelta"  >
 
-			<Grid x:Name="TextControl"    AllowDrop="True" CanDrag="True" DragStarting="TextControl_DragStarting" DragOver="TextControl_DragOver" Drop="TextControl_Drop" PointerMoved="TextControl_PointerMoved"  PointerPressed="TextControl_PointerPressed" PointerReleased="TextControl_PointerReleased" PointerCaptureLost="TextControl_PointerLost" PointerCanceled="TextControl_PointerLost" PointerExited="TextControl_PointerExited">
+			<Grid x:Name="TextControl"    AllowDrop="True" CanDrag="True" DragStarting="TextControl_DragStarting"  DragEnter="TextControl_DragEnter" DragOver="TextControl_DragOver" Drop="TextControl_Drop" PointerMoved="TextControl_PointerMoved"  PointerPressed="TextControl_PointerPressed" PointerReleased="TextControl_PointerReleased" PointerCaptureLost="TextControl_PointerLost" PointerCanceled="TextControl_PointerLost" PointerExited="TextControl_PointerExited">
 				<Grid.ContextFlyout>
 					<MenuFlyout x:Name="ContextMenu" x:FieldModifier="public" >
 						<MenuFlyoutItem Text="Copy" Command="{x:Bind Command_Copy}" IsEnabled="{x:Bind IsSelection}" >
