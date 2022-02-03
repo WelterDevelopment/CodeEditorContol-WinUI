@@ -155,15 +155,19 @@ namespace CodeEditorControl_WinUI
 	public class TokenDefinition : Bindable
 	{
 		public Token Token { get => Get(Token.Normal); set => Set(value); }
-		public Color Color { get => Get(Color.FromArgb(255, 220, 220, 220)); set {
-				Set(value); 
+		public Color Color
+		{
+			get => Get(Color.FromArgb(255, 220, 220, 220)); set
+			{
+				Set(value);
 				try
 				{
 					EditorOptions.TokenColors[Token] = value;
 					CodeWriter.Current?.RedrawText();
 				}
 				catch { }
-			} }
+			}
+		}
 	}
 	public static class EditorOptions
 	{
@@ -354,6 +358,7 @@ namespace CodeEditorControl_WinUI
 		public Dictionary<Token, string[]> WordTokens { get; set; }
 		public Dictionary<char, char> AutoClosingPairs { get; set; } = new();
 		public List<Suggestion> Commands { get; set; }
+		public List<string> WordSelectionDefinitions { get; set; } = new() { /*language=regex*/ @"\b\w+?\b", };
 
 		public string LineComment { get; set; }
 	}
@@ -372,6 +377,8 @@ namespace CodeEditorControl_WinUI
 
 		public List<Char> Chars { get => Get(new List<Char>()); set => Set(value); }
 
+		public List<List<Char>> WrappedLines { get => Get(new List<List<Char>>()); set => Set(value); }
+
 		public int Count
 		{
 			get { return Chars.Count; }
@@ -385,18 +392,17 @@ namespace CodeEditorControl_WinUI
 
 		public int iLine { get => LineNumber - 1; }
 
-		public int Indents		{			get => LineText.Count(x => x == '\t'); 		}
+		public int Indents { get { return LineText != null ? LineText.Count(x => x == '\t') : 0; } }
 
 		public int GetLineWraps(int maxchar, int tablength, int wrappingindent)
 		{
-			List<Line> wrappedlines = new List<Line>();
 
 			int linewraps = 0;
 			int indents = Indents;
 			int iWrappingChar = 0;
-			Line wrappedLine = new Line();
+			List<Char> wrappedLine = new List<Char>();
 
-			for (int iChar = 0; iChar < Count-1; iChar++)
+			for (int iChar = 0; iChar < Count - 1; iChar++)
 			{
 				int iWrappingEndPosition = (linewraps + 1) * maxchar - (wrappingindent * linewraps) - (indents * (tablength - 1) * (linewraps + 1));
 
@@ -413,13 +419,68 @@ namespace CodeEditorControl_WinUI
 			return linewraps;
 		}
 
+		public void CalculateWrappedLines(int iVisibleChars, int TabLength = 2, int WrapIndent = 3)
+		{
+			WrappedLines.Clear();
+			int lastChar = Count-1;
+			int indents = 0;
+			int linewraps = 0;
+			int iWrappingChar = 0;
+			int iLastWrappingPosition = 0;
+			if (lastChar == -1)
+			{
+				WrappedLines.Add(new(Chars));
+			}
+			else
+			for (int iChar = 0; iChar <= lastChar; iChar++)
+			{
+				Char c = this[iChar];
+
+				if (c.C == '\t')
+				{
+					//x = Width_Left + CharWidth * (iChar + indents * (TabLength - 1) - iCharOffset);
+					indents += 1;
+				}
+				else if (iChar >= indents * (TabLength - 1))
+				{
+					int maxchar = iVisibleChars-1;
+					//if (iChar + indents * (TabLength - 1) - iCharOffset < maxchar)
+					//{
+					//	x = Width_Left + CharWidth * (iChar + indents * (TabLength - 1) - iCharOffset);
+					//}
+					//else
+					//{
+					int iWrappingEndPosition = (linewraps + 1) * maxchar - (WrapIndent * linewraps) - (indents * (TabLength - 1) * (linewraps +1));
+
+					iWrappingEndPosition = Math.Min(iWrappingEndPosition,lastChar);
+
+					if (iChar > 0 && iChar <= iWrappingEndPosition)
+						iWrappingChar++;
+
+					if (iChar == iWrappingEndPosition)
+					{
+						iWrappingChar = WrapIndent;
+						linewraps++;
+						WrappedLines.Add(new(Chars.GetRange(iLastWrappingPosition, iChar - iLastWrappingPosition+1)));
+						iLastWrappingPosition = iChar+1;
+						//	args.DrawingSession.FillRectangle(0, y, Width_Left - Width_TextIndent, CharHeight, Color_LeftBackground);
+						//wrapindent = 1;
+					}
+
+
+				}
+			}
+		}
+
 		public bool IsFoldEnd { get => Get(false); set => Set(value); }
 		public bool IsFoldInner { get => Get(false); set => Set(value); }
 		public bool IsFoldInnerEnd { get => Get(false); set => Set(value); }
 		public bool IsFoldStart { get => Get(false); set => Set(value); }
-		public bool IsUnsaved { get => Get(false); set { Set(value); if (!value) lastsavedtext = LineText; } }
+		public bool IsUnsaved { get => Get(false); set { Set(value); } }
 		public Language Language { get => Get<Language>(); set { Set(value); Chars = FormattedText(LineText); } }
 		public int LineNumber { get => Get(0); set => Set(value); }
+
+		public void Save() { lastsavedtext = LineText; IsUnsaved = false; }
 
 		public string LineText
 		{
@@ -427,6 +488,7 @@ namespace CodeEditorControl_WinUI
 			set
 			{
 				IsUnsaved = value != lastsavedtext;
+
 				Set(value);
 
 				Chars = FormattedText(value);
@@ -766,7 +828,7 @@ namespace CodeEditorControl_WinUI
 
 		public static Range operator +(Range p1, int c2)
 		{
-			return new Range(p1.Start+c2, p1.End+c2);
+			return new Range(p1.Start + c2, p1.End + c2);
 		}
 		public static Range operator -(Range p1, int c2)
 		{
