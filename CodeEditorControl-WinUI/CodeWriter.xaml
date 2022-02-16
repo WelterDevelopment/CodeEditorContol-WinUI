@@ -753,7 +753,10 @@
 						</TextBlock>
 					</StackPanel>
 					<ScrollViewer BorderThickness="0,1,0,0" BorderBrush="{ThemeResource ListBoxBorderThemeBrush}" VerticalContentAlignment="Top" Grid.Row="1" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Hidden">
+						<StackPanel>
 						<controls:MarkdownTextBlock Background="Transparent" Text="{Binding Description}" IsTextSelectionEnabled="True"></controls:MarkdownTextBlock>
+							<ItemsControl ItemsSource="{Binding Values}"></ItemsControl>
+						</StackPanel>
 					</ScrollViewer>
 				</Grid>
 			</Grid>

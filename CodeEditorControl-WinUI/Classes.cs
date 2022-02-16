@@ -264,10 +264,6 @@ namespace CodeEditorControl_WinUI
 		public new Char[] C { get => Get(new Char[] { }); set => Set(value); }
 	}
 
-	public class CodeWriterOptions : Bindable
-	{
-	}
-
 	public class EditAction
 	{
 		public EditActionType EditActionType { get; set; }
@@ -316,7 +312,7 @@ namespace CodeEditorControl_WinUI
 
 		public bool IsSelected { get => Get(false); set => Set(value); }
 
-		public string Optional { get; set; }
+		public bool Optional { get; set; }
 
 		public string Delimiters { get; set; }
 
@@ -328,17 +324,16 @@ namespace CodeEditorControl_WinUI
 
 	public class Parameter : Suggestion
 	{
-		public List<Constant> Constant { get; set; }
-
-
 	}
-	public class Constant
+
+	public class Constant : Parameter
 	{
 		public string Type { get; set; }
+	}
 
-		public string Default { get; set; }
-
-		public string Value { get; set; }
+	public class KeyValue : Parameter
+	{
+		public List<string> Values { get; set; } = new();
 	}
 
 	public class Language

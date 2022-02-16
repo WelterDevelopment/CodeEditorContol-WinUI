@@ -1022,15 +1022,22 @@ namespace CodeEditorControl_WinUI
 					{
 						IsSuggestingOptions = true;
 						SuggestionStart = CursorPlace;
-						IntelliSense intelliSense = GetCommandFromPlace(CursorPlace);
-						if (intelliSense != null)
+						var command = GetCommandAtPosition(CursorPlace);
+						IntelliSense intelliSense = command.Command;
+						var argument = command.ArgumentsRanges.FirstOrDefault(x => CursorPlace.iChar >= x.Start.iChar && CursorPlace.iChar <= x.End.iChar);
+						if (argument != null)
 						{
-							if (intelliSense.ArgumentsList?.Count > 0)
+							int argumentindex = command.ArgumentsRanges.IndexOf(argument);
+							//IntelliSense intelliSense = GetCommandFromPlace(CursorPlace);
+							if (intelliSense != null && argumentindex != -1)
 							{
-								SuggestionStart = CursorPlace + 1;
-								Options = intelliSense.ArgumentsList.FirstOrDefault()?.Parameters;
-								AllOptions = Suggestions = Options.Select(x => { ((Suggestion)x).Snippet = "="; return (Suggestion)x; }).ToList();
-								IsSuggesting = true;
+								if (intelliSense.ArgumentsList?.Count > argumentindex)
+								{
+									SuggestionStart = CursorPlace + 1;
+									Options = intelliSense.ArgumentsList[argumentindex]?.Parameters;
+									AllOptions = Suggestions = Options.Select(x => { if (x is KeyValue) ((Suggestion)x).Snippet = "="; return (Suggestion)x; }).ToList();
+									IsSuggesting = true;
+								}
 							}
 						}
 					}
@@ -1272,29 +1279,6 @@ namespace CodeEditorControl_WinUI
 			}
 		}
 
-		private int findClosingParen(char[] text, int openPos)
-		{
-			int closePos = openPos;
-			int counter = 1;
-			while (counter > 0)
-			{
-				if (closePos == text.Length - 1)
-				{
-					return ++closePos;
-				}
-				char c = text[++closePos];
-				if (c == '[')
-				{
-					counter++;
-				}
-				else if (c == ']')
-				{
-					counter--;
-				}
-			}
-			return closePos;
-		}
-
 		private CanvasTextFormat CanvasTextFormat { get; set; } = new CanvasTextFormat();
 		private void FontSizeChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
 		{
@@ -1421,6 +1405,65 @@ namespace CodeEditorControl_WinUI
 			}
 
 			return pairs.Any(x => x.iClose >= place && x.iOpen < place);
+		}
+
+		class CommandAtPosition
+		{
+			public IntelliSense Command { get; set; }
+			public Range CommandRange { get; set; }
+			public List<Range> ArgumentsRanges { get; set; }
+		}
+
+		private CommandAtPosition GetCommandAtPosition(Place place)
+		{
+			CommandAtPosition commandAtPosition = new CommandAtPosition();
+			MatchCollection commandsInLine = Regex.Matches(Lines[place.iLine].LineText, @"(\\.+?\b)(\[(?>\[(?<c>)|[^\[\]]+|\](?<-c>))*(?(c)(?!))\])*");
+
+			if (commandsInLine.Any())
+			{
+				foreach (Match command in commandsInLine)
+				{
+					if (command.Success && place.iChar>= command.Index && place.iChar <= command.Index + command.Length)
+					{
+						var commandname = command.Groups[1];
+						commandAtPosition.CommandRange = new(new(commandname.Index,place.iLine),new(command.Index+command.Length,place.iLine));
+						commandAtPosition.Command = AllSuggestions.FirstOrDefault(x=>x.Name == commandname.Value) as IntelliSense;
+						if (command.Groups.Count > 2) {
+							commandAtPosition.ArgumentsRanges = new();
+							for (int group = 2; group < command.Groups.Count; group++)
+							{
+								var argument = command.Groups[group];
+								commandAtPosition.ArgumentsRanges.Add(new(new(argument.Index, place.iLine), new(argument.Index + argument.Length, place.iLine)));
+							} 
+						}
+						return commandAtPosition;
+					}
+				}
+			}
+			return commandAtPosition;
+		}
+
+		private int findClosingParen(char[] text, int openPos)
+		{
+			int closePos = openPos;
+			int counter = 1;
+			while (counter > 0)
+			{
+				if (closePos == text.Length - 1)
+				{
+					return ++closePos;
+				}
+				char c = text[++closePos];
+				if (c == '[')
+				{
+					counter++;
+				}
+				else if (c == ']')
+				{
+					counter--;
+				}
+			}
+			return closePos;
 		}
 
 		private void KeyboardAccelerator_Invoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
@@ -2785,36 +2828,37 @@ namespace CodeEditorControl_WinUI
 			tempFocus = false;
 		}
 
+		PointerPoint CurrentPointerPoint { get; set; }
+
 		private async void TextControl_PointerMoved(object sender, PointerRoutedEventArgs e)
 		{
 			try
 			{
-				PointerPoint currentpoint = e.GetCurrentPoint(TextControl);
+				CurrentPointerPoint = e.GetCurrentPoint(TextControl);
 
 				if (!isDragging)
 					if (e.Pointer.PointerDeviceType == Microsoft.UI.Input.PointerDeviceType.Mouse | e.Pointer.PointerDeviceType == Microsoft.UI.Input.PointerDeviceType.Pen)
 					{
-						Place place = await PointToPlace(currentpoint.Position);
-						if (isSelecting && currentpoint.Properties.IsLeftButtonPressed)
+						Place place = await PointToPlace(CurrentPointerPoint.Position);
+						if (isSelecting && CurrentPointerPoint.Properties.IsLeftButtonPressed)
 						{
 							if (!isLineSelect)
 							{
-								Selection = new Range(Selection.Start, await PointToPlace(currentpoint.Position));
+								Selection = new Range(Selection.Start, await PointToPlace(CurrentPointerPoint.Position));
 							}
 							else
 							{
-
 								place.iChar = Lines[place.iLine].Count;
 								Selection = new Range(Selection.Start, place);
 							}
 						}
 						else if (isMiddleClickScrolling)
 						{
-							middleClickScrollingEndPoint = currentpoint.Position;
+							middleClickScrollingEndPoint = CurrentPointerPoint.Position;
 						}
 						else
 						{
-							if (currentpoint.Position.X < Width_Left)
+							if (CurrentPointerPoint.Position.X < Width_Left)
 							{
 								ProtectedCursor = InputSystemCursor.Create(InputSystemCursorShape.Arrow);
 								//Cursor = new CoreCursor(CoreCursorType.Arrow, 1);
