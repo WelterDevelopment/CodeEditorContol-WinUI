@@ -722,15 +722,27 @@
 				<ItemsControl></ItemsControl>
 			</Grid>
 
-			<Grid x:Name="Grd_Suggestions" Visibility="{x:Bind IsSuggesting}" HorizontalAlignment="Left" VerticalAlignment="Top" Background="{ThemeResource FlyoutBackgroundThemeBrush}" CornerRadius="6" BorderThickness="1" BorderBrush="{ThemeResource AppBarBorderThemeBrush}" Height="200">
-				<Grid.RenderTransform>
+
+			
+			<Popup IsOpen="{x:Bind IsSuggesting}" IsLightDismissEnabled="False">
+				<Popup.RenderTransform>
 					<TranslateTransform X="{x:Bind CursorPoint.X}" Y="{x:Bind CursorPoint.Y}"></TranslateTransform>
-				</Grid.RenderTransform>
+				</Popup.RenderTransform>
+				
+			<Grid x:Name="Grd_Suggestions" HorizontalAlignment="Left" VerticalAlignment="Top" Background="{ThemeResource AcrylicInAppFillColorDefaultBrush}" CornerRadius="6" BorderThickness="1" BorderBrush="{ThemeResource AppBarBorderThemeBrush}" Height="200">
+					<Grid.Transitions>
+						<TransitionCollection>
+							<PopupThemeTransition ></PopupThemeTransition>
+						</TransitionCollection>
+					</Grid.Transitions>
+					<!--<Grid.RenderTransform>
+					<TranslateTransform X="{x:Bind CursorPoint.X}" Y="{x:Bind CursorPoint.Y}"></TranslateTransform>
+				</Grid.RenderTransform>-->
 				<Grid.ColumnDefinitions>
 					<ColumnDefinition Width="200" />
 					<ColumnDefinition Width="200" />
 				</Grid.ColumnDefinitions>
-				<ListBox x:Name="Lbx_Suggestions" Grid.Column="0" PointerEntered="NormalArrowPointerEntered" SingleSelectionFollowsFocus="True" SelectionMode="Single" KeyDown="Lbx_Suggestions_KeyDown"  ItemsSource="{x:Bind Suggestions}" ItemTemplateSelector="{StaticResource SuggestionTemplateSelector}" IsDoubleTapEnabled="True" DoubleTapped="Lbx_Suggestions_DoubleTapped" SelectedIndex="{x:Bind SuggestionIndex, Mode=TwoWay}" >
+				<ListBox x:Name="Lbx_Suggestions" Grid.Column="0" Background="Transparent" PointerEntered="NormalArrowPointerEntered" SingleSelectionFollowsFocus="True" SelectionMode="Single" KeyDown="Lbx_Suggestions_KeyDown"  ItemsSource="{x:Bind Suggestions}" ItemTemplateSelector="{StaticResource SuggestionTemplateSelector}" IsDoubleTapEnabled="True" DoubleTapped="Lbx_Suggestions_DoubleTapped" SelectedIndex="{x:Bind SuggestionIndex, Mode=TwoWay}" >
 					<ListBox.ItemContainerStyle>
 						<Style TargetType="ListBoxItem">
 							<Setter Property="Margin" Value="0"></Setter>
@@ -738,7 +750,11 @@
 						</Style>
 					</ListBox.ItemContainerStyle>
 				</ListBox>
-				<Grid Grid.Column="1" Padding="6" RowSpacing="6" DataContext="{x:Bind SelectedSuggestion}" Background="{ThemeResource ApplicationPageBackgroundThemeBrush}" >
+				
+				<Grid Grid.Column="1" Padding="6" RowSpacing="6" DataContext="{x:Bind SelectedSuggestion}" >
+					<Grid.Background>
+						<SolidColorBrush Color="#11000000"></SolidColorBrush>
+					</Grid.Background>
 					<Grid.RowDefinitions>
 						<RowDefinition Height="Auto" />
 						<RowDefinition Height="*" />
@@ -752,14 +768,17 @@
 						<TextBlock Text="{Binding ArgumentsList, Converter={StaticResource ArgumentsToString}}" IsTextSelectionEnabled="True">
 						</TextBlock>
 					</StackPanel>
-					<ScrollViewer BorderThickness="0,1,0,0" BorderBrush="{ThemeResource ListBoxBorderThemeBrush}" VerticalContentAlignment="Top" Grid.Row="1" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Hidden">
-						<StackPanel>
-						<controls:MarkdownTextBlock Background="Transparent" Text="{Binding Description}" IsTextSelectionEnabled="True"></controls:MarkdownTextBlock>
-							<ItemsControl ItemsSource="{Binding Values}"></ItemsControl>
+					<ScrollViewer BorderThickness="0,1,0,0" BorderBrush="{ThemeResource ListBoxBorderThemeBrush}" VerticalAlignment="Stretch" VerticalContentAlignment="Top" Grid.Row="1" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Hidden">
+						<StackPanel VerticalAlignment="Top">
+						<!--<controls:MarkdownTextBlock Background="Transparent" Text="{Binding Description}" IsTextSelectionEnabled="True"></controls:MarkdownTextBlock>-->
+								<TextBlock Text="{Binding Description}" IsTextSelectionEnabled="True"></TextBlock>
+								<ItemsControl ItemsSource="{Binding Values}"></ItemsControl>
 						</StackPanel>
 					</ScrollViewer>
 				</Grid>
 			</Grid>
+			</Popup>
+
 			<Grid PointerEntered="NormalArrowPointerEntered" x:Name="FindPopup" Visibility="{x:Bind IsFindPopupOpen}" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,4,0,4">
 				<animations:Implicit.ShowAnimations>
 					<animations:TranslationAnimation Duration="0:0:0.2" From="0, 20, 0" To="0"/>

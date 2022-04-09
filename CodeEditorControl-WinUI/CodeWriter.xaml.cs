@@ -317,11 +317,11 @@ namespace CodeEditorControl_WinUI
 					for (int iLine = start.iLine; iLine <= end.iLine; iLine++)
 					{
 						if (iLine == start.iLine)
-							text += Lines[iLine].LineText.Substring(start.iChar) + "\n";
+							text += Lines[iLine].LineText.Substring(start.iChar) + "\r\n";
 						else if (iLine == end.iLine)
 							text += Lines[iLine].LineText.Substring(0, end.iChar);
 						else
-							text += Lines[iLine].LineText + "\n";
+							text += Lines[iLine].LineText + "\r\n";
 					}
 				}
 
@@ -1017,7 +1017,8 @@ namespace CodeEditorControl_WinUI
 
 					Lines[CursorPlace.iLine].LineText = Lines[CursorPlace.iLine].LineText.Insert(CursorPlace.iChar, args.Character.ToString());
 
-
+					
+					if (Language.EnableIntelliSense)
 					if (((args.Character == ',' | args.Character == ' ') && IsInsideBrackets(CursorPlace)) | Language.OptionsTriggerCharacters.Contains(args.Character))
 					{
 						IsSuggestingOptions = true;
@@ -1050,10 +1051,16 @@ namespace CodeEditorControl_WinUI
 							Lines[CursorPlace.iLine].LineText = Lines[CursorPlace.iLine].LineText.Insert(CursorPlace.iChar + 1, Language.AutoClosingPairs[args.Character].ToString());
 					}
 
+
 					Selection = new(Selection.VisualStart + 1);
+
+
 					FilterSuggestions();
+
 					textChanged();
+
 					CanvasText.Invalidate();
+
 					IsFindPopupOpen = false;
 					args.Handled = true;
 				}
@@ -1325,7 +1332,9 @@ namespace CodeEditorControl_WinUI
 
 			await Task.Run(() =>
 			{
-				string[] lines = text.Contains("\r\n") ? text.Split("\r\n", StringSplitOptions.None) : text.Split("\n", StringSplitOptions.None);
+				text = text.Replace("\r\n", "\n").Replace("\r", "\n");
+				string[] lines = text.Split("\n", StringSplitOptions.None);
+				//string[] lines = text.Contains("\r\n") ? text.Split("\r\n", StringSplitOptions.None) : text.Split("\n", StringSplitOptions.None);
 
 				lastVisibleLine = Math.Min(Lines.Count, lastVisibleLine + 5);
 				int lineNumber = 1;
@@ -2486,7 +2495,7 @@ namespace CodeEditorControl_WinUI
 		private void TextAction_Find()
 		{
 			IsFindPopupOpen = true;
-			if (!SelectedText.Contains("\n"))
+			if (!SelectedText.Contains("\r\n"))
 				Tbx_Search.Text = SelectedText;
 			Tbx_Search.Focus(FocusState.Keyboard);
 			Tbx_Search.SelectionStart = Tbx_Search.Text.Length;
@@ -2553,6 +2562,7 @@ namespace CodeEditorControl_WinUI
 				int i = 0;
 				await Task.Run(() =>
 				{
+					text = text.Replace("\r\n", "\n");
 					int tabcount = Lines[place.iLine].Indents;
 					string stringtomove = "";
 					foreach (string line in text.Split('\n', StringSplitOptions.None))
@@ -2599,10 +2609,15 @@ namespace CodeEditorControl_WinUI
 		{
 			try
 			{
+			
+				
 				RecalcLineNumbers();
+
 				IsSettingValue = true;
-				string t = string.Join("\n", Lines.Select(x => x.LineText));
+				string t = string.Join("\r\n", Lines.Select(x => x.LineText));
+
 				Text = t;
+
 				if (Lines[CursorPlace.iLine].LineText.Length > maxchars)
 				{
 					maxchars = Lines[CursorPlace.iLine].LineText.Length;
@@ -2610,6 +2625,7 @@ namespace CodeEditorControl_WinUI
 					VerticalScroll.Visibility = Lines.Count * CharHeight > TextControl.ActualHeight ? Visibility.Visible : Visibility.Collapsed;
 					HorizontalScroll.Visibility = maxchars * CharHeight > TextControl.ActualWidth ? Visibility.Visible : Visibility.Collapsed;
 				}
+
 				IsSettingValue = false;
 				TextChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Text)));
 			}
@@ -3113,8 +3129,15 @@ namespace CodeEditorControl_WinUI
 			{
 				PointerPoint currentpoint = e.GetCurrentPoint(TextControl);
 				Place place = await PointToPlace(currentpoint.Position);
-				isSelecting = false;
+
 				isLineSelect = false;
+
+				if (isSelecting)
+				{
+					isSelecting = false;
+					e.Handled = true;
+				}
+			
 				if (isDragging && place > Selection.VisualStart && place <= Selection.VisualEnd)
 				{
 					e.Handled = true;

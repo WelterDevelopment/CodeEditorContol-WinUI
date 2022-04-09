@@ -356,6 +356,8 @@ namespace CodeEditorControl_WinUI
 		public List<string> WordSelectionDefinitions { get; set; } = new() { /*language=regex*/ @"\b\w+?\b", };
 
 		public string LineComment { get; set; }
+
+		public bool EnableIntelliSense { get; set; } = false;
 	}
 
 	public class Line : Bindable
@@ -573,6 +575,18 @@ namespace CodeEditorControl_WinUI
 						}
 					}
 				}
+
+			if (!string.IsNullOrEmpty(Language.LineComment))
+			{
+				int commentIndex = text.IndexOf(Language.LineComment);
+				if (commentIndex > -1)
+				{
+					for (int i = commentIndex; i< text.Count(); i++)
+					{
+						groups[i].T = Token.Comment;
+					}
+				}
+			}
 
 			return new(groups);
 		}
