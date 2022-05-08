@@ -4,10 +4,12 @@ using Microsoft.UI.Xaml.Data;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Globalization;
 using System.Linq;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 using System.Windows.Input;
 using Windows.Foundation;
 using Windows.UI;
@@ -123,30 +125,89 @@ namespace CodeEditorControl_WinUI
 	public static class Languages
 	{
 
-		public static Language Lua = new("Lua")
+		public static List<Language> LanguageList = new()
 		{
-			FoldingPairs = new()
+			new("Lua")
 			{
-				new() { RegexStart = /*language=regex*/ @"\bfunction\b", RegexEnd = /*language=regex*/ @"\bend\b" },
-				new() { RegexStart = /*language=regex*/ @"\bfor\b", RegexEnd = /*language=regex*/ @"\bend\b" },
-				new() { RegexStart = /*language=regex*/ @"\bwhile\b", RegexEnd = /*language=regex*/ @"\bend\b" },
-				new() { RegexStart = /*language=regex*/ @"\bif\b", RegexEnd = /*language=regex*/ @"\bend\b" },
+				FoldingPairs = new()
+				{
+					new() { RegexStart = /*language=regex*/ @"\b(function|for|while|if)\b", RegexEnd = /*language=regex*/ @"\bend\b" },
+				},
+				RegexTokens = new()
+				{
+					{ Token.Math, /*language=regex*/ @"\b(math)\.(pi|a?tan|atan2|tanh|a?cos|cosh|a?sin|sinh|max|pi|min|ceil|floor|(fr|le)?exp|pow|fmod|modf|random(seed)?|sqrt|log(10)?|deg|rad|abs)\b" },
+					{ Token.Array, /*language=regex*/ @"\b((table)\.(insert|concat|sort|remove|maxn)|(string)\.(insert|sub|rep|reverse|format|len|find|byte|char|dump|lower|upper|g?match|g?sub|format|formatters))\b" },
+					{ Token.Symbol, /*language=regex*/ @"[:=<>,.!?&%+\|\-*\/\^~;]" },
+					{ Token.Bracket, /*language=regex*/ @"[\[\]\(\)\{\}]" },
+					{ Token.Number, /*language=regex*/ @"0[xX][0-9a-fA-F]*|-?\d*\.\d+([eE][\-+]?\d+)?|-?\d+?" },
+					{ Token.String, /*language=regex*/"\\\".*?\\\"|'.*?'" },
+					{ Token.Comment, /*language=regex*/"\\\"[^\\\"]*\\\" | --.*?\\\n" },
+				},
+				WordTokens = new()
+				{
+					{ Token.Keyword, new string[] { "local", "true", "false", "in", "else", "not", "or", "and", "then", "nil", "end", "do", "repeat", "goto", "until", "return", "break" } },
+					{ Token.Environment, new string[] { "function", "end", "if", "elseif", "else", "while", "for", } },
+					{ Token.Function, new string[] { "#", "assert", "collectgarbage", "dofile", "_G", "getfenv", "ipairs", "load", "loadstring", "pairs", "pcall", "print", "rawequal", "rawget", "rawset", "select", "setfenv", "_VERSION", "xpcall", "module", "require", "tostring", "tonumber", "type", "rawset", "setmetatable", "getmetatable", "error", "unpack", "next", } }
+				},
 			},
-			RegexTokens = new()
+			new("Markdown")
 			{
-				{ Token.Math, /*language=regex*/ @"\b(math)\.(pi|a?tan|atan2|tanh|a?cos|cosh|a?sin|sinh|max|pi|min|ceil|floor|(fr|le)?exp|pow|fmod|modf|random(seed)?|sqrt|log(10)?|deg|rad|abs)\b" },
-				{ Token.Array, /*language=regex*/ @"\b((table)\.(insert|concat|sort|remove|maxn)|(string)\.(insert|sub|rep|reverse|format|len|find|byte|char|dump|lower|upper|g?match|g?sub|format|formatters))\b" },
-				{ Token.Symbol, /*language=regex*/ @"[:=<>,.!?&%+\|\-*\/\^~;]" },
-				{ Token.Bracket, /*language=regex*/ @"[\[\]\(\)\{\}]" },
-				{ Token.Number, /*language=regex*/ @"0[xX][0-9a-fA-F]*|-?\d*\.\d+([eE][\-+]?\d+)?|-?\d+?" },
-				{ Token.String, /*language=regex*/ "\\\".*?\\\"|'.*?'" },
-				{ Token.Comment, /*language=regex*/ "\\\"[^\\\"]*\\\" | --.*?\\\n" },
+				FoldingPairs = new()
+				{
+
+				},
+				RegexTokens = new()
+				{
+					{ Token.Environment, /*language=regex*/ @"^\s*?#+? .*" },
+					{ Token.Keyword, /*language=regex*/ @"^[\w ]*?(?=>)" },
+					{ Token.Command, /*language=regex*/ @"(?<=<\/|<)\w+?\b(?=.*?\/?>)" },
+					{ Token.Function, /*language=regex*/ @"\[.*?\]" },
+					{ Token.Key, /*language=regex*/ @"(?<=\s)\w+?\s*?(?==)" },
+					{ Token.Comment, /*language=regex*/ @"^\s*?> .*" },
+					{ Token.String, /*language=regex*/ @"'.*?'" },
+					{ Token.Symbol, /*language=regex*/ @"[:=<>,.!?&%+\|\-*\/\^~;´`]" },
+					{ Token.Bracket, /*language=regex*/ @"[\[\]\(\)\{\}]" },
+					{ Token.Number, /*language=regex*/ @"0[xX][0-9a-fA-F]*\b|-?\d*\.\d+([eE][\-+]?\d+)?\b|-?\d+?\b" },
+
+				},
+				WordTokens = new()
+				{
+
+				},
 			},
-			WordTokens = new()
+			new("Xml")
 			{
-				{ Token.Keyword, new string[] { "local", "true", "false", "in", "else", "not", "or", "and", "then", "nil", "end", "do", "repeat", "goto", "until", "return", "break" } },
-				{ Token.Environment, new string[] { "function", "end", "if", "elseif", "else", "while", "for", } },
-				{ Token.Function, new string[] { "#", "assert", "collectgarbage", "dofile", "_G", "getfenv", "ipairs", "load", "loadstring", "pairs", "pcall", "print", "rawequal", "rawget", "rawset", "select", "setfenv", "_VERSION", "xpcall", "module", "require", "tostring", "tonumber", "type", "rawset", "setmetatable", "getmetatable", "error", "unpack", "next", } }
+				FoldingPairs = new()
+				{
+
+				},
+				RegexTokens = new()
+				{
+					{ Token.Command, /*language=regex*/ @"</?.+?/?>" },
+					{ Token.String, /*language=regex*/"\\\".*?\\\"|'.*?'" },
+					{ Token.Symbol, /*language=regex*/ @"[:=<>,.!?&%+\|\-*\/\^~;´`]" },
+					{ Token.Bracket, /*language=regex*/ @"[\[\]\(\)\{\}]" },
+					{ Token.Number, /*language=regex*/ @"0[xX][0-9a-fA-F]*|-?\d*\.\d+([eE][\-+]?\d+)?|-?\d+?" },
+				},
+				WordTokens = new()
+				{
+
+				},
+			},
+			new("Text")
+			{
+				FoldingPairs = new()
+				{
+
+				},
+				RegexTokens = new()
+				{
+
+				},
+				WordTokens = new()
+				{
+
+				},
 			},
 		};
 	}
@@ -274,8 +335,9 @@ namespace CodeEditorControl_WinUI
 
 	public class Folding : Bindable
 	{
-		public int Endline { get => Get(0); set => Set(value); }
-		public int StartLine { get => Get(0); set => Set(value); }
+		public string Name { get => Get<string>(null); set => Set(value); }
+		public int Endline { get => Get(-1); set => Set(value); }
+		public int StartLine { get => Get(-1); set => Set(value); }
 	}
 
 	public class HighlightRange
@@ -290,8 +352,9 @@ namespace CodeEditorControl_WinUI
 
 		public Token Token { get; set; } = Token.Normal;
 		public IntelliSenseType IntelliSenseType { get; set; } = IntelliSenseType.Command;
-		public string Snippet { get; set; }
-		public string Description { get; set; }
+		public string Snippet { get; set; } = "";
+		public string Options { get; set; } = "";
+		public string Description { get; set; } = "";
 	}
 
 	public class IntelliSense : Suggestion
@@ -349,6 +412,8 @@ namespace CodeEditorControl_WinUI
 
 		public char[] CommandTriggerCharacters { get; set; } = new char[] { };
 		public char[] OptionsTriggerCharacters { get; set; } = new char[] { };
+
+		public char[] EscapeSymbols { get; set; } = new char[] { };
 		public Dictionary<Token, string> RegexTokens { get; set; }
 		public Dictionary<Token, string[]> WordTokens { get; set; }
 		public Dictionary<char, char> AutoClosingPairs { get; set; } = new();
@@ -474,7 +539,7 @@ namespace CodeEditorControl_WinUI
 		public bool IsFoldInnerEnd { get => Get(false); set => Set(value); }
 		public bool IsFoldStart { get => Get(false); set => Set(value); }
 		public bool IsUnsaved { get => Get(false); set { Set(value); } }
-		public Language Language { get => Get<Language>(); set { Set(value); Chars = FormattedText(LineText); } }
+		public Language Language { get => Get<Language>(); set { Set(value); SetLineText(LineText); } }
 		public int LineNumber { get => Get(0); set => Set(value); }
 
 		public void Save() { lastsavedtext = LineText; IsUnsaved = false; }
@@ -487,12 +552,35 @@ namespace CodeEditorControl_WinUI
 				IsUnsaved = value != lastsavedtext;
 
 				Set(value);
-
-				Chars = FormattedText(value);
-				IsFoldStart = FoldableStart(value);
-				IsFoldInnerEnd = FoldableEnd(value);
-				IsFoldInner = !IsFoldStart && !IsFoldInnerEnd;
+				
 			}
+		}
+
+		public void SetLineText(string value)
+		{
+			LineText = value;
+
+			Task.Run(() =>
+			{
+				Chars = FormattedText(value);
+				//IsFoldStart = FoldableStart(value);
+				//IsFoldInnerEnd = FoldableEnd(value);
+				//IsFoldInner = !IsFoldStart && !IsFoldInnerEnd;
+			}).Wait();
+		}
+
+		public void AddToLineText(string value)
+		{
+			LineText += value;
+
+			Task.Run(() =>
+			{
+				Chars = FormattedText(LineText);
+				//IsFoldStart = FoldableStart(value);
+				//IsFoldInnerEnd = FoldableEnd(value);
+				//IsFoldInner = !IsFoldStart && !IsFoldInnerEnd;
+			}).Wait();
+
 		}
 
 		public int WordWrapStringsCount { get; internal set; }
@@ -581,10 +669,15 @@ namespace CodeEditorControl_WinUI
 				int commentIndex = text.IndexOf(Language.LineComment);
 				if (commentIndex > -1)
 				{
-					for (int i = commentIndex; i< text.Count(); i++)
+					if (commentIndex > 0 && Language.EscapeSymbols.Contains(groups[commentIndex - 1].C))
 					{
-						groups[i].T = Token.Comment;
+
 					}
+					else
+						for (int i = commentIndex; i < text.Count(); i++)
+						{
+							groups[i].T = Token.Comment;
+						}
 				}
 			}
 
@@ -873,6 +966,8 @@ namespace CodeEditorControl_WinUI
 	{
 		public string RegexEnd { get; set; }
 		public string RegexStart { get; set; }
+		public int MatchingGroup { get; set; } = -1;
+		public List<string> FoldingIgnoreWords { get; set; }
 	}
 
 	public class WidthToThickness : IValueConverter
@@ -888,7 +983,20 @@ namespace CodeEditorControl_WinUI
 			return 0;
 		}
 	}
+public class Multiply : IValueConverter
+	{
+		public object Convert(object value, Type targetType, object parameter, string culture)
+		{
+			double input = double.Parse(value.ToString(), CultureInfo.InvariantCulture);
+			double factor = double.Parse(parameter.ToString(), CultureInfo.InvariantCulture);
+			return Math.Max( Math.Min(input * factor, 32) , 12);
+		}
 
+		public object ConvertBack(object value, Type targetType, object parameter, string culture)
+		{
+			return 0;
+		}
+	}
 	public class TokenToColor : IValueConverter
 	{
 		public object Convert(object value, Type targetType, object parameter, string culture)

@@ -10,10 +10,11 @@
     mc:Ignorable="d" 
     FontFamily="Consolas" IsTextScaleFactorEnabled="False" TabIndex="0" AllowFocusOnInteraction="True"  IsFocusEngagementEnabled="True"
     x:DefaultBindMode="OneWay" GotFocus="UserControl_GotFocus" LostFocus="UserControl_LostFocus"
-    xmlns:animations="using:CommunityToolkit.WinUI.UI.Animations" CharacterReceived="CodeWriter_CharacterReceived" Loaded="UserControl_Loaded"
+    xmlns:animations="using:CommunityToolkit.WinUI.UI.Animations" CharacterReceived="CodeWriter_CharacterReceived" Loaded="UserControl_Loaded" 
     >
 	<UserControl.Resources>
 		<local:WidthToThickness x:Key="WidthToThickness"></local:WidthToThickness>
+		<local:Multiply x:Key="Multiply"></local:Multiply>
 		<local:TokenToColor x:Key="TokenToColor"></local:TokenToColor>
 		<local:FocusToVisibility x:Key="FocusToVisibility"></local:FocusToVisibility>
 		<local:ArgumentsToString x:Key="ArgumentsToString"></local:ArgumentsToString>
@@ -643,7 +644,7 @@
 			<RowDefinition Height="Auto" />
 		</Grid.RowDefinitions>
 
-		<Grid Grid.Column="0" x:Name="ScrollContent" KeyDown="Scroll_KeyDown" KeyUp="Scroll_KeyUp"  ManipulationMode="TranslateX,TranslateY,TranslateInertia,Scale" ManipulationStarted="ScrollContent_ManipulationStarted"  ManipulationDelta="ScrollContent_ManipulationDelta"  >
+		<Grid Grid.Column="0" x:Name="ScrollContent" Background="{x:Bind Background}" KeyDown="Scroll_KeyDown" KeyUp="Scroll_KeyUp"  ManipulationMode="TranslateX,TranslateY,TranslateInertia,Scale" ManipulationStarted="ScrollContent_ManipulationStarted"  ManipulationDelta="ScrollContent_ManipulationDelta"  >
 
 			<Grid x:Name="TextControl"    AllowDrop="True" CanDrag="True" DragStarting="TextControl_DragStarting"  DragEnter="TextControl_DragEnter" DragOver="TextControl_DragOver" Drop="TextControl_Drop" PointerMoved="TextControl_PointerMoved"  PointerPressed="TextControl_PointerPressed" PointerReleased="TextControl_PointerReleased" PointerCaptureLost="TextControl_PointerLost" PointerCanceled="TextControl_PointerLost" PointerExited="TextControl_PointerExited">
 				<Grid.ContextFlyout>
@@ -724,34 +725,38 @@
 
 
 			
-			<Popup IsOpen="{x:Bind IsSuggesting}" IsLightDismissEnabled="False">
+			<Popup IsOpen="{x:Bind IsSuggesting}"  IsLightDismissEnabled="False">
 				<Popup.RenderTransform>
 					<TranslateTransform X="{x:Bind CursorPoint.X}" Y="{x:Bind CursorPoint.Y}"></TranslateTransform>
 				</Popup.RenderTransform>
-				
-			<Grid x:Name="Grd_Suggestions" HorizontalAlignment="Left" VerticalAlignment="Top" Background="{ThemeResource AcrylicInAppFillColorDefaultBrush}" CornerRadius="6" BorderThickness="1" BorderBrush="{ThemeResource AppBarBorderThemeBrush}" Height="200">
-					<Grid.Transitions>
+
+				<Grid x:Name="Grd_Suggestions" HorizontalAlignment="Left" VerticalAlignment="Top" Background="{ThemeResource AcrylicInAppFillColorDefaultBrush}" CornerRadius="6" BorderThickness="1" BorderBrush="{ThemeResource AppBarBorderThemeBrush}" Height="{x:Bind IntelliSenseWidth}">
+					<animations:Implicit.ShowAnimations>
+						<animations:TranslationAnimation Duration="0:0:0.15" From="0, 20, 0" To="0" ></animations:TranslationAnimation>
+						<animations:OpacityAnimation Duration="0:0:0.15" From="0" To="1.0"></animations:OpacityAnimation>
+					</animations:Implicit.ShowAnimations>
+					<!--<Grid.Transitions>
 						<TransitionCollection>
-							<PopupThemeTransition ></PopupThemeTransition>
+							<EntranceThemeTransition  ></EntranceThemeTransition>
 						</TransitionCollection>
-					</Grid.Transitions>
+					</Grid.Transitions>-->
 					<!--<Grid.RenderTransform>
 					<TranslateTransform X="{x:Bind CursorPoint.X}" Y="{x:Bind CursorPoint.Y}"></TranslateTransform>
 				</Grid.RenderTransform>-->
 				<Grid.ColumnDefinitions>
-					<ColumnDefinition Width="200" />
-					<ColumnDefinition Width="200" />
+					<ColumnDefinition Width="Auto" />
+						<ColumnDefinition Width="Auto" />
 				</Grid.ColumnDefinitions>
-				<ListBox x:Name="Lbx_Suggestions" Grid.Column="0" Background="Transparent" PointerEntered="NormalArrowPointerEntered" SingleSelectionFollowsFocus="True" SelectionMode="Single" KeyDown="Lbx_Suggestions_KeyDown"  ItemsSource="{x:Bind Suggestions}" ItemTemplateSelector="{StaticResource SuggestionTemplateSelector}" IsDoubleTapEnabled="True" DoubleTapped="Lbx_Suggestions_DoubleTapped" SelectedIndex="{x:Bind SuggestionIndex, Mode=TwoWay}" >
+				<ListBox x:Name="Lbx_Suggestions" FontSize="{x:Bind FontSize, Converter={StaticResource Multiply}, ConverterParameter=0.75}" Grid.Column="0" Width="{x:Bind IntelliSenseWidth}" Background="Transparent" PointerEntered="NormalArrowPointerEntered" SingleSelectionFollowsFocus="True" SelectionMode="Single" KeyDown="Lbx_Suggestions_KeyDown"  ItemsSource="{x:Bind Suggestions}" ItemTemplateSelector="{StaticResource SuggestionTemplateSelector}" IsDoubleTapEnabled="True" DoubleTapped="Lbx_Suggestions_DoubleTapped" SelectedIndex="{x:Bind SuggestionIndex, Mode=TwoWay}" >
 					<ListBox.ItemContainerStyle>
 						<Style TargetType="ListBoxItem">
 							<Setter Property="Margin" Value="0"></Setter>
-							<Setter Property="Padding" Value="4"></Setter>
-						</Style>
+								<Setter Property="Padding" Value="4"></Setter>
+							</Style>
 					</ListBox.ItemContainerStyle>
 				</ListBox>
-				
-				<Grid Grid.Column="1" Padding="6" RowSpacing="6" DataContext="{x:Bind SelectedSuggestion}" >
+
+					<Grid Grid.Column="1" Padding="6" RowSpacing="6" DataContext="{x:Bind SelectedSuggestion}" Width="{x:Bind IntelliSenseWidth}" >
 					<Grid.Background>
 						<SolidColorBrush Color="#11000000"></SolidColorBrush>
 					</Grid.Background>
@@ -760,19 +765,19 @@
 						<RowDefinition Height="*" />
 					</Grid.RowDefinitions>
 					<StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="0">
-						<TextBlock Text="{Binding Name}" IsTextSelectionEnabled="True">
+							<TextBlock Text="{Binding Name}" IsTextSelectionEnabled="True" FontSize="{x:Bind FontSize, Converter={StaticResource Multiply}, ConverterParameter=0.75}">
 							<TextBlock.Foreground>
 								<SolidColorBrush Color="{Binding Token, Converter={StaticResource TokenToColor}}"></SolidColorBrush>
 							</TextBlock.Foreground>
 						</TextBlock>
-						<TextBlock Text="{Binding ArgumentsList, Converter={StaticResource ArgumentsToString}}" IsTextSelectionEnabled="True">
+							<TextBlock Text="{Binding ArgumentsList, Converter={StaticResource ArgumentsToString}}" IsTextSelectionEnabled="True" FontSize="{x:Bind FontSize, Converter={StaticResource Multiply}, ConverterParameter=0.75}">
 						</TextBlock>
 					</StackPanel>
 					<ScrollViewer BorderThickness="0,1,0,0" BorderBrush="{ThemeResource ListBoxBorderThemeBrush}" VerticalAlignment="Stretch" VerticalContentAlignment="Top" Grid.Row="1" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Hidden">
 						<StackPanel VerticalAlignment="Top">
 						<!--<controls:MarkdownTextBlock Background="Transparent" Text="{Binding Description}" IsTextSelectionEnabled="True"></controls:MarkdownTextBlock>-->
-								<TextBlock Text="{Binding Description}" IsTextSelectionEnabled="True"></TextBlock>
-								<ItemsControl ItemsSource="{Binding Values}"></ItemsControl>
+								<!--<TextBlock Text="{Binding Description}" IsTextSelectionEnabled="True"></TextBlock>-->
+								<ItemsControl ItemsSource="{Binding Values}" FontSize="{x:Bind FontSize, Converter={StaticResource Multiply}, ConverterParameter=0.75}" ></ItemsControl>
 						</StackPanel>
 					</ScrollViewer>
 				</Grid>
@@ -788,8 +793,8 @@
 					<animations:TranslationAnimation Duration="0:0:0.2" From="0" To="0, 20, 0"/>
 					<animations:OpacityAnimation Duration="0:0:0.2" From="1.0" To="0"/>
 				</animations:Implicit.HideAnimations>
-				<Border CornerRadius="4"  BorderThickness="1" BorderBrush="{ThemeResource ListBoxBorderThemeBrush}">
-					<Grid Width="300" Background="{x:Bind Background}">
+				<Border CornerRadius="4"  BorderThickness="1" BorderBrush="{ThemeResource ListBoxBorderThemeBrush}" Background="{ThemeResource AcrylicInAppFillColorDefaultBrush}">
+					<Grid Width="300" >
 						<Grid Padding="6" RowSpacing="4" ColumnSpacing="4">
 							<Grid.RowDefinitions>
 								<RowDefinition Height="Auto" />
@@ -798,9 +803,9 @@
 							</Grid.RowDefinitions>
 							<Grid.ColumnDefinitions>
 								<ColumnDefinition Width="*" />
-								<ColumnDefinition Width="Auto" />
-								<ColumnDefinition Width="Auto" />
-								<ColumnDefinition Width="Auto" />
+								<ColumnDefinition Width="Auto" MinWidth="22" />
+								<ColumnDefinition Width="Auto" MinWidth="22" />
+								<ColumnDefinition Width="Auto" MinWidth="22" />
 							</Grid.ColumnDefinitions>
 
 							<Button Grid.Row="0" Grid.Column="3" Padding="4" HorizontalAlignment="Right" Click="Btn_SearchClose">
@@ -810,20 +815,22 @@
 							</Button>
 
 							<TextBox Grid.Row="1" x:Name="Tbx_Search" KeyDown="Tbx_Search_KeyDown" HorizontalAlignment="Stretch" PlaceholderText="Find..." TextChanged="Tbx_SearchChanged"></TextBox>
-							<Button Grid.Row="1" Grid.Column="1" ToolTipService.ToolTip="Find next" Padding="4" Click="Btn_SearchNext">
+							<Button Grid.Row="1" Grid.Column="1" ToolTipService.ToolTip="Find next" HorizontalAlignment="Stretch" Padding="4" Click="Btn_SearchNext">
 								<SymbolIcon Symbol="Forward"></SymbolIcon>
 							</Button>
-							<ToggleButton Grid.Row="1" Grid.Column="2" ToolTipService.ToolTip="Match case" Padding="4"  IsChecked="{x:Bind IsMatchCase, Mode=TwoWay}">
-								<SymbolIcon Symbol="FontColor"></SymbolIcon>
+							<ToggleButton Grid.Row="1" Grid.Column="2" ToolTipService.ToolTip="Match case"  HorizontalAlignment="Stretch" Padding="4"  IsChecked="{x:Bind IsMatchCase, Mode=TwoWay}">
+								<TextBlock Text="Aa" FontFamily="Consolas"  FontWeight="Bold" />
 							</ToggleButton>
-							<ToggleButton Grid.Row="1" Grid.Column="3" Content=".*" ToolTipService.ToolTip="Use Regex" Padding="4"  IsChecked="{x:Bind IsRegex, Mode=TwoWay}" HorizontalAlignment="Stretch" />
+							<ToggleButton Grid.Row="1" Grid.Column="3" ToolTipService.ToolTip="Use Regex" Padding="4"  IsChecked="{x:Bind IsRegex, Mode=TwoWay}" HorizontalAlignment="Stretch" >
+								<TextBlock Text=".*" FontFamily="Consolas" FontWeight="Bold" />
+							</ToggleButton>
 
 							<TextBox Grid.Row="2" x:Name="Tbx_Replace" Visibility="Visible" HorizontalAlignment="Stretch" PlaceholderText="Replace..." KeyDown="Tbx_Replace_KeyDown" ></TextBox>
 							<Button Grid.Row="2" Grid.Column="1"  Padding="4" ToolTipService.ToolTip="Replace next" Click="Btn_ReplaceNext" >
-								<SymbolIcon Symbol="Forward"></SymbolIcon>
+								<FontIcon Glyph="&#xE768;" />
 							</Button>
-							<Button Grid.Row="2" Grid.Column="2"  Padding="4" ToolTipService.ToolTip="Replace all" Click="Btn_ReplaceAll" >
-								<SymbolIcon Symbol="ShowResults"></SymbolIcon>
+							<Button Grid.Row="2" Grid.Column="2"  HorizontalAlignment="Stretch" Padding="4"  ToolTipService.ToolTip="Replace all" Click="Btn_ReplaceAll" >
+								<FontIcon Glyph="&#xEB9D;" />
 							</Button>
 						</Grid>
 					</Grid>

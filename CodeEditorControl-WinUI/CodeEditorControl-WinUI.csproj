@@ -20,8 +20,8 @@
 	<ItemGroup>
 		<PackageReference Include="CommunityToolkit.WinUI.UI.Animations" Version="7.1.2" />
 		<PackageReference Include="CommunityToolkit.WinUI.UI.Controls" Version="7.1.2" />
-		<PackageReference Include="Microsoft.Graphics.Win2D" Version="1.0.1" />
-		<PackageReference Include="Microsoft.WindowsAppSDK" Version="1.0.1" />
+		<PackageReference Include="Microsoft.Graphics.Win2D" Version="1.0.3.1" />
+		<PackageReference Include="Microsoft.WindowsAppSDK" Version="1.0.3" />
 	</ItemGroup>
 
 	<ItemGroup>

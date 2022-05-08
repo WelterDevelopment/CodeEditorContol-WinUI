@@ -8,9 +8,12 @@
     mc:Ignorable="d" 
     DataContext="{x:Bind VM}" 
     RequestedTheme="{Binding RequestedTheme, Mode=OneWay}" 
-    Background="{ThemeResource ApplicationPageBackgroundThemeBrush}" 
     >
-	<Grid RowSpacing="12">
+
+	<Grid RowSpacing="12" Background="{ThemeResource ApplicationPageBackgroundThemeBrush}" >
+		<Grid.BackgroundTransition>
+			<BrushTransition></BrushTransition>
+		</Grid.BackgroundTransition>
 		<Grid.ColumnDefinitions>
 			<ColumnDefinition  />
 		</Grid.ColumnDefinitions>
