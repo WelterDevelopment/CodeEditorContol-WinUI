@@ -85,18 +85,20 @@ namespace CodeEditor_WinUI_TestApp
 		private void ThemeComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
 		{
 			App.MainWindow.RequestedTheme = Enum.Parse<ElementTheme>(e.AddedItems.First().ToString());
-			if (App.MainWindow.ActualTheme == ApplicationTheme.Light)
-			{
-				CW.Color_Background = Color.FromArgb(150, 252, 252, 252);
-				CW.Color_LeftBackground = Colors.Transparent; //Color.FromArgb(255, 230, 230, 230);
-			}
-			else
-			{
-				CW.Color_Background = Color.FromArgb(150, 28, 28, 28);
-				CW.Color_LeftBackground = Colors.Transparent; //Color.FromArgb(255, 25, 25, 25);
-			}
 
-			App.MainWindow.SetBackdrop( SystemBackdropWindow.BackdropType.Acrylic);
+			//// Change the Colors depending on the Theme:
+			//if (App.MainWindow.ActualTheme == ApplicationTheme.Light)
+			//{
+			//	CW.Color_Background = Color.FromArgb(150, 220, 220, 224);
+			//	CW.Color_LeftBackground = Colors.Transparent; //Color.FromArgb(255, 230, 230, 230);
+			//}
+			//else
+			//{
+			//	CW.Color_Background = Color.FromArgb(50, 150, 150, 206);
+			//	CW.Color_LeftBackground = Colors.Transparent; //Color.FromArgb(255, 25, 25, 25);
+			//}
+
+			App.MainWindow.SetBackdrop( SystemBackdropWindow.BackdropType.Mica);
 			App.MainWindow.ResetColors();
 		}
 

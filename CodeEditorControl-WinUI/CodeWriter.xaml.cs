@@ -158,7 +158,9 @@ namespace CodeEditorControl_WinUI
 
 		public Color Color_FoldingMarker { get => Get(Color.FromArgb(255, 140, 140, 140)); set => Set(value); }
 
-		public Color Color_Background { get => Get(Color.FromArgb(255, 40, 40, 40)); set => Set(value); }
+		public Color Color_FoldingMarkerUnselected { get => Get(Color.FromArgb(150, 140, 140, 140)); set => Set(value); }
+
+		public Color Color_Background { get => Get(Color.FromArgb(30, 140, 140, 140)); set => Set(value); }
 		public Color Color_LeftBackground { get => Get(Colors.Transparent); set => Set(value); }
 
 		public Color Color_LineNumber { get => Get(Color.FromArgb(255, 210, 210, 210)); set => Set(value); }
@@ -946,7 +948,7 @@ namespace CodeEditorControl_WinUI
 									{
 										if (iChar >= iCharOffset - indents * (TabLength - 1)) // Draw indent arrows
 										{
-											args.DrawingSession.DrawLine(x, y, x, y + CharHeight, ActualTheme == ElementTheme.Light ? Color_WeakMarker.InvertColorBrightness() : Color_WeakMarker, 1.5f, new CanvasStrokeStyle() { DashStyle = ShowIndentGuides == IndentGuide.Line ? CanvasDashStyle.Solid : CanvasDashStyle.Dash });
+											args.DrawingSession.DrawLine(x, y, x, y + CharHeight, ActualTheme == ElementTheme.Light ? Color_FoldingMarkerUnselected.InvertColorBrightness() : Color_FoldingMarkerUnselected, 1.5f, new CanvasStrokeStyle() { DashStyle = ShowIndentGuides == IndentGuide.Line ? CanvasDashStyle.Solid : CanvasDashStyle.Dash });
 										}
 									}
 								}
@@ -3515,20 +3517,7 @@ namespace CodeEditorControl_WinUI
 
 		private async void UserControl_Loaded(object sender, RoutedEventArgs e)
 		{
-			await Task.Delay(2000);
-		
-
-			ListView listView = new ListView() { ItemsSource = Fonts };
-
-			await new ContentDialog() { XamlRoot = XamlRoot, PrimaryButtonText = "OK", Title = "Fonts", Content = listView }.ShowAsync();
 		}
 
-		public List<string> Fonts
-		{
-			get
-			{
-				return CanvasTextFormat.GetSystemFontFamilies().OrderBy(f => f).ToList();
-			}
-		}
 	}
 }

@@ -16,8 +16,6 @@
 				<ResourceDictionary Source="ScrollBarResourceDictionary.xaml"/>
 			</ResourceDictionary.MergedDictionaries>
 		
-		<FontFamily x:Key="FiraCode">Fonts/FiraCode.ttf#Fira Code</FontFamily>
-		<FontFamily x:Key="JetBrainsMono">Fonts/JetBrainsMono.ttf#JetBrains Mono Thin</FontFamily>
 		<local:WidthToThickness x:Key="WidthToThickness"></local:WidthToThickness>
 		<local:Multiply x:Key="Multiply"></local:Multiply>
 		<local:TokenToColor x:Key="TokenToColor"></local:TokenToColor>

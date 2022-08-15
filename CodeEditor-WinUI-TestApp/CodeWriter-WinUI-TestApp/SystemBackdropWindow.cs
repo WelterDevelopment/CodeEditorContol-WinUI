@@ -41,7 +41,7 @@ namespace CodeEditor_WinUI_TestApp
 			m_wsdqHelper = new WindowsSystemDispatcherQueueHelper();
 			m_wsdqHelper.EnsureWindowsSystemDispatcherQueueController();
 
-			SetBackdrop(BackdropType.Acrylic);
+			SetBackdrop(BackdropType.Mica);
 		}
 
 		public enum BackdropType
@@ -136,11 +136,11 @@ namespace CodeEditor_WinUI_TestApp
 
 				switch (ActualTheme)
 				{
-					case ApplicationTheme.Dark: m_configurationSource.Theme = SystemBackdropTheme.Dark; AcrylicColor = Color.FromArgb(255,33,33,44); break;
+					case ApplicationTheme.Dark: m_configurationSource.Theme = SystemBackdropTheme.Dark; AcrylicColor = Color.FromArgb(255,10,10,10); break;
 					case ApplicationTheme.Light: m_configurationSource.Theme = SystemBackdropTheme.Light; AcrylicColor = Color.FromArgb(255, 200, 200, 210); break;
 				}
 
-				m_acrylicController = new() { TintColor = AcrylicColor, FallbackColor = AcrylicColor, TintOpacity = 0.5f, LuminosityOpacity = 0.8f };
+				m_acrylicController = new() { TintColor = AcrylicColor, FallbackColor = AcrylicColor, TintOpacity = 0.9f, LuminosityOpacity = 0.8f };
 				m_acrylicController.AddSystemBackdropTarget(this.As<ICompositionSupportsSystemBackdrop>());
 				m_acrylicController.SetSystemBackdropConfiguration(m_configurationSource);
 				return true;
