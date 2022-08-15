@@ -1697,6 +1697,11 @@ namespace CodeEditorControl_WinUI
 			//		innerLang = true;
 			//	}
 			//}
+
+			foreach (Line line in Lines)
+			{
+				line.Language = Language;
+			}
 			DispatcherQueue.TryEnqueue(() => { Invalidate(); });
 			//});
 		}
