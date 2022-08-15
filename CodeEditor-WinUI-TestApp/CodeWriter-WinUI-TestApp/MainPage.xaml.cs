@@ -1,12 +1,17 @@
 ﻿using CodeEditorControl_WinUI;
+using Microsoft.Graphics.Canvas.Text;
+using Microsoft.UI;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Media;
+using Microsoft.UI.Xaml.Navigation;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using Windows.UI;
 
 namespace CodeEditor_WinUI_TestApp
 {
@@ -21,6 +26,7 @@ namespace CodeEditor_WinUI_TestApp
 			CW.Save();
 		}
 
+		
 		private ViewModel VM { get; } = new ViewModel();
 
 		private void Btn_Add_Click(object sender, RoutedEventArgs e)
@@ -75,5 +81,24 @@ namespace CodeEditor_WinUI_TestApp
 			});
 			CW.SyntaxErrors = errors;
 		}
+
+		private void ThemeComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+		{
+			App.MainWindow.RequestedTheme = Enum.Parse<ElementTheme>(e.AddedItems.First().ToString());
+			if (App.MainWindow.ActualTheme == ApplicationTheme.Light)
+			{
+				CW.Color_Background = Color.FromArgb(150, 252, 252, 252);
+				CW.Color_LeftBackground = Colors.Transparent; //Color.FromArgb(255, 230, 230, 230);
+			}
+			else
+			{
+				CW.Color_Background = Color.FromArgb(150, 28, 28, 28);
+				CW.Color_LeftBackground = Colors.Transparent; //Color.FromArgb(255, 25, 25, 25);
+			}
+
+			App.MainWindow.SetBackdrop( SystemBackdropWindow.BackdropType.Acrylic);
+			App.MainWindow.ResetColors();
+		}
+
 	}
 }

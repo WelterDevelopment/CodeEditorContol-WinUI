@@ -19,6 +19,10 @@ using Windows.UI;
 
 namespace CodeEditorControl_WinUI
 {
+	public enum IndentGuide
+	{
+		None, Line, Dashed
+	}
 	public enum EditActionType
 	{
 		Delete, Paste, Add, Remove
@@ -218,7 +222,8 @@ namespace CodeEditorControl_WinUI
 		public Token Token { get => Get(Token.Normal); set => Set(value); }
 		public Color Color
 		{
-			get => Get(Color.FromArgb(255, 220, 220, 220)); set
+			get => Get(Color.FromArgb(255, 220, 220, 220)); 
+			set
 			{
 				Set(value);
 				try
@@ -560,26 +565,26 @@ namespace CodeEditorControl_WinUI
 		{
 			LineText = value;
 
-			Task.Run(() =>
-			{
+			//await Task.Run(() =>
+			//{
 				Chars = FormattedText(value);
 				//IsFoldStart = FoldableStart(value);
 				//IsFoldInnerEnd = FoldableEnd(value);
 				//IsFoldInner = !IsFoldStart && !IsFoldInnerEnd;
-			}).Wait();
+			//});
 		}
 
 		public void AddToLineText(string value)
 		{
 			LineText += value;
 
-			Task.Run(() =>
-			{
+			//Task.Run(() =>
+			//{
 				Chars = FormattedText(LineText);
 				//IsFoldStart = FoldableStart(value);
 				//IsFoldInnerEnd = FoldableEnd(value);
 				//IsFoldInner = !IsFoldStart && !IsFoldInnerEnd;
-			}).Wait();
+			//}).Wait();
 
 		}
 

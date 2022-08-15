@@ -14,14 +14,35 @@
 		<Optimize>true</Optimize>
 	</PropertyGroup>
 	<ItemGroup>
+	  <None Remove="Fonts\FiraCode.ttf" />
+	  <None Remove="Fonts\JetBrainsMono.ttf" />
+	  <None Remove="ScrollBarResourceDictionary.xaml" />
+	</ItemGroup>
+	<ItemGroup>
+	  <Content Include="Fonts\FiraCode.ttf">
+	    <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+	  </Content>
+	  <Content Include="Fonts\JetBrainsMono.ttf">
+	    <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+	  </Content>
+	</ItemGroup>
+	<ItemGroup>
 		<None Include="..\.editorconfig" Link=".editorconfig" />
 	</ItemGroup>
 
 	<ItemGroup>
 		<PackageReference Include="CommunityToolkit.WinUI.UI.Animations" Version="7.1.2" />
-		<PackageReference Include="CommunityToolkit.WinUI.UI.Controls" Version="7.1.2" />
 		<PackageReference Include="Microsoft.Graphics.Win2D" Version="1.0.3.1" />
-		<PackageReference Include="Microsoft.WindowsAppSDK" Version="1.0.3" />
+		<PackageReference Include="Microsoft.Win32.Registry" Version="5.0.0" />
+		<PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.22621.1" />
+		<PackageReference Include="Microsoft.WindowsAppSDK" Version="1.1.4" />
+		<PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <Page Update="ScrollBarResourceDictionary.xaml">
+	    <Generator>MSBuild:Compile</Generator>
+	  </Page>
 	</ItemGroup>
 
 	<ItemGroup>

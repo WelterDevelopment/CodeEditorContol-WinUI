@@ -11,6 +11,7 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
+using Microsoft.UI.Xaml.Navigation;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -23,12 +24,14 @@ using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using System.Timers;
 using System.Windows.Input;
 using Windows.ApplicationModel.DataTransfer;
 using Windows.ApplicationModel.DataTransfer.DragDrop;
 using Windows.Devices.Input;
 using Windows.Foundation;
 using Windows.Graphics.Imaging;
+using Windows.Storage;
 using Windows.System;
 using Windows.UI;
 using Windows.UI.Core;
@@ -39,6 +42,7 @@ namespace CodeEditorControl_WinUI
 	public partial class CodeWriter : UserControl, INotifyPropertyChanged
 	{
 		public static new readonly DependencyProperty FontSizeProperty = DependencyProperty.Register("FontSize", typeof(int), typeof(CodeWriter), new PropertyMetadata(12, (d, e) => ((CodeWriter)d).FontSizeChanged(d, e)));
+		public static readonly DependencyProperty FontProperty = DependencyProperty.Register("Font", typeof(string), typeof(CodeWriter), new PropertyMetadata("Consolas", (d, e) => ((CodeWriter)d).FontChanged(d, e)));
 		public static readonly DependencyProperty IsFoldingEnabledProperty = DependencyProperty.Register("IsFoldingEnabled", typeof(bool), typeof(CodeWriter), new PropertyMetadata(true, (d, e) => ((CodeWriter)d).Invalidate()));
 		public static readonly DependencyProperty IsWrappingEnabledProperty = DependencyProperty.Register("IsWrappingEnabled", typeof(bool), typeof(CodeWriter), new PropertyMetadata(true, (d, e) => ((CodeWriter)d).Invalidate()));
 		public static readonly DependencyProperty WrappingLengthProperty = DependencyProperty.Register("WrappingLength", typeof(int), typeof(CodeWriter), new PropertyMetadata(1, (d, e) => ((CodeWriter)d).Invalidate()));
@@ -46,6 +50,7 @@ namespace CodeEditorControl_WinUI
 		public static new readonly DependencyProperty RequestedThemeProperty = DependencyProperty.Register("RequestedTheme", typeof(ElementTheme), typeof(CodeWriter), new PropertyMetadata(12, (d, e) => ((CodeWriter)d).RequestedThemeChanged(d, e)));
 		public static readonly DependencyProperty ScrollPositionProperty = DependencyProperty.Register("ScrollPosition", typeof(Place), typeof(CodeWriter), new PropertyMetadata(new Place(), (d, e) => ((CodeWriter)d).OnScrollPositionChanged(d, e)));
 		public static readonly DependencyProperty ShowControlCharactersProperty = DependencyProperty.Register("ShowControlCharacters", typeof(bool), typeof(CodeWriter), new PropertyMetadata(true, (d, e) => ((CodeWriter)d).OnShowControlCharactersChanged(d, e)));
+		public static readonly DependencyProperty ShowIndentGuidesProperty = DependencyProperty.Register("ShowIndentGuides", typeof(IndentGuide), typeof(CodeWriter), new PropertyMetadata(IndentGuide.None, (d, e) => ((CodeWriter)d).Invalidate()));
 		public static readonly DependencyProperty ShowHorizontalTicksProperty = DependencyProperty.Register("ShowHorizontalTicks", typeof(bool), typeof(CodeWriter), new PropertyMetadata(false, (d, e) => ((CodeWriter)d).Invalidate()));
 		public static readonly DependencyProperty ShowLineMarkersProperty = DependencyProperty.Register("ShowLineMarkers", typeof(bool), typeof(CodeWriter), new PropertyMetadata(true, (d, e) => ((CodeWriter)d).Invalidate()));
 		public static readonly DependencyProperty ShowLineNumbersProperty = DependencyProperty.Register("ShowLineNumbers", typeof(bool), typeof(CodeWriter), new PropertyMetadata(true, (d, e) => ((CodeWriter)d).Invalidate()));
@@ -153,9 +158,13 @@ namespace CodeEditorControl_WinUI
 
 		public Color Color_FoldingMarker { get => Get(Color.FromArgb(255, 140, 140, 140)); set => Set(value); }
 
-		public Color Color_LeftBackground { get => Get(Color.FromArgb(255, 40, 40, 40)); set => Set(value); }
+		public Color Color_Background { get => Get(Color.FromArgb(255, 40, 40, 40)); set => Set(value); }
+		public Color Color_LeftBackground { get => Get(Colors.Transparent); set => Set(value); }
 
-		public Color Color_LineNumber { get => Get(Color.FromArgb(255, 120, 160, 180)); set => Set(value); }
+		public Color Color_LineNumber { get => Get(Color.FromArgb(255, 210, 210, 210)); set => Set(value); }
+
+		public Color Color_LineNumberUnselected { get => Get(Color.FromArgb(160, 210, 210, 210)); set => Set(value); }
+		public Color Color_SelelectedLineBackground { get => Get(Color.FromArgb(20, 210, 210, 210)); set => Set(value); }
 
 		public Color Color_Selection { get => Get(Color.FromArgb(255, 25, 50, 80)); set => Set(value); }
 
@@ -224,6 +233,10 @@ namespace CodeEditorControl_WinUI
 		public Point CursorPoint { get => Get(new Point()); set => Set(value); }
 
 		public new int FontSize { get => (int)GetValue(FontSizeProperty); set { SetValue(FontSizeProperty, value); } }
+
+		public  string Font { get => (string)GetValue(FontProperty); set { SetValue(FontProperty, value); } }
+
+		private string FontUri { get; set; } = "Consolas";
 
 		public ObservableCollection<EditAction> EditActionHistory { get => (ObservableCollection<EditAction>)GetValue(EditActionHistoryProperty); 
 			set 
@@ -359,6 +372,12 @@ namespace CodeEditorControl_WinUI
 		{
 			get => (bool)GetValue(ShowControlCharactersProperty);
 			set => SetValue(ShowControlCharactersProperty, value);
+		}
+
+		public IndentGuide ShowIndentGuides
+		{
+			get => (IndentGuide)GetValue(ShowIndentGuidesProperty);
+			set => SetValue(ShowIndentGuidesProperty, value);
 		}
 
 		public bool ShowHorizontalTicks
@@ -510,7 +529,7 @@ namespace CodeEditorControl_WinUI
 			}
 		}
 
-		public void Invalidate(bool sizechanged = true)
+		public void Invalidate(bool sizechanged = false)
 		{
 			try
 			{
@@ -645,7 +664,8 @@ namespace CodeEditorControl_WinUI
 
 					if (Selection.Start == CursorPlace)
 					{
-						args.DrawingSession.DrawRoundedRectangle(Width_Left, y, (int)TextControl.ActualWidth - Width_Left, CharHeight, 2, 2, ActualTheme == ElementTheme.Light ? Color_FoldingMarker.InvertColorBrightness() : Color_FoldingMarker, 2f);
+						//args.DrawingSession.DrawRoundedRectangle(Width_Left, y, (int)TextControl.ActualWidth - Width_Left, CharHeight, 2, 2, ActualTheme == ElementTheme.Light ? Color_FoldingMarker.InvertColorBrightness() : Color_FoldingMarker, 2f);
+						args.DrawingSession.FillRectangle(Width_Left,y,(int)TextControl.ActualWidth - Width_Left, CharHeight, ActualTheme == ElementTheme.Light ? Color_SelelectedLineBackground.InvertColorBrightness() : Color_SelelectedLineBackground);
 					}
 
 					if (y <= TextControl.ActualHeight && y >= 0 && x <= TextControl.ActualWidth && x >= Width_Left)
@@ -781,7 +801,7 @@ namespace CodeEditorControl_WinUI
 						args.DrawingSession.FillRectangle(0, y, Width_Left - Width_TextIndent, CharHeight, Color_LeftBackground);
 
 						if (ShowLineNumbers)
-							args.DrawingSession.DrawText((iLine + 1).ToString(), CharWidth * IntLength(Lines.Count) + Width_LeftMargin, y, ActualTheme == ElementTheme.Light ? Color_LineNumber.InvertColorBrightness() : Color_LineNumber, new CanvasTextFormat() { FontFamily = "Consolas", FontSize = ScaledFontSize, HorizontalAlignment = CanvasHorizontalAlignment.Right });
+							args.DrawingSession.DrawText((iLine + 1).ToString(), CharWidth * IntLength(Lines.Count) + Width_LeftMargin, y, ActualTheme == ElementTheme.Light ? Color_LineNumber.InvertColorBrightness() : Color_LineNumber, new CanvasTextFormat() { FontFamily = FontUri, FontSize = ScaledFontSize, HorizontalAlignment = CanvasHorizontalAlignment.Right });
 						if (IsFoldingEnabled && Language.FoldingPairs != null)
 						{
 							
@@ -870,16 +890,16 @@ namespace CodeEditorControl_WinUI
 										{
 											if (IsInsideBrackets(new(iChar, iLine)))
 											{
-												args.DrawingSession.DrawText(c.C.ToString(), x, y, ActualTheme == ElementTheme.Light ? EditorOptions.TokenColors[Token.Key].InvertColorBrightness() : EditorOptions.TokenColors[Token.Key], new CanvasTextFormat() { FontFamily = "Consolas", FontSize = ScaledFontSize });
+												args.DrawingSession.DrawText(c.C.ToString(), x, y, ActualTheme == ElementTheme.Light ? EditorOptions.TokenColors[Token.Key].InvertColorBrightness() : EditorOptions.TokenColors[Token.Key], new CanvasTextFormat() { FontFamily = FontUri, FontSize = ScaledFontSize });
 											}
 											else
 											{
-												args.DrawingSession.DrawText(c.C.ToString(), x, y, ActualTheme == ElementTheme.Light ? EditorOptions.TokenColors[Token.Normal].InvertColorBrightness() : EditorOptions.TokenColors[Token.Normal], new CanvasTextFormat() { FontFamily = "Consolas", FontSize = ScaledFontSize });
+												args.DrawingSession.DrawText(c.C.ToString(), x, y, ActualTheme == ElementTheme.Light ? EditorOptions.TokenColors[Token.Normal].InvertColorBrightness() : EditorOptions.TokenColors[Token.Normal], new CanvasTextFormat() { FontFamily = FontUri, FontSize = ScaledFontSize });
 											}
 										}
 										else
 										{
-											args.DrawingSession.DrawText(c.C.ToString(), x, y, ActualTheme == ElementTheme.Light ? EditorOptions.TokenColors[c.T].InvertColorBrightness() : EditorOptions.TokenColors[c.T], new CanvasTextFormat() { FontFamily = "Consolas", FontSize = ScaledFontSize });
+											args.DrawingSession.DrawText(c.C.ToString(), x, y, ActualTheme == ElementTheme.Light ? EditorOptions.TokenColors[c.T].InvertColorBrightness() : EditorOptions.TokenColors[c.T], new CanvasTextFormat() { FontFamily = FontUri, FontSize = ScaledFontSize });
 										}
 
 									}
@@ -922,6 +942,13 @@ namespace CodeEditorControl_WinUI
 
 											args.DrawingSession.DrawGeometry(arrow, x, y, ActualTheme == ElementTheme.Light ? Color_WeakMarker.InvertColorBrightness() : Color_WeakMarker, thickness);
 										}
+									if (ShowIndentGuides != IndentGuide.None)
+									{
+										if (iChar >= iCharOffset - indents * (TabLength - 1)) // Draw indent arrows
+										{
+											args.DrawingSession.DrawLine(x, y, x, y + CharHeight, ActualTheme == ElementTheme.Light ? Color_WeakMarker.InvertColorBrightness() : Color_WeakMarker, 1.5f, new CanvasStrokeStyle() { DashStyle = ShowIndentGuides == IndentGuide.Line ? CanvasDashStyle.Solid : CanvasDashStyle.Dash });
+										}
+									}
 								}
 								else if (iChar >= iCharOffset - indents * (TabLength - 1))
 								{
@@ -932,16 +959,16 @@ namespace CodeEditorControl_WinUI
 										{
 											if (IsInsideBrackets(new(iChar, iLine)))
 											{
-												args.DrawingSession.DrawText(c.C.ToString(), x, y, ActualTheme == ElementTheme.Light ? EditorOptions.TokenColors[Token.Key].InvertColorBrightness() : EditorOptions.TokenColors[Token.Key], new CanvasTextFormat() { FontFamily = "Consolas", FontSize = ScaledFontSize });
+												args.DrawingSession.DrawText(c.C.ToString(), x, y, ActualTheme == ElementTheme.Light ? EditorOptions.TokenColors[Token.Key].InvertColorBrightness() : EditorOptions.TokenColors[Token.Key], new CanvasTextFormat() { FontFamily = FontUri, FontSize = ScaledFontSize });
 											}
 											else
 											{
-												args.DrawingSession.DrawText(c.C.ToString(), x, y, ActualTheme == ElementTheme.Light ? EditorOptions.TokenColors[Token.Normal].InvertColorBrightness() : EditorOptions.TokenColors[Token.Normal], new CanvasTextFormat() { FontFamily = "Consolas", FontSize = ScaledFontSize });
+												args.DrawingSession.DrawText(c.C.ToString(), x, y, ActualTheme == ElementTheme.Light ? EditorOptions.TokenColors[Token.Normal].InvertColorBrightness() : EditorOptions.TokenColors[Token.Normal], new CanvasTextFormat() { FontFamily = FontUri, FontSize = ScaledFontSize });
 											}
 										}
 										else
 										{
-											args.DrawingSession.DrawText(c.C.ToString(), x, y, ActualTheme == ElementTheme.Light ? EditorOptions.TokenColors[c.T].InvertColorBrightness() : EditorOptions.TokenColors[c.T], new CanvasTextFormat() { FontFamily = "Consolas", FontSize = ScaledFontSize });
+											args.DrawingSession.DrawText(c.C.ToString(), x, y, ActualTheme == ElementTheme.Light ? EditorOptions.TokenColors[c.T].InvertColorBrightness() : EditorOptions.TokenColors[c.T], new CanvasTextFormat() { FontFamily = FontUri, FontSize = ScaledFontSize });
 										}
 									}
 
@@ -980,7 +1007,7 @@ namespace CodeEditorControl_WinUI
 										x = Width_Left + CharWidth * (iWrappingChar - iCharOffset + indents * (TabLength - 1));
 										//}
 
-										args.DrawingSession.DrawText(c.C.ToString(), x, y, ActualTheme == ElementTheme.Light ? EditorOptions.TokenColors[c.T].InvertColorBrightness() : EditorOptions.TokenColors[c.T], new CanvasTextFormat() { FontFamily = "Consolas", FontSize = ScaledFontSize });
+										args.DrawingSession.DrawText(c.C.ToString(), x, y, ActualTheme == ElementTheme.Light ? EditorOptions.TokenColors[c.T].InvertColorBrightness() : EditorOptions.TokenColors[c.T], new CanvasTextFormat() { FontFamily = FontUri, FontSize = ScaledFontSize });
 									}
 
 								}
@@ -1272,15 +1299,20 @@ namespace CodeEditorControl_WinUI
 		{
 			if (sizechanged)
 			{
-				CanvasTextFormat = new CanvasTextFormat
+				TextFormat = new CanvasTextFormat()
 				{
-					FontFamily = "Consolas",
+					FontFamily = FontUri,
 					FontSize = ScaledFontSize
 				};
-				Size size = MeasureTextSize(CanvasDevice.GetSharedDevice(), "M", CanvasTextFormat);
-				Size sizew = MeasureTextSize(CanvasDevice.GetSharedDevice(), "M", CanvasTextFormat);
+				Size size = MeasureTextSize(CanvasDevice.GetSharedDevice(), "M", TextFormat);
+				Size sizew = MeasureTextSize(CanvasDevice.GetSharedDevice(), "M", TextFormat);
 				CharHeight = (int)(size.Height * 2f);
-				CharWidth = (int)(sizew.Width * 1.1f);
+				float widthfactor = 1.1f;
+				if (Font.StartsWith("Cascadia"))
+				{
+					widthfactor = 1.35f;
+				}
+				CharWidth = (int)(sizew.Width * widthfactor);
 			}
 
 
@@ -1290,17 +1322,24 @@ namespace CodeEditorControl_WinUI
 				int EndLine = Math.Min((int)((VerticalScroll.Value + Scroll.ActualHeight) / CharHeight) + 1, Lines.Count);
 
 				maxchars = 0;
-			 var lines =	Lines.ToList();
-				foreach (Line l in lines)
+				
+				//var lines = new List<Line>();
+				//lock (Lines)
+				//{
+				//	lines = new List<Line>(Lines);
+				//}
+				for (int i = 0; i < Lines.Count; i++)
 				{
-					if (l != null)
+					Line l = Lines[i];
 					maxchars = Math.Max(l.Count + l.Indents * (TabLength - 1) + 1, maxchars);
 				}
 
 				VisibleLines.Clear();
-				foreach (Line l in lines)
+
+				for (int i = 0; i < Lines.Count; i++)
 				{
-					if ( l!= null && l.LineNumber <= EndLine && l.LineNumber >= StartLine)
+					Line l = Lines[i];
+					if (l != null && l.LineNumber <= EndLine && l.LineNumber >= StartLine)
 					{
 						VisibleLines.Add(l);
 					}
@@ -1340,6 +1379,7 @@ namespace CodeEditorControl_WinUI
 				DispatcherQueue.TryEnqueue(async () =>
 				{
 					//await Task.Run(()=> // Doesn't work because somewhere in CalculateLineWraps() the UI thread is called.
+				
 					CalculateLineWraps()
 					//)
 					;
@@ -1354,14 +1394,21 @@ namespace CodeEditorControl_WinUI
 
 		private void CalculateLineWraps()
 		{
-			var lines = new List<Line>(Lines);
-			foreach (Line line in lines)
+			try
 			{
-				line.CalculateWrappedLines(iVisibleChars, TabLength, WrappingLength);
+				lock (Lines)
+				{
+					var lines = new List<Line>(Lines);
+					foreach (Line line in lines)
+					{
+						line.CalculateWrappedLines(iVisibleChars, TabLength, WrappingLength);
+					}
+				}
 			}
+			catch { }
 		}
 
-		private CanvasTextFormat CanvasTextFormat { get; set; } = new CanvasTextFormat();
+		private CanvasTextFormat TextFormat { get; set; } = new CanvasTextFormat();
 		private void FontSizeChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
 		{
 			int currline = 0;
@@ -1377,6 +1424,30 @@ namespace CodeEditorControl_WinUI
 			}
 
 			IntelliSenseWidth = Math.Max(150, Math.Min( 20 * CharWidth,  300));
+		}
+
+		private async void FontChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+		{
+			switch (Font)
+			{
+				case "Fira Code": FontUri = "CodeEditorControl-WinUI/Fonts/FiraCode.ttf#Fira Code"; break;
+				case "JetBrains Mono": FontUri = "CodeEditorControl-WinUI/Fonts/JetBrainsMono.ttf#JetBrains Mono Thin"; break;
+				default: FontUri = Font; break;
+			}
+
+			int currline = 0;
+
+			if (VerticalScroll != null)
+			{
+				currline = (int)VerticalScroll.Value / CharHeight;
+			}
+			Invalidate(true);
+			if (VerticalScroll != null)
+			{
+				VerticalScroll.Value = currline * CharHeight;
+			}
+
+			IntelliSenseWidth = Math.Max(150, Math.Min(20 * CharWidth, 300));
 		}
 
 		private void HorizontalScroll_ValueChanged(object sender, RangeBaseValueChangedEventArgs e)
@@ -1829,14 +1900,14 @@ namespace CodeEditorControl_WinUI
 
 				if (ActualTheme == ElementTheme.Light)
 				{
-					Background = new SolidColorBrush(Color.FromArgb(255, 240, 240, 240));
-					Color_LeftBackground = Color.FromArgb(255, 220, 220, 220);
+					//Background = new SolidColorBrush(Color.FromArgb(150, 252, 252, 252));
+					//Color_LeftBackground = Color.FromArgb(255, 230, 230, 230);
 					//Color_LineNumber = Color.FromArgb(255, 120, 160, 180).InvertColorBrightness;
 				}
 				else
 				{
-					Background = new SolidColorBrush(Color.FromArgb(255, 30, 30, 30));
-					Color_LeftBackground = Color.FromArgb(255, 25, 25, 25);
+					//Background = new SolidColorBrush(Color.FromArgb(150, 28, 28, 28));
+					//Color_LeftBackground = Color.FromArgb(255, 25, 25, 25);
 					//Color_LineNumber = Color.FromArgb(255, 120, 160, 180);
 				}
 			}
@@ -2969,7 +3040,7 @@ namespace CodeEditorControl_WinUI
 			}
 		}
 
-		private async void TextControl_PointerExited(object sender, PointerRoutedEventArgs e)
+		private void TextControl_PointerExited(object sender, PointerRoutedEventArgs e)
 		{
 			try
 			{
@@ -3009,16 +3080,16 @@ namespace CodeEditorControl_WinUI
 
 					if (point.Position.X < 0)
 					{
-						DispatcherTimer Timer = new DispatcherTimer() { Interval = TimeSpan.FromMilliseconds(100) };
+						DispatcherTimer Timer = new () { Interval = TimeSpan.FromMilliseconds(100) };
 						Timer.Tick += async (a, b) =>
 						{
-							PointerPoint pointleft = e.GetCurrentPoint(TextControl);
-							if (pointleft.Position.X > 0 | !pointleft.Properties.IsLeftButtonPressed)
-							{
-								((DispatcherTimer)a).Stop();
-							}
-							HorizontalScroll.Value += pointleft.Position.X;
-							Selection = new(Selection.Start, await PointToPlace(pointleft.Position));
+								PointerPoint pointleft = e.GetCurrentPoint(TextControl);
+								if (pointleft.Position.X > 0 | !pointleft.Properties.IsLeftButtonPressed)
+								{
+									((Timer)a).Stop();
+								}
+								HorizontalScroll.Value += pointleft.Position.X;
+								Selection = new(Selection.Start, await PointToPlace(pointleft.Position));
 						};
 						Timer.Start();
 					}
@@ -3442,8 +3513,22 @@ namespace CodeEditorControl_WinUI
 			//IsSuggesting = false;
 		}
 
-		private void UserControl_Loaded(object sender, RoutedEventArgs e)
+		private async void UserControl_Loaded(object sender, RoutedEventArgs e)
 		{
+			await Task.Delay(2000);
+		
+
+			ListView listView = new ListView() { ItemsSource = Fonts };
+
+			await new ContentDialog() { XamlRoot = XamlRoot, PrimaryButtonText = "OK", Title = "Fonts", Content = listView }.ShowAsync();
+		}
+
+		public List<string> Fonts
+		{
+			get
+			{
+				return CanvasTextFormat.GetSystemFontFamilies().OrderBy(f => f).ToList();
+			}
 		}
 	}
 }
