@@ -7,7 +7,7 @@
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
     xmlns:xaml="using:Microsoft.Graphics.Canvas.UI.Xaml"
     mc:Ignorable="d"  IsTextScaleFactorEnabled="False" TabIndex="0" AllowFocusOnInteraction="True"  IsFocusEngagementEnabled="True"
-    x:DefaultBindMode="OneWay" GotFocus="UserControl_GotFocus" LostFocus="UserControl_LostFocus"
+    x:DefaultBindMode="OneWay" GotFocus="UserControl_GotFocus" LostFocus="UserControl_LostFocus" 
     xmlns:animations="using:CommunityToolkit.WinUI.UI.Animations" CharacterReceived="CodeWriter_CharacterReceived" Loaded="UserControl_Loaded" 
     >
 	<UserControl.Resources>
@@ -61,12 +61,12 @@
 			<RowDefinition Height="Auto" />
 		</Grid.RowDefinitions>
 
-		<Grid Grid.Column="0" x:Name="ScrollContent" Background="{x:Bind Background}" KeyDown="Scroll_KeyDown" KeyUp="Scroll_KeyUp"  ManipulationMode="TranslateX,TranslateY,TranslateInertia,Scale" ManipulationStarted="ScrollContent_ManipulationStarted"  ManipulationDelta="ScrollContent_ManipulationDelta"  >
+		<Grid Grid.Column="0" x:Name="ScrollContent" Background="Transparent" KeyDown="Scroll_KeyDown" KeyUp="Scroll_KeyUp"  ManipulationMode="TranslateX,TranslateY,TranslateInertia,Scale" ManipulationStarted="ScrollContent_ManipulationStarted"  ManipulationDelta="ScrollContent_ManipulationDelta"  >
 
-			<Grid x:Name="TextControl"  CornerRadius="{x:Bind CornerRadius}" AllowDrop="True" CanDrag="True" DragStarting="TextControl_DragStarting"  DragEnter="TextControl_DragEnter" DragOver="TextControl_DragOver" Drop="TextControl_Drop" PointerMoved="TextControl_PointerMoved"  PointerPressed="TextControl_PointerPressed" PointerReleased="TextControl_PointerReleased" PointerCaptureLost="TextControl_PointerLost" PointerCanceled="TextControl_PointerLost" PointerExited="TextControl_PointerExited">
-				<Grid.Background>
+			<Grid x:Name="TextControl"  CornerRadius="{x:Bind CornerRadius}" AllowDrop="True" CanDrag="True" DragStarting="TextControl_DragStarting"  DragEnter="TextControl_DragEnter" DragOver="TextControl_DragOver" Drop="TextControl_Drop" PointerMoved="TextControl_PointerMoved"  PointerPressed="TextControl_PointerPressed" PointerReleased="TextControl_PointerReleased" PointerCaptureLost="TextControl_PointerLost" Background="{x:Bind Background}" PointerCanceled="TextControl_PointerLost" PointerExited="TextControl_PointerExited">
+				<!--<Grid.Background>
 					<SolidColorBrush Color="{x:Bind Color_Background}"></SolidColorBrush>
-				</Grid.Background>
+				</Grid.Background>-->
 				<Grid.ContextFlyout>
 					<MenuFlyout x:Name="ContextMenu" x:FieldModifier="public" >
 						<MenuFlyoutItem Text="Copy" Command="{x:Bind Command_Copy}" IsEnabled="{x:Bind IsSelection}" >
@@ -138,11 +138,35 @@
 				</Grid.ContextFlyout>
 
 
-				<xaml:CanvasControl HorizontalAlignment="Stretch" VerticalAlignment="Stretch" x:Name="CanvasBeam" Draw="CanvasBeam_Draw" Visibility="{x:Bind IsFocused}"></xaml:CanvasControl>
-				<xaml:CanvasControl HorizontalAlignment="Stretch" VerticalAlignment="Stretch" x:Name="CanvasSelection" Draw="CanvasSelection_Draw"></xaml:CanvasControl>
-				<xaml:CanvasControl HorizontalAlignment="Stretch" VerticalAlignment="Stretch"  x:Name="CanvasText" Draw="CanvasText_Draw" ></xaml:CanvasControl>
-				
+				<xaml:CanvasControl HorizontalAlignment="Stretch" VerticalAlignment="Stretch" x:Name="CanvasSelection" Draw="CanvasSelection_Draw"/>
+				<xaml:CanvasControl HorizontalAlignment="Stretch" VerticalAlignment="Stretch" x:Name="CanvasBeam" Draw="CanvasBeam_Draw" Visibility="{x:Bind IsFocused}"/>
+				<xaml:CanvasControl HorizontalAlignment="Stretch" VerticalAlignment="Stretch"  x:Name="CanvasText" Draw="CanvasText_Draw"/>
+
+
 				<ItemsControl></ItemsControl>
+				<!--<Grid>
+					<Grid.ColumnDefinitions>
+						<ColumnDefinition Width="Auto" />
+						<ColumnDefinition Width="*" />
+					</Grid.ColumnDefinitions>
+
+
+
+					<ScrollViewer Grid.Column="1"  x:Name="LinesControl">
+					<ItemsControl  ItemsSource="{x:Bind Lines}">
+						
+					<ItemsControl.ItemTemplate>
+						<DataTemplate>
+							<Grid >
+								<TextBlock Text="{Binding LineText}" FontSize="20" ></TextBlock>
+							</Grid>
+						</DataTemplate>
+					</ItemsControl.ItemTemplate>
+
+				</ItemsControl>
+					</ScrollViewer>
+				</Grid>-->
+
 			</Grid>
 
 

@@ -1,17 +1,12 @@
 ﻿using CodeEditorControl_WinUI;
-using Microsoft.Graphics.Canvas.Text;
-using Microsoft.UI;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
-using Microsoft.UI.Xaml.Media;
-using Microsoft.UI.Xaml.Navigation;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
-using Windows.UI;
 
 namespace CodeEditor_WinUI_TestApp
 {
@@ -102,5 +97,10 @@ namespace CodeEditor_WinUI_TestApp
 			App.MainWindow.ResetColors();
 		}
 
+		private void CW_InfoMessage(object sender, string e)
+		{
+			VM.Log += $"Log | " + e + "\n";
+			LogScroll.ScrollToVerticalOffset(LogScroll.ScrollableHeight);
+		}
 	}
 }

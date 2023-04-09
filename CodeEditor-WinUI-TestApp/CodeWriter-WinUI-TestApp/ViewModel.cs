@@ -8,7 +8,7 @@ using Windows.UI;
 
 namespace CodeEditor_WinUI_TestApp
 {
-	internal class ViewModel : Bindable
+    internal class ViewModel : Bindable
 	{
 		public static List<Language> LanguageList = new()
 		{
@@ -181,27 +181,8 @@ namespace CodeEditor_WinUI_TestApp
 
 		public ObservableCollection<TokenDefinition> TokenColorDefinitions
 		{
-			get => Get(new ObservableCollection<TokenDefinition>()
-			{
-				new() { Token = Token.Normal, Color = Color.FromArgb(255, 220, 220, 220) },
-				new() { Token = Token.Comment, Color = Color.FromArgb(255, 30, 180, 40) },
-				new() { Token = Token.Command, Color = Color.FromArgb(255, 40, 120, 240) },
-				new() { Token = Token.Function, Color = Color.FromArgb(255, 120, 110, 220) },
-				new() { Token = Token.Special, Color = Color.FromArgb(255, 120, 110, 220) },
-				new() { Token = Token.Environment, Color = Color.FromArgb(255, 50, 190, 150) },
-				new() { Token = Token.Primitive, Color = Color.FromArgb(255, 230, 60, 30) },
-				new() { Token = Token.Style, Color = Color.FromArgb(255, 220, 50, 150) },
-				new() { Token = Token.Array, Color = Color.FromArgb(255, 200, 100, 80) },
-				new() { Token = Token.Key, Color = Color.FromArgb(255, 140, 210, 150) },
-				new() { Token = Token.Reference, Color = Color.FromArgb(255, 180, 140, 40) },
-				new() { Token = Token.Math, Color = Color.FromArgb(255, 220, 160, 60) },
-				new() { Token = Token.Symbol, Color = Color.FromArgb(255, 140, 200, 240) },
-				new() { Token = Token.Bracket, Color = Color.FromArgb(255, 120, 200, 220) },
-				new() { Token = Token.Number, Color = Color.FromArgb(255, 180, 220, 180) },
-				new() { Token = Token.Keyword, Color = Color.FromArgb(255, 40, 120, 240) },
-				new() { Token = Token.String, Color = Color.FromArgb(255, 235, 120, 70) },
-			}
-			); set => Set(value);
+			get => Get(new ObservableCollection<TokenDefinition>(EditorOptions.TokenColors.Select(x => new TokenDefinition() { Token = x.Key, Color = x.Value })));
+			set => Set(value);
 		}
 	}
 }
