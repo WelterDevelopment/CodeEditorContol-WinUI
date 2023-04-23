@@ -108,6 +108,8 @@ public partial class CodeWriter : UserControl, INotifyPropertyChanged
 							}
 							Selection = new(start, end);
 
+							
+
 							DoubleClicked?.Invoke(this, new());
 						}
 						previousPosition = currentpoint.Position;
