@@ -244,7 +244,7 @@ public partial class CodeWriter : UserControl, INotifyPropertyChanged
 	public Color Color_WeakMarker { get => Get(Color.FromArgb(255, 60, 60, 60)); set => Set(value); }
 
 	/// <summary>Font</summary>
-	public new int FontSize { get => (int)GetValue(FontSizeProperty); set { SetValue(FontSizeProperty, value); } }
+	public new int FontSize { get => Math.Max((int)GetValue(FontSizeProperty),1); set { SetValue(FontSizeProperty, value); } }
 	public string Font { get => (string)GetValue(FontProperty); set { SetValue(FontProperty, value); } }
 	private string FontUri { get; set; } = "Consolas";
 	private new float Scale { get { return XamlRoot != null && XamlRoot?.RasterizationScale != null ? (float)XamlRoot.RasterizationScale : 1.0f; } }
