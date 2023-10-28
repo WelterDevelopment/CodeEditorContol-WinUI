@@ -1,23 +1,23 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 	<PropertyGroup>
-		<TargetFramework>net7.0-windows10.0.22000.0</TargetFramework>
+		<TargetFramework>net6.0-windows10.0.22000.0</TargetFramework>
 		<TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
 		<RootNamespace>CodeEditorControl_WinUI</RootNamespace>
 		<Platforms>x86;x64;arm64</Platforms>
 		<UseWinUI>true</UseWinUI>
 	</PropertyGroup>
 	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-		<Optimize>true</Optimize>
+		<Optimize>False</Optimize>
 		<WarningLevel>2</WarningLevel>
 		<NoWarn>CS1998;CS4014</NoWarn>
 	</PropertyGroup>
 	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|arm64'">
-		<Optimize>true</Optimize>
+		<Optimize>False</Optimize>
 		<WarningLevel>2</WarningLevel>
 		<NoWarn>CS1998;CS4014</NoWarn>
 	</PropertyGroup>
 	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x86'">
-		<Optimize>true</Optimize>
+		<Optimize>False</Optimize>
 		<WarningLevel>2</WarningLevel>
 		<NoWarn>CS1998;CS4014</NoWarn>
 	</PropertyGroup>
@@ -51,12 +51,10 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<PackageReference Include="CommunityToolkit.WinUI.UI.Animations" Version="7.1.2" />
-		<PackageReference Include="Microsoft.Graphics.Win2D" Version="1.0.4" />
+		<PackageReference Include="Microsoft.Graphics.Win2D" Version="1.0.5.1" />
 		<PackageReference Include="Microsoft.Win32.Registry" Version="5.0.0" />
 		<PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.22621.756" />
-		<PackageReference Include="Microsoft.WindowsAppSDK" Version="1.2.230313.1" />
-		<PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+		<PackageReference Include="Microsoft.WindowsAppSDK" Version="1.4.231008000" />
 	</ItemGroup>
 
 	<ItemGroup>

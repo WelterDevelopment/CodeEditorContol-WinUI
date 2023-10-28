@@ -8,7 +8,7 @@
     xmlns:xaml="using:Microsoft.Graphics.Canvas.UI.Xaml"
     mc:Ignorable="d"  IsTextScaleFactorEnabled="False" TabIndex="0" AllowFocusOnInteraction="True"  IsFocusEngagementEnabled="True"
     x:DefaultBindMode="OneWay" GotFocus="UserControl_GotFocus" LostFocus="UserControl_LostFocus" 
-    xmlns:animations="using:CommunityToolkit.WinUI.UI.Animations" CharacterReceived="CodeWriter_CharacterReceived" Loaded="UserControl_Loaded" 
+     CharacterReceived="CodeWriter_CharacterReceived" Loaded="UserControl_Loaded" 
     >
 	<UserControl.Resources>
 		<ResourceDictionary>
@@ -177,10 +177,11 @@
 				</Popup.RenderTransform>
 
 				<Grid x:Name="Grd_Suggestions" HorizontalAlignment="Left" VerticalAlignment="Top" Background="{ThemeResource AcrylicInAppFillColorDefaultBrush}" CornerRadius="6" BorderThickness="1" BorderBrush="{ThemeResource AppBarBorderThemeBrush}" Height="{x:Bind IntelliSenseWidth}">
+					<!--commented until Communitytoolkit 8.0 (.NET 6) released
 					<animations:Implicit.ShowAnimations>
 						<animations:TranslationAnimation Duration="0:0:0.15" From="0, 20, 0" To="0" ></animations:TranslationAnimation>
 						<animations:OpacityAnimation Duration="0:0:0.15" From="0" To="1.0"></animations:OpacityAnimation>
-					</animations:Implicit.ShowAnimations>
+					</animations:Implicit.ShowAnimations>-->
 					<!--<Grid.Transitions>
 						<TransitionCollection>
 							<EntranceThemeTransition  ></EntranceThemeTransition>
@@ -231,14 +232,14 @@
 			</Popup>
 
 			<Grid PointerEntered="NormalArrowPointerEntered" x:Name="FindPopup" Visibility="{x:Bind IsFindPopupOpen}" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,4,0,4">
-				<animations:Implicit.ShowAnimations>
+				<!--<animations:Implicit.ShowAnimations>
 					<animations:TranslationAnimation Duration="0:0:0.2" From="0, 20, 0" To="0"/>
 					<animations:OpacityAnimation Duration="0:0:0.2" From="0" To="1.0"/>
 				</animations:Implicit.ShowAnimations>
 				<animations:Implicit.HideAnimations>
 					<animations:TranslationAnimation Duration="0:0:0.2" From="0" To="0, 20, 0"/>
 					<animations:OpacityAnimation Duration="0:0:0.2" From="1.0" To="0"/>
-				</animations:Implicit.HideAnimations>
+				</animations:Implicit.HideAnimations>-->
 				<Border CornerRadius="4"  BorderThickness="1" BorderBrush="{ThemeResource ListBoxBorderThemeBrush}" Background="{ThemeResource AcrylicInAppFillColorDefaultBrush}">
 					<Grid Width="300" >
 						<Grid Padding="6" RowSpacing="4" ColumnSpacing="4">

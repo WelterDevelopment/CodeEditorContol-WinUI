@@ -375,13 +375,13 @@ public partial class CodeWriter : UserControl, INotifyPropertyChanged
 				float width = (float)VerticalScroll.ActualWidth;
 				float height = (float)CanvasScrollbarMarkers.ActualHeight;
 
-				foreach (SearchMatch search in new List<SearchMatch>(SearchMatches))
+				foreach (SearchMatch search in SearchMatches.ToArray())
 					args.DrawingSession.DrawLine(width / 3f, search.iLine / (float)Lines.Count * height, width * 2 / 3f, search.iLine / (float)Lines.Count * height, ActualTheme == ElementTheme.Light ? Colors.LightGray.ChangeColorBrightness(-0.3f) : Colors.LightGray, markersize);
 
-				foreach (Line line in Lines.Where(x => x.IsUnsaved))
+				foreach (Line line in Lines.Where(x => x.IsUnsaved).ToArray())
 					args.DrawingSession.DrawLine(0, line.iLine / (float)Lines.Count * height, width * 1 / 3f, line.iLine / (float)Lines.Count * height, ActualTheme == ElementTheme.Light ? Color_UnsavedMarker.ChangeColorBrightness(-0.2f) : Color_UnsavedMarker, markersize);
 
-				foreach (SyntaxError error in new List<SyntaxError>(SyntaxErrors))
+				foreach (SyntaxError error in SyntaxErrors.ToArray())
 				{
 					if (error.SyntaxErrorType == SyntaxErrorType.Error)
 					{
@@ -1019,7 +1019,9 @@ public partial class CodeWriter : UserControl, INotifyPropertyChanged
 		catch { }
 	}
 
-	private CanvasTextFormat TextFormat { get; set; } = new CanvasTextFormat();
+
+	// ToDo: Hier gibts einen Fehler, wenn kompiliert mit x64 - Release
+	private CanvasTextFormat TextFormat { get; set; }
 	
 	private async Task InitializeLines(string text)
 	{

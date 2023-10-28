@@ -132,6 +132,8 @@ public partial class CodeWriter : UserControl, INotifyPropertyChanged
 				break;
 		}
 	}
+
+	Microsoft.UI.Dispatching.DispatcherQueue _queue = Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread();
 	private void Tbx_SearchChanged(object sender, TextChangedEventArgs e)
 	{
 		try
@@ -139,57 +141,60 @@ public partial class CodeWriter : UserControl, INotifyPropertyChanged
 			searchindex = 0;
 			string text = Tbx_Search.Text;
 
-			if (text == "")
-			{
-				SearchMatches.Clear();
-				CanvasScrollbarMarkers.Invalidate();
-				CanvasSelection.Invalidate();
-				return;
-			}
 
-			SearchMatches.Clear();
-			for (int iLine = 0; iLine < Lines.Count; iLine++)
+			_queue.TryEnqueue(() =>
 			{
-				if (IsRegex)
+				if (text == "")
 				{
-					bool isValidRegex = true;
-					MatchCollection coll = null;
-					try
-					{
-						coll = Regex.Matches(Lines[iLine].LineText, text, IsMatchCase ? RegexOptions.None : RegexOptions.IgnoreCase);
-					}
-					catch
-					{
-						isValidRegex = false;
-					}
-					if (isValidRegex && coll != null)
-					{
-						foreach (Match m in coll)
-							SearchMatches.Add(new() { Match = m.Value, iChar = m.Index, iLine = iLine });
-					}
+					SearchMatches.Clear();
+					CanvasScrollbarMarkers.Invalidate();
+					CanvasSelection.Invalidate();
+					return;
 				}
-				else
-				{
-					int nextindex = 0;
 
-					while (nextindex != -1)
+				SearchMatches.Clear();
+				for (int iLine = 0; iLine < Lines.Count; iLine++)
+				{
+					if (IsRegex)
 					{
-						nextindex = Lines[iLine].LineText.IndexOf(text, nextindex, IsMatchCase ? StringComparison.CurrentCulture : StringComparison.CurrentCultureIgnoreCase);
-						if (nextindex != -1)
+						bool isValidRegex = true;
+						MatchCollection coll = null;
+						try
 						{
-							SearchMatches.Add(new() { Match = text, iChar = nextindex, iLine = iLine });
-							nextindex++;
+							coll = Regex.Matches(Lines[iLine].LineText, text, IsMatchCase ? RegexOptions.None : RegexOptions.IgnoreCase);
+						}
+						catch
+						{
+							isValidRegex = false;
+						}
+						if (isValidRegex && coll != null)
+						{
+							foreach (Match m in coll)
+								SearchMatches.Add(new() { Match = m.Value, iChar = m.Index, iLine = iLine });
+						}
+					}
+					else
+					{
+						int nextindex = 0;
+
+						while (nextindex != -1)
+						{
+							nextindex = Lines[iLine].LineText.IndexOf(text, nextindex, IsMatchCase ? StringComparison.CurrentCulture : StringComparison.CurrentCultureIgnoreCase);
+							if (nextindex != -1)
+							{
+								SearchMatches.Add(new() { Match = text, iChar = nextindex, iLine = iLine });
+								nextindex++;
+							}
 						}
 					}
 				}
-			}
-			if (SearchMatches.Count > 0)
-			{
-				Selection = new Range(new Place(SearchMatches[0].iChar, SearchMatches[0].iLine));
-			}
-			CanvasScrollbarMarkers.Invalidate();
-			CanvasSelection.Invalidate();
-
+				if (SearchMatches.Count > 0)
+				{
+					Selection = new Range(new Place(SearchMatches[0].iChar, SearchMatches[0].iLine));
+				}
+				CanvasScrollbarMarkers.Invalidate();
+				CanvasSelection.Invalidate();
+			});
 		}
 		catch (Exception ex)
 		{
