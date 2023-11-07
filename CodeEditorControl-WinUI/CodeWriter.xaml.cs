@@ -108,13 +108,6 @@ public partial class CodeWriter : UserControl, INotifyPropertyChanged
 	public Point CursorPoint { get => Get(new Point()); set => Set(value); }
 
 
-
-
-
-
-
-
-
 	private void OnShowScrollbarsChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
 	{
 		if ((bool)e.NewValue)
@@ -124,10 +117,6 @@ public partial class CodeWriter : UserControl, INotifyPropertyChanged
 			HorizontalScroll.Style = VerticalScroll.Style = Application.Current.Resources["DefaultScrollBarStyle"] as Style;
 		}
 	}
-
-
-	
-
 
 
 	public bool IsSelection { get => Get(false); set => Set(value); }
@@ -146,14 +135,7 @@ public partial class CodeWriter : UserControl, INotifyPropertyChanged
 			}
 		}
 	}
-
-
-
 	public ObservableCollection<Line> Lines { get => Get(new ObservableCollection<Line>()); set => Set(value); }
-
-
-
-	
 
 	public string SelectedText
 	{
@@ -375,13 +357,13 @@ public partial class CodeWriter : UserControl, INotifyPropertyChanged
 				float width = (float)VerticalScroll.ActualWidth;
 				float height = (float)CanvasScrollbarMarkers.ActualHeight;
 
-				foreach (SearchMatch search in SearchMatches.ToArray())
+				foreach (SearchMatch search in SearchMatches?.ToArray())
 					args.DrawingSession.DrawLine(width / 3f, search.iLine / (float)Lines.Count * height, width * 2 / 3f, search.iLine / (float)Lines.Count * height, ActualTheme == ElementTheme.Light ? Colors.LightGray.ChangeColorBrightness(-0.3f) : Colors.LightGray, markersize);
 
-				foreach (Line line in Lines.Where(x => x.IsUnsaved).ToArray())
+				foreach (Line line in Lines?.Where(x => x.IsUnsaved)?.ToArray())
 					args.DrawingSession.DrawLine(0, line.iLine / (float)Lines.Count * height, width * 1 / 3f, line.iLine / (float)Lines.Count * height, ActualTheme == ElementTheme.Light ? Color_UnsavedMarker.ChangeColorBrightness(-0.2f) : Color_UnsavedMarker, markersize);
 
-				foreach (SyntaxError error in SyntaxErrors.ToArray())
+				foreach (SyntaxError error in SyntaxErrors?.ToArray())
 				{
 					if (error.SyntaxErrorType == SyntaxErrorType.Error)
 					{
@@ -828,8 +810,7 @@ public partial class CodeWriter : UserControl, INotifyPropertyChanged
 				FilterSuggestions();
 
 				textChanged();
-
-				CanvasText.Invalidate();
+			
 
 				IsFindPopupOpen = false;
 				args.Handled = true;
@@ -1741,29 +1722,34 @@ public partial class CodeWriter : UserControl, INotifyPropertyChanged
 
 
 
-	private void textChanged()
+	private async void textChanged()
 	{
 		try
 		{
+		CanvasText.Invalidate();
 
-			RecalcLineNumbers();
+			
 
-			updateFoldingPairs();
+			
 
-			IsSettingValue = true;
-			string t = string.Join("\r\n", Lines.Select(x => x.LineText));
-
-			Text = t;
-
-			if (Lines[CursorPlace.iLine].LineText.Length > maxchars)
+			DispatcherQueue.TryEnqueue(() =>
 			{
-				maxchars = Lines[CursorPlace.iLine].LineText.Length;
-				HorizontalScroll.Maximum = (maxchars + 2 + Lines[CursorPlace.iLine].Indents * TabLength) * CharWidth - Scroll.ActualWidth + Width_Left;
-				VerticalScroll.Visibility = Lines.Count * CharHeight > TextControl.ActualHeight ? Visibility.Visible : Visibility.Collapsed;
-				HorizontalScroll.Visibility = maxchars * CharHeight > TextControl.ActualWidth ? Visibility.Visible : Visibility.Collapsed;
-			}
+				RecalcLineNumbers();
+				updateFoldingPairs();
 
-			IsSettingValue = false;
+				if (Lines[CursorPlace.iLine].LineText.Length > maxchars)
+				{
+					maxchars = Lines[CursorPlace.iLine].LineText.Length;
+					HorizontalScroll.Maximum = (maxchars + 2 + Lines[CursorPlace.iLine].Indents * TabLength) * CharWidth - Scroll.ActualWidth + Width_Left;
+					VerticalScroll.Visibility = Lines.Count * CharHeight > TextControl.ActualHeight ? Visibility.Visible : Visibility.Collapsed;
+					HorizontalScroll.Visibility = maxchars * CharHeight > TextControl.ActualWidth ? Visibility.Visible : Visibility.Collapsed;
+				}
+				IsSettingValue = true;
+				Text = string.Join("\r\n", Lines.Select(x => x.LineText));
+				IsSettingValue = false;
+			});
+			
+
 			TextChanged?.Invoke(this, new(nameof(Text)));
 		}
 		catch (Exception ex)
