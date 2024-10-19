@@ -77,7 +77,7 @@ public partial class CodeWriter : UserControl, INotifyPropertyChanged
 				Lines[sm.iLine].SetLineText(Lines[sm.iLine].LineText.Remove(sm.iChar, sm.Match.Length).Insert(sm.iChar, Tbx_Replace.Text));
 				EditActionHistory.Add(new() { EditActionType = EditActionType.Paste, Selection = Selection, TextInvolved = Tbx_Replace.Text, TextState = Text });
 				SearchMatches.RemoveAt(searchindex);
-				textChanged();
+				updateText();
 				Invalidate();
 				Selection = new(new(sm.iChar, sm.iLine), new(sm.iChar + Tbx_Replace.Text.Length, sm.iLine));
 
@@ -102,7 +102,7 @@ public partial class CodeWriter : UserControl, INotifyPropertyChanged
 				EditActionHistory.Add(new() { EditActionType = EditActionType.Paste, Selection = Selection, TextInvolved = "< multiple replacements >", TextState = Text });
 				Selection = new(new(SearchMatches.Last().iChar, SearchMatches.Last().iLine), new(SearchMatches.Last().iChar + Tbx_Replace.Text.Length, SearchMatches.Last().iLine));
 				SearchMatches.Clear();
-				textChanged();
+				updateText();
 				Invalidate();
 			}
 		}

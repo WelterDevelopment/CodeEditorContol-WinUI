@@ -34,9 +34,19 @@ public partial class CodeWriter : UserControl, INotifyPropertyChanged
 		ContextMenu.Items.Add(item);
 	}
 
+	public void Action_Add(ICommandBarElement item)
+	{
+		//ContextMenu.SecondaryCommands.Add(item);
+	}
+
 	public void Action_Remove(MenuFlyoutItemBase item)
 	{
 		ContextMenu.Items.Remove(item);
+	}
+
+	public void Action_Remove(ICommandBarElement item)
+	{
+	//	ContextMenu.SecondaryCommands.Remove(item);
 	}
 
 	private void EditActionHistory_CollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
@@ -123,8 +133,9 @@ public partial class CodeWriter : UserControl, INotifyPropertyChanged
 		}
 
 		Selection = new(start, end);
-		textChanged();
 		CanvasText.Invalidate();
+		updateText();
+		
 		CanvasScrollbarMarkers.Invalidate();
 		LinesChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Lines)));
 	}
@@ -181,7 +192,7 @@ public partial class CodeWriter : UserControl, INotifyPropertyChanged
 		{
 			ErrorOccured?.Invoke(this, new ErrorEventArgs(ex));
 		}
-		textChanged();
+		updateText();
 		Invalidate();
 	}
 
@@ -266,7 +277,7 @@ public partial class CodeWriter : UserControl, INotifyPropertyChanged
 		{
 			ErrorOccured?.Invoke(this, new ErrorEventArgs(ex));
 		}
-		textChanged();
+		updateText();
 		Invalidate();
 	}
 

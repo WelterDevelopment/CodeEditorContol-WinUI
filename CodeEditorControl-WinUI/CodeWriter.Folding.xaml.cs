@@ -10,12 +10,12 @@ namespace CodeEditorControl_WinUI;
 public partial class CodeWriter : UserControl, INotifyPropertyChanged
 {
 	List<Folding> foldings = new List<Folding>();
-	private void updateFoldingPairs()
+	private void updateFoldingPairs(Language languange)
 	{
 		try
 		{
 			foldings.Clear();
-		if (Language.FoldingPairs != null)
+		if (languange.FoldingPairs != null)
 		{
 			foreach (var line in Lines.ToList())
 			{

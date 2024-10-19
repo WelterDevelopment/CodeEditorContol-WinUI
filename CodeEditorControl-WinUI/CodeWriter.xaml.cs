@@ -69,7 +69,7 @@ public partial class CodeWriter : UserControl, INotifyPropertyChanged
 
 	public Place CursorPlace
 	{
-		get => Get(new Place(0,0));
+		get => Get(new Place(0, 0));
 		set
 		{
 			Set(value);
@@ -173,7 +173,7 @@ public partial class CodeWriter : UserControl, INotifyPropertyChanged
 
 	public Range Selection
 	{
-		get => Get(new Range(CursorPlace,CursorPlace));
+		get => Get(new Range(CursorPlace, CursorPlace));
 		set
 		{
 			Set(value);
@@ -290,9 +290,9 @@ public partial class CodeWriter : UserControl, INotifyPropertyChanged
 
 
 
-	
 
-	
+
+
 
 	private void CanvasBeam_Draw(CanvasControl sender, CanvasDrawEventArgs args)
 	{
@@ -320,7 +320,7 @@ public partial class CodeWriter : UserControl, INotifyPropertyChanged
 				if (Selection.Start == CursorPlace)
 				{
 					//args.DrawingSession.DrawRoundedRectangle(Width_Left, y, (int)TextControl.ActualWidth - Width_Left, CharHeight, 2, 2, ActualTheme == ElementTheme.Light ? Color_FoldingMarker.InvertColorBrightness() : Color_FoldingMarker, 2f);
-					args.DrawingSession.FillRectangle(Width_Left,y,(int)TextControl.ActualWidth - Width_Left, CharHeight, ActualTheme == ElementTheme.Light ? Color_SelelectedLineBackground.InvertColorBrightness() : Color_SelelectedLineBackground);
+					args.DrawingSession.FillRectangle(Width_Left, y, (int)TextControl.ActualWidth - Width_Left, CharHeight, ActualTheme == ElementTheme.Light ? Color_SelelectedLineBackground.InvertColorBrightness() : Color_SelelectedLineBackground);
 				}
 
 				if (y <= TextControl.ActualHeight && y >= 0 && x <= TextControl.ActualWidth && x >= Width_Left)
@@ -356,26 +356,27 @@ public partial class CodeWriter : UserControl, INotifyPropertyChanged
 				float markersize = (float)Math.Max(CharHeight / (VerticalScroll.Maximum + ScrollContent.ActualHeight) * CanvasScrollbarMarkers.ActualHeight, 4f);
 				float width = (float)VerticalScroll.ActualWidth;
 				float height = (float)CanvasScrollbarMarkers.ActualHeight;
+				float linecount = Lines.Count;
 
 				foreach (SearchMatch search in SearchMatches?.ToArray())
-					args.DrawingSession.DrawLine(width / 3f, search.iLine / (float)Lines.Count * height, width * 2 / 3f, search.iLine / (float)Lines.Count * height, ActualTheme == ElementTheme.Light ? Colors.LightGray.ChangeColorBrightness(-0.3f) : Colors.LightGray, markersize);
+					args.DrawingSession.DrawLine(width / 3f, search.iLine / linecount * height, width * 2 / 3f, search.iLine / linecount * height, ActualTheme == ElementTheme.Light ? Colors.LightGray.ChangeColorBrightness(-0.3f) : Colors.LightGray, markersize);
 
-				foreach (Line line in Lines?.Where(x => x.IsUnsaved)?.ToArray())
-					args.DrawingSession.DrawLine(0, line.iLine / (float)Lines.Count * height, width * 1 / 3f, line.iLine / (float)Lines.Count * height, ActualTheme == ElementTheme.Light ? Color_UnsavedMarker.ChangeColorBrightness(-0.2f) : Color_UnsavedMarker, markersize);
+				foreach (Line line in Lines?.ToArray()?.Where(x => x.IsUnsaved))
+					args.DrawingSession.DrawLine(0, line.iLine / linecount * height, width * 1 / 3f, line.iLine / linecount * height, ActualTheme == ElementTheme.Light ? Color_UnsavedMarker.ChangeColorBrightness(-0.2f) : Color_UnsavedMarker, markersize);
 
 				foreach (SyntaxError error in SyntaxErrors?.ToArray())
 				{
 					if (error.SyntaxErrorType == SyntaxErrorType.Error)
 					{
-						args.DrawingSession.DrawLine(width * 2 / 3f, error.iLine / (float)Lines.Count * height, width, error.iLine / (float)Lines.Count * height, ActualTheme == ElementTheme.Light ? Colors.Red.ChangeColorBrightness(-0.2f) : Colors.Red, markersize);
+						args.DrawingSession.DrawLine(width * 2 / 3f, error.iLine / linecount * height, width, error.iLine / linecount * height, ActualTheme == ElementTheme.Light ? Colors.Red.ChangeColorBrightness(-0.2f) : Colors.Red, markersize);
 					}
 					else if (error.SyntaxErrorType == SyntaxErrorType.Warning)
 					{
-						args.DrawingSession.DrawLine(width * 2 / 3f, error.iLine / (float)Lines.Count * height, width, error.iLine / (float)Lines.Count * height, ActualTheme == ElementTheme.Light ? Colors.Yellow.ChangeColorBrightness(-0.2f) : Colors.Yellow, markersize);
+						args.DrawingSession.DrawLine(width * 2 / 3f, error.iLine / linecount * height, width, error.iLine / linecount * height, ActualTheme == ElementTheme.Light ? Colors.Yellow.ChangeColorBrightness(-0.2f) : Colors.Yellow, markersize);
 					}
 				}
 
-				float cursorY = CursorPlace.iLine / (float)Lines.Count * height;
+				float cursorY = CursorPlace.iLine / linecount * height;
 				args.DrawingSession.DrawLine(0, cursorY, width, cursorY, ActualTheme == ElementTheme.Light ? Color_Beam.InvertColorBrightness() : Color_Beam, 2f);
 			}
 		}
@@ -433,14 +434,14 @@ public partial class CodeWriter : UserControl, INotifyPropertyChanged
 		}
 	}
 
-	private void CanvasText_Draw(CanvasControl sender, CanvasDrawEventArgs args)
+	private void CanvasLineInfo_Draw(CanvasControl sender, CanvasDrawEventArgs args)
 	{
 		try
 		{
 			sender.DpiScale = XamlRoot.RasterizationScale > 1.0d ? 1.15f : 1.0f; // The text was shaking around on text input at Scale factors > 1. Setting DpiScale seems to prevent this.
 			args.DrawingSession.Antialiasing = CanvasAntialiasing.Aliased;
-																																																																								//args.DrawingSession.Blend = CanvasBlend.Add;
-																																																																								//args.DrawingSession.TextAntialiasing = CanvasTextAntialiasing.ClearType;
+			//args.DrawingSession.Blend = CanvasBlend.Add;
+			//args.DrawingSession.TextAntialiasing = CanvasTextAntialiasing.ClearType;
 			if (VisibleLines.Count > 0)
 			{
 				int foldPos = Width_LeftMargin + Width_LineNumber + Width_ErrorMarker + Width_WarningMarker;
@@ -448,23 +449,29 @@ public partial class CodeWriter : UserControl, INotifyPropertyChanged
 				int warningPos = errorPos + Width_ErrorMarker;
 				int totalwraps = 0;
 				float thickness = Math.Max(1, CharWidth / 6f);
+				var folds = foldings?.ToList();
+				var lines = Lines?.ToList();
+				var vislines = VisibleLines?.ToList();
 
-				for (int iLine = VisibleLines[0].iLine; iLine < VisibleLines.Last().LineNumber; iLine++)
+				if (lines == null | lines.Count == 0 | vislines == null | vislines.Count == 0)
+					return;
+
+				for (int iLine = vislines[0].iLine; iLine < vislines.Last().LineNumber; iLine++)
 				{
-					int y = CharHeight * (iLine - VisibleLines[0].LineNumber + 1 + totalwraps);
+					int y = CharHeight * (iLine - vislines[0].LineNumber + 1 + totalwraps);
 					int x = 0;
 					args.DrawingSession.FillRectangle(0, y, Width_Left - Width_TextIndent, CharHeight, Color_LeftBackground);
 
 					if (ShowLineNumbers)
-						args.DrawingSession.DrawText((iLine + 1).ToString(), CharWidth * IntLength(Lines.Count) + Width_LeftMargin, y, ActualTheme == ElementTheme.Light ? Color_LineNumber.InvertColorBrightness() : Color_LineNumber, new CanvasTextFormat() { FontFamily = FontUri, FontSize = ScaledFontSize, HorizontalAlignment = CanvasHorizontalAlignment.Right });
+						args.DrawingSession.DrawText((iLine + 1).ToString(), CharWidth * IntLength(lines.Count) + Width_LeftMargin, y, ActualTheme == ElementTheme.Light ? Color_LineNumber.InvertColorBrightness() : Color_LineNumber, new CanvasTextFormat() { FontFamily = FontUri, FontSize = ScaledFontSize, HorizontalAlignment = CanvasHorizontalAlignment.Right });
 					if (IsFoldingEnabled && Language.FoldingPairs != null)
 					{
-						
-						if (foldings.Any(x => x.StartLine == iLine))
+
+						if (folds.Any(x => x.StartLine == iLine))
 						{
 							//args.DrawingSession.FillCircle(foldPos + CharWidth / 2, y + CharHeight / 2, CharWidth / 3, ActualTheme == ElementTheme.Light ? Color_FoldingMarker.InvertColorBrightness() : Color_FoldingMarker);
 							float w = CharWidth * 0.75f;
-							args.DrawingSession.FillRectangle(foldPos + (CharWidth - w)/2f, y + CharHeight/2 - w/2f, w,w, ActualTheme == ElementTheme.Light ? Color_FoldingMarker.InvertColorBrightness() : Color_FoldingMarker);
+							args.DrawingSession.FillRectangle(foldPos + (CharWidth - w) / 2f, y + CharHeight / 2 - w / 2f, w, w, ActualTheme == ElementTheme.Light ? Color_FoldingMarker.InvertColorBrightness() : Color_FoldingMarker);
 							//args.DrawingSession.DrawLine(foldPos + CharWidth / 4, y + CharHeight / 2, foldPos + CharWidth * 3 / 4, y + CharHeight / 2, ActualTheme == ElementTheme.Light ? Color_FoldingMarker.InvertColorBrightness() : Color_FoldingMarker, 2);
 						}
 
@@ -473,21 +480,21 @@ public partial class CodeWriter : UserControl, INotifyPropertyChanged
 						//	args.DrawingSession.DrawLine(foldPos + CharWidth / 2, y, foldPos + CharWidth / 2, y + CharHeight, ActualTheme == ElementTheme.Light ? Color_FoldingMarker.InvertColorBrightness() : Color_FoldingMarker, 2);
 						//	args.DrawingSession.DrawLine(foldPos + CharWidth / 2, y + CharHeight / 2, foldPos + CharWidth, y + CharHeight / 2, ActualTheme == ElementTheme.Light ? Color_FoldingMarker.InvertColorBrightness() : Color_FoldingMarker, 2);
 						//}
-						else if (foldings.Any(x => x.Endline == iLine))
+						else if (folds.Any(x => x.Endline == iLine))
 						{
 							args.DrawingSession.DrawLine(foldPos + CharWidth / 2f - thickness / 2f, y + CharHeight / 2f, foldPos + CharWidth, y + CharHeight / 2f, ActualTheme == ElementTheme.Light ? Color_FoldingMarker.InvertColorBrightness() : Color_FoldingMarker, thickness);
-							args.DrawingSession.DrawLine(foldPos + CharWidth / 2f , y, foldPos + CharWidth / 2f, y + CharHeight /2f, ActualTheme == ElementTheme.Light ? Color_FoldingMarker.InvertColorBrightness() : Color_FoldingMarker, thickness);
+							args.DrawingSession.DrawLine(foldPos + CharWidth / 2f, y, foldPos + CharWidth / 2f, y + CharHeight / 2f, ActualTheme == ElementTheme.Light ? Color_FoldingMarker.InvertColorBrightness() : Color_FoldingMarker, thickness);
 						}
-						
-						if (foldings.Any(x => iLine > x.StartLine && iLine < x.Endline))
+
+						if (folds.Any(x => iLine > x.StartLine && iLine < x.Endline))
 						{
-							args.DrawingSession.DrawLine(foldPos + CharWidth / 2f, y - CharHeight/2f, foldPos + CharWidth / 2f, y + CharHeight*1.5f, ActualTheme == ElementTheme.Light ? Color_FoldingMarker.InvertColorBrightness() : Color_FoldingMarker, thickness);
+							args.DrawingSession.DrawLine(foldPos + CharWidth / 2f, y - CharHeight / 2f, foldPos + CharWidth / 2f, y + CharHeight * 1.5f, ActualTheme == ElementTheme.Light ? Color_FoldingMarker.InvertColorBrightness() : Color_FoldingMarker, thickness);
 						}
 					}
 
 					if (ShowLineMarkers)
 					{
-						if (Lines[iLine].IsUnsaved)
+						if (lines[iLine].IsUnsaved)
 							args.DrawingSession.FillRectangle(warningPos, y, Width_ErrorMarker, CharHeight, ActualTheme == ElementTheme.Light ? Color_UnsavedMarker.ChangeColorBrightness(-0.2f) : Color_UnsavedMarker);
 
 						if (SyntaxErrors.Any(x => x.iLine == iLine))
@@ -504,19 +511,51 @@ public partial class CodeWriter : UserControl, INotifyPropertyChanged
 						}
 					}
 
-					int lastChar = IsWrappingEnabled ? Lines[iLine].Count : Math.Min(iCharOffset + ((int)Scroll.ActualWidth - Width_Left) / CharWidth, Lines[iLine].Count);
+
+				}
+			}
+		}
+		catch (Exception ex)
+		{
+			ErrorOccured?.Invoke(this, new ErrorEventArgs(ex));
+		}
+	}
+
+	private void CanvasText_Draw(CanvasControl sender, CanvasDrawEventArgs args)
+	{
+		try
+		{
+			sender.DpiScale = XamlRoot.RasterizationScale > 1.0d ? 1.15f : 1.0f; // The text was shaking around on text input at Scale factors > 1. Setting DpiScale seems to prevent this.
+			args.DrawingSession.Antialiasing = CanvasAntialiasing.Aliased;
+			//args.DrawingSession.Blend = CanvasBlend.Add;
+			//args.DrawingSession.TextAntialiasing = CanvasTextAntialiasing.ClearType;
+			if (VisibleLines.Count > 0)
+			{
+				int foldPos = Width_LeftMargin + Width_LineNumber + Width_ErrorMarker + Width_WarningMarker;
+				int errorPos = Width_LeftMargin + Width_LineNumber;
+				int warningPos = errorPos + Width_ErrorMarker;
+				int totalwraps = 0;
+				float thickness = Math.Max(1, CharWidth / 6f);
+				var folds = foldings.ToList();
+				var lines = Lines.ToList();
+
+				for (int iLine = VisibleLines[0].iLine; iLine < VisibleLines.Last().LineNumber; iLine++)
+				{
+					int y = CharHeight * (iLine - VisibleLines[0].LineNumber + 1 + totalwraps);
+					int x = 0;
+					int lastChar = IsWrappingEnabled ? lines[iLine].Count : Math.Min(iCharOffset + ((int)Scroll.ActualWidth - Width_Left) / CharWidth, lines[iLine].Count);
 					int indents = 0;
 
-					int textWrappingLines = Lines[iLine].Count / ((int)Scroll.ActualWidth - Width_Left);
+					int textWrappingLines = lines[iLine].Count / ((int)Scroll.ActualWidth - Width_Left);
 					int linewraps = 0;
 					int wrapindent = 0;
 					int iWrappingChar = 0;
 
 					if (IsWrappingEnabled)
 					{
-						for (int iWrappedLine = 0; iWrappedLine < Lines[iLine].WrappedLines.Count; iWrappedLine++)
+						for (int iWrappedLine = 0; iWrappedLine < lines[iLine].WrappedLines.Count; iWrappedLine++)
 						{
-							var wrappedLine = Lines[iLine].WrappedLines[iWrappedLine];
+							var wrappedLine = lines[iLine].WrappedLines[iWrappedLine];
 							for (int iChar = 0; iChar < wrappedLine.Count; iChar++)
 							{
 								Char c = wrappedLine[iChar];
@@ -557,7 +596,7 @@ public partial class CodeWriter : UserControl, INotifyPropertyChanged
 								}
 
 							}
-							if (iWrappedLine < Lines[iLine].WrappedLines.Count - 1)
+							if (iWrappedLine < lines[iLine].WrappedLines.Count - 1)
 							{
 								y += CharHeight;
 								iWrappingChar = WrappingLength;
@@ -570,7 +609,7 @@ public partial class CodeWriter : UserControl, INotifyPropertyChanged
 					else
 						for (int iChar = 0; iChar < lastChar; iChar++)
 						{
-							Char c = Lines[iLine][iChar];
+							Char c = lines[iLine][iChar];
 
 							if (c.C == '\t')
 							{
@@ -664,7 +703,7 @@ public partial class CodeWriter : UserControl, INotifyPropertyChanged
 
 							}
 						}
-					if (ShowControlCharacters && iLine < Lines.Count - 1 && lastChar >= iCharOffset - indents * (TabLength - 1))
+					if (ShowControlCharacters && iLine < lines.Count - 1 && lastChar >= iCharOffset - indents * (TabLength - 1))
 					{
 						x = Width_Left + CharWidth * (lastChar + indents * (TabLength - 1) - iCharOffset);
 						CanvasPathBuilder enterpath = new CanvasPathBuilder(sender);
@@ -750,7 +789,7 @@ public partial class CodeWriter : UserControl, INotifyPropertyChanged
 					}
 				}
 
-				 Lines[CursorPlace.iLine].SetLineText(Lines[CursorPlace.iLine].LineText.Insert(CursorPlace.iChar, args.Character.ToString()));
+				Lines[CursorPlace.iLine].SetLineText(Lines[CursorPlace.iLine].LineText.Insert(CursorPlace.iChar, args.Character.ToString()));
 
 
 				if (Language.EnableIntelliSense)
@@ -773,18 +812,19 @@ public partial class CodeWriter : UserControl, INotifyPropertyChanged
 									Options = intelliSense.ArgumentsList[argumentindex]?.Parameters;
 									AllOptions = Suggestions = Options.Select(x =>
 									{
-										if (x is KeyValue keyValue) 
-										{ 
+										if (x is KeyValue keyValue)
+										{
 											keyValue.Snippet = "=";
 											string options = "";
-											if (keyValue.Values != null) {
+											if (keyValue.Values != null)
+											{
 												if (keyValue.Values.Count > 5)
-													options = string.Join("|",keyValue.Values.Take(5)) + "|...";
+													options = string.Join("|", keyValue.Values.Take(5)) + "|...";
 												else
 													options = string.Join("|", keyValue.Values);
-												keyValue.Options =  options; 
+												keyValue.Options = options;
 											}
-											keyValue.IntelliSenseType = IntelliSenseType.Argument; 
+											keyValue.IntelliSenseType = IntelliSenseType.Argument;
 										}
 										return (Suggestion)x;
 									}
@@ -798,19 +838,20 @@ public partial class CodeWriter : UserControl, INotifyPropertyChanged
 				if (Language.AutoClosingPairs.Keys.Contains(args.Character))
 				{
 					if (CursorPlace.iChar == Lines[CursorPlace.iLine].Count)
-						 Lines[CursorPlace.iLine].SetLineText(Lines[CursorPlace.iLine].LineText + Language.AutoClosingPairs[args.Character]);
+						Lines[CursorPlace.iLine].SetLineText(Lines[CursorPlace.iLine].LineText + Language.AutoClosingPairs[args.Character]);
 					else //if (Lines[CursorPlace.iLine].LineText[CursorPlace.iChar + 1] == ' ')
-						 Lines[CursorPlace.iLine].SetLineText(Lines[CursorPlace.iLine].LineText.Insert(CursorPlace.iChar+1, Language.AutoClosingPairs[args.Character].ToString()));
+						Lines[CursorPlace.iLine].SetLineText(Lines[CursorPlace.iLine].LineText.Insert(CursorPlace.iChar + 1, Language.AutoClosingPairs[args.Character].ToString()));
 				}
 
 
 				Selection = new(Selection.VisualStart + 1);
 				iCharPosition = CursorPlace.iChar;
 
-				FilterSuggestions();
 
-				textChanged();
-			
+				CanvasText.Invalidate();
+				updateText();
+				//textChanged();
+				FilterSuggestions();
 
 				IsFindPopupOpen = false;
 				args.Handled = true;
@@ -823,9 +864,9 @@ public partial class CodeWriter : UserControl, INotifyPropertyChanged
 
 	}
 
-	
 
-	
+
+
 
 	private int GetWrappingLinesOffset(int iline)
 	{
@@ -926,7 +967,7 @@ public partial class CodeWriter : UserControl, INotifyPropertyChanged
 			//LinesControl.ScrollToVerticalOffset(VerticalScroll.Value);
 
 			maxchars = 0;
-			
+
 			for (int i = 0; i < Lines.Count; i++)
 			{
 				Line l = Lines[i];
@@ -947,7 +988,7 @@ public partial class CodeWriter : UserControl, INotifyPropertyChanged
 			Width_LeftMargin = ShowLineNumbers ? CharWidth : 0;
 			Width_LineNumber = ShowLineNumbers ? CharWidth * IntLength(Lines.Count) : 0;
 			Width_FoldingMarker = IsFoldingEnabled && Language.FoldingPairs != null ? CharWidth : 0;
-			Width_ErrorMarker = ShowLineNumbers ?  CharWidth / 2 : 0;
+			Width_ErrorMarker = ShowLineNumbers ? CharWidth / 2 : 0;
 			Width_WarningMarker = ShowLineMarkers ? CharWidth / 2 : 0;
 
 			VerticalScroll.Maximum = (Lines.Count + 2) * CharHeight - Scroll.ActualHeight;
@@ -980,6 +1021,7 @@ public partial class CodeWriter : UserControl, INotifyPropertyChanged
 				CanvasSelection.Invalidate();
 				CanvasText.Invalidate();
 				CanvasScrollbarMarkers.Invalidate();
+				CanvasLineInfo.Invalidate();
 			});
 		}
 	}
@@ -1003,7 +1045,10 @@ public partial class CodeWriter : UserControl, INotifyPropertyChanged
 
 	// ToDo: Hier gibts einen Fehler, wenn kompiliert mit x64 - Release
 	private CanvasTextFormat TextFormat { get; set; }
-	
+
+	private DispatcherTimer TextChangedTimer { get; set; } = new() { Interval = TimeSpan.FromMilliseconds(100) };
+	private string TextChangedTimerLastText { get; set; } = "";
+
 	private async Task InitializeLines(string text)
 	{
 		VisibleLines.Clear();
@@ -1023,7 +1068,7 @@ public partial class CodeWriter : UserControl, INotifyPropertyChanged
 			text = text.Replace("\r\n", "\n").Replace("\r", "\n");
 			string[] lines = text.Split("\n", StringSplitOptions.None);
 
-			lastVisibleLine = Math.Min(Lines.Count, lastVisibleLine + 5);
+			lastVisibleLine = Math.Min(lines.Length, lastVisibleLine + 5);
 			int lineNumber = 1;
 			bool innerLang = false;
 
@@ -1059,7 +1104,7 @@ public partial class CodeWriter : UserControl, INotifyPropertyChanged
 				l.Save();
 				Lines.Add(l);
 				lineNumber++;
-				if (lineNumber == lastVisibleLine && lines.Length > 50)
+				if (lineNumber == lastVisibleLine)
 				{
 					DispatcherQueue.TryEnqueue(() =>
 								{
@@ -1072,7 +1117,7 @@ public partial class CodeWriter : UserControl, INotifyPropertyChanged
 						{
 							if (isCanvasLoaded && Lines != null && Lines.Count > 0)
 							{
-								updateFoldingPairs();
+								updateFoldingPairs(Language);
 								Invalidate(true);
 								if (!IsInitialized)
 								{
@@ -1082,6 +1127,9 @@ public partial class CodeWriter : UserControl, INotifyPropertyChanged
 							}
 						});
 		});
+
+
+
 	}
 
 	private bool invoked = false;
@@ -1115,7 +1163,7 @@ public partial class CodeWriter : UserControl, INotifyPropertyChanged
 		}
 	}
 
-	
+
 
 	private Size MeasureTextSize(CanvasDevice device, string text, CanvasTextFormat textFormat, float limitedToWidth = 0.0f, float limitedToHeight = 0.0f)
 	{
@@ -1172,12 +1220,12 @@ public partial class CodeWriter : UserControl, INotifyPropertyChanged
 				{
 					for (int wrappingLine = 0; wrappingLine < line.WrappedLines.Count; wrappingLine++)
 					{
-						
+
 						if (wrappingLine != 0)
 							iwrappedLines++;
 						if (visualline == iline + iwrappedLines)
 						{
-							icharoffset = wrappingLine*iVisibleChars;
+							icharoffset = wrappingLine * iVisibleChars;
 							wraplines = iwrappedLines;
 							return;
 						}
@@ -1187,14 +1235,14 @@ public partial class CodeWriter : UserControl, INotifyPropertyChanged
 			};
 			getLine();
 			ilineoffset = wraplines;
-			}
+		}
 		//for (int ivisibleline = 0; ivisibleline < ivisualline; ivisibleline++)
 		//{
 		//	ilineoffset += VisibleLines[ivisibleline].WrappedLines.Count;
 
 		//}
 
-		
+
 		//int linewraps = Lines[currentplace.iLine].GetLineWraps(iVisibleChars,TabLength,WrappingLength);
 
 		y += ilineoffset * CharHeight;
@@ -1242,7 +1290,7 @@ public partial class CodeWriter : UserControl, INotifyPropertyChanged
 				icharoffset = wraplines > 1 ? wraplines * (iVisibleChars - Lines[iline].Indents * (TabLength - 1)) + (wraplines - 1) * WrappingLength : wraplines * (iVisibleChars - Lines[iline].Indents * (TabLength - 1));
 			}
 			else
-				iline = Math.Max(Math.Min( ivisualline + VisibleLines[0].iLine, Lines.Count-1),0) ;
+				iline = Math.Max(Math.Min(ivisualline + VisibleLines[0].iLine, Lines.Count - 1), 0);
 
 			int ichar = 0;
 			if ((int)currentpoint.X - Width_Left - HorizontalOffset > 0)
@@ -1281,9 +1329,9 @@ public partial class CodeWriter : UserControl, INotifyPropertyChanged
 			Lines[i].LineNumber = i + 1;
 	}
 
-	
 
-	
+
+
 
 	private CoreVirtualKeyStates shiftKeyState = CoreVirtualKeyStates.None;
 	private CoreVirtualKeyStates controlKeyState = CoreVirtualKeyStates.None;
@@ -1303,7 +1351,7 @@ public partial class CodeWriter : UserControl, INotifyPropertyChanged
 
 	private int iCharPosition = 0;
 
-	private  void Scroll_KeyDown(object sender, KeyRoutedEventArgs e)
+	private void Scroll_KeyDown(object sender, KeyRoutedEventArgs e)
 	{
 		try
 		{
@@ -1355,7 +1403,7 @@ public partial class CodeWriter : UserControl, INotifyPropertyChanged
 								{
 									if (Lines[iLine].LineText.StartsWith("\t"))
 									{
-										 Lines[iLine].SetLineText(Lines[iLine].LineText.Remove(0, 1));
+										Lines[iLine].SetLineText(Lines[iLine].LineText.Remove(0, 1));
 										if (iLine == Selection.VisualStart.iLine)
 											start -= 1;
 										else if (iLine == Selection.VisualEnd.iLine)
@@ -1368,7 +1416,7 @@ public partial class CodeWriter : UserControl, INotifyPropertyChanged
 							{
 								for (int iLine = Selection.VisualStart.iLine; iLine <= Selection.VisualEnd.iLine; iLine++)
 								{
-									 Lines[iLine].SetLineText(Lines[iLine].LineText.Insert(0, "\t"));
+									Lines[iLine].SetLineText(Lines[iLine].LineText.Insert(0, "\t"));
 								}
 								Selection = new(Selection.Start + 1, Selection.End + 1);
 							}
@@ -1379,18 +1427,18 @@ public partial class CodeWriter : UserControl, INotifyPropertyChanged
 							{
 								if (Lines[CursorPlace.iLine].LineText.StartsWith("\t"))
 								{
-									 Lines[CursorPlace.iLine].SetLineText(Lines[CursorPlace.iLine].LineText.Remove(0, 1));
+									Lines[CursorPlace.iLine].SetLineText(Lines[CursorPlace.iLine].LineText.Remove(0, 1));
 									Selection = new(CursorPlace - 1);
 								}
 							}
 							else
 							{
-								 Lines[CursorPlace.iLine].SetLineText(Lines[CursorPlace.iLine].LineText.Insert(CursorPlace.iChar, "\t"));
+								Lines[CursorPlace.iLine].SetLineText(Lines[CursorPlace.iLine].LineText.Insert(CursorPlace.iChar, "\t"));
 								Selection = new(CursorPlace + 1);
 							}
 						}
 
-						textChanged();
+						updateText();
 						CanvasText.Invalidate();
 						e.Handled = true;
 						break;
@@ -1423,20 +1471,20 @@ public partial class CodeWriter : UserControl, INotifyPropertyChanged
 						if (CursorPlace.iChar < Lines[CursorPlace.iLine].Count)
 						{
 							storetext = Lines[CursorPlace.iLine].LineText.Substring(CursorPlace.iChar);
-							 Lines[CursorPlace.iLine].SetLineText(Lines[CursorPlace.iLine].LineText.Remove(CursorPlace.iChar));
+							Lines[CursorPlace.iLine].SetLineText(Lines[CursorPlace.iLine].LineText.Remove(CursorPlace.iChar));
 						}
 						string indents = string.Concat(Enumerable.Repeat("\t", Lines[CursorPlace.iLine].Indents));
 						var newline = new Line(Language) { LineNumber = CursorPlace.iLine, IsUnsaved = true };
-						 newline.SetLineText(indents + storetext);
+						newline.SetLineText(indents + storetext);
 						Lines.Insert(CursorPlace.iLine + 1, newline);
-						
+
 						for (int i = CursorPlace.iLine + 1; i < Lines.Count; i++)
 							Lines[i].LineNumber = i + 1;
 						Place newselect = CursorPlace;
 						newselect.iLine++;
 						newselect.iChar = Lines[CursorPlace.iLine].Indents;
 						Selection = new Range(newselect, newselect);
-						textChanged();
+						updateText();
 						Invalidate();
 						e.Handled = true;
 						break;
@@ -1450,15 +1498,16 @@ public partial class CodeWriter : UserControl, INotifyPropertyChanged
 								storetext = Lines[CursorPlace.iLine + 1].LineText;
 								Lines.RemoveAt(CursorPlace.iLine + 1);
 								Lines[CursorPlace.iLine].AddToLineText(storetext);
-								textChanged();
+								updateText();
 								Invalidate();
 							}
 							else if (CursorPlace.iChar < Lines[CursorPlace.iLine].Count)
 							{
 								EditActionHistory.Add(new() { TextState = Text, Selection = Selection, EditActionType = EditActionType.Remove, TextInvolved = Lines[CursorPlace.iLine].LineText[CursorPlace.iChar].ToString().Replace("\t", @"\t") });
-								 Lines[CursorPlace.iLine].SetLineText(Lines[CursorPlace.iLine].LineText.Remove(CursorPlace.iChar, 1));
-								textChanged();
+								Lines[CursorPlace.iLine].SetLineText(Lines[CursorPlace.iLine].LineText.Remove(CursorPlace.iChar, 1));
 								CanvasText.Invalidate();
+								updateText();
+
 							}
 						}
 						else
@@ -1494,7 +1543,9 @@ public partial class CodeWriter : UserControl, INotifyPropertyChanged
 								newplace = new(Lines[CursorPlace.iLine - 1].Count, CursorPlace.iLine - 1);
 								Lines[newplace.iLine].AddToLineText(storetext);
 								Selection = new Range(newplace);
-
+								RecalcLineNumbers();
+								updateText();
+								Invalidate();
 							}
 							else
 							{
@@ -1521,18 +1572,23 @@ public partial class CodeWriter : UserControl, INotifyPropertyChanged
 									EditActionHistory.Add(new() { TextInvolved = texttoremove, TextState = Text, EditActionType = EditActionType.Remove, Selection = Selection });
 								}
 
-								 Lines[CursorPlace.iLine].SetLineText(Lines[CursorPlace.iLine].LineText.Remove(CursorPlace.iChar - 1, 1));
+								Lines[CursorPlace.iLine].SetLineText(Lines[CursorPlace.iLine].LineText.Remove(CursorPlace.iChar - 1, 1));
 
 								newplace.iChar--;
 								Selection = new Range(newplace);
+								FilterSuggestions();
+								RecalcLineNumbers();
+								updateText();
+								CanvasText.Invalidate();
+								CanvasLineInfo.Invalidate();
 							}
-							FilterSuggestions();
-							textChanged();
-							Invalidate();
+
+
+
 						}
 						else
 						{
-								TextAction_Delete(Selection);
+							TextAction_Delete(Selection);
 							Selection = new(Selection.VisualStart);
 						}
 						break;
@@ -1601,17 +1657,17 @@ public partial class CodeWriter : UserControl, INotifyPropertyChanged
 						break;
 
 					case VirtualKey.PageDown:
-							newplace.iLine = Math.Min(Lines.Count -1, CursorPlace.iLine + iVisibleLines);
-							newplace.iChar = Math.Min(Lines[newplace.iLine].Count, Math.Max(newplace.iChar, iCharPosition));
-							VerticalScroll.Value += (newplace.iLine-CursorPlace.iLine)*CharHeight;
-							if (shiftdown)
-							{
-								Selection = new(Selection.Start, newplace);
-							}
-							else
-							{
-								Selection = new(newplace);
-							}
+						newplace.iLine = Math.Min(Lines.Count - 1, CursorPlace.iLine + iVisibleLines);
+						newplace.iChar = Math.Min(Lines[newplace.iLine].Count, Math.Max(newplace.iChar, iCharPosition));
+						VerticalScroll.Value += (newplace.iLine - CursorPlace.iLine) * CharHeight;
+						if (shiftdown)
+						{
+							Selection = new(Selection.Start, newplace);
+						}
+						else
+						{
+							Selection = new(newplace);
+						}
 						break;
 
 					case VirtualKey.PageUp:
@@ -1718,25 +1774,29 @@ public partial class CodeWriter : UserControl, INotifyPropertyChanged
 
 	#endregion Bindable
 
-	
 
 
+	private async void updateText()
+	{
+		string text = await Task.Run(() =>
+		{
+			return string.Join("\r\n", Lines.Select(x => x.LineText)); // 6ms
+		});
+
+		IsSettingValue = true;
+		TextChangedTimerLastText = Text;
+		Text = text;
+		TextChangedTimer?.Stop();
+		TextChangedTimer?.Start();
+		TextChanged?.Invoke(this, new(nameof(Text)));
+		IsSettingValue = false;
+	}
 
 	private async void textChanged()
 	{
 		try
 		{
-		CanvasText.Invalidate();
-
-			
-
-			
-
-			DispatcherQueue.TryEnqueue(() =>
-			{
-				RecalcLineNumbers();
-				updateFoldingPairs();
-
+			if (Lines?.Count >= CursorPlace.iLine + 1)
 				if (Lines[CursorPlace.iLine].LineText.Length > maxchars)
 				{
 					maxchars = Lines[CursorPlace.iLine].LineText.Length;
@@ -1744,13 +1804,34 @@ public partial class CodeWriter : UserControl, INotifyPropertyChanged
 					VerticalScroll.Visibility = Lines.Count * CharHeight > TextControl.ActualHeight ? Visibility.Visible : Visibility.Collapsed;
 					HorizontalScroll.Visibility = maxchars * CharHeight > TextControl.ActualWidth ? Visibility.Visible : Visibility.Collapsed;
 				}
-				IsSettingValue = true;
-				Text = string.Join("\r\n", Lines.Select(x => x.LineText));
-				IsSettingValue = false;
-			});
-			
 
-			TextChanged?.Invoke(this, new(nameof(Text)));
+			Language lang = Language;
+
+			await Task.Run(() =>
+			{
+				//DateTime dt1 = DateTime.Now;
+				RecalcLineNumbers();
+				//DateTime dt2 = DateTime.Now;
+				//TimeSpan ddt1 = dt2 - dt1;
+				//InfoMessage?.Invoke(this, ddt1.TotalMilliseconds.ToString());
+				updateFoldingPairs(lang); // 80 ms
+																														//DateTime dt3 = DateTime.Now;
+																														//TimeSpan ddt2 = dt3 - dt2;
+																														//InfoMessage?.Invoke(this, ddt2.TotalMilliseconds.ToString());
+
+				//DateTime dt4 = DateTime.Now;
+				//TimeSpan ddt3 = dt4 - dt3;
+				//InfoMessage?.Invoke(this, ddt3.TotalMilliseconds.ToString());
+
+
+				//DateTime dt5 = DateTime.Now;
+				//TimeSpan ddt4 = dt5 - dt4;
+				//InfoMessage?.Invoke(this, ddt4.TotalMilliseconds.ToString());
+
+			});
+
+			CanvasLineInfo.Invalidate();
+
 		}
 		catch (Exception ex)
 		{
@@ -1759,7 +1840,7 @@ public partial class CodeWriter : UserControl, INotifyPropertyChanged
 	}
 	bool tempFocus = false;
 	bool dragStarted = false;
-	
+
 	PointerPoint CurrentPointerPoint { get; set; }
 
 	private void VerticalScroll_PointerEntered(object sender, PointerRoutedEventArgs e)
@@ -1805,5 +1886,6 @@ public partial class CodeWriter : UserControl, INotifyPropertyChanged
 	private async void UserControl_Loaded(object sender, RoutedEventArgs e)
 	{
 	}
+
 
 }

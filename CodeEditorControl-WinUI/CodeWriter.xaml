@@ -68,7 +68,16 @@
 					<SolidColorBrush Color="{x:Bind Color_Background}"></SolidColorBrush>
 				</Grid.Background>-->
 				<Grid.ContextFlyout>
-					<MenuFlyout x:Name="ContextMenu" x:FieldModifier="public" >
+					<MenuFlyout x:Name="ContextMenu" x:FieldModifier="public"  ShouldConstrainToRootBounds="True">
+						<!--<AppBarButton Content="Copy" Command="{x:Bind Command_Copy}" IsEnabled="{x:Bind IsSelection}" >
+							<AppBarButton.Icon>
+								<SymbolIcon Symbol="Copy"></SymbolIcon>
+							</AppBarButton.Icon>
+							<AppBarButton.KeyboardAccelerators>
+								<KeyboardAccelerator Modifiers="Control" Key="C"  Invoked="KeyboardAccelerator_Invoked"/>
+							</AppBarButton.KeyboardAccelerators>
+						</AppBarButton>-->
+						
 						<MenuFlyoutItem Text="Copy" Command="{x:Bind Command_Copy}" IsEnabled="{x:Bind IsSelection}" >
 							<MenuFlyoutItem.Icon>
 								<SymbolIcon Symbol="Copy"></SymbolIcon>
@@ -141,6 +150,7 @@
 				<xaml:CanvasControl HorizontalAlignment="Stretch" VerticalAlignment="Stretch" x:Name="CanvasSelection" Draw="CanvasSelection_Draw"/>
 				<xaml:CanvasControl HorizontalAlignment="Stretch" VerticalAlignment="Stretch" x:Name="CanvasBeam" Draw="CanvasBeam_Draw" Visibility="{x:Bind IsFocused}"/>
 				<xaml:CanvasControl HorizontalAlignment="Stretch" VerticalAlignment="Stretch"  x:Name="CanvasText" Draw="CanvasText_Draw"/>
+				<xaml:CanvasControl HorizontalAlignment="Stretch" VerticalAlignment="Stretch"  x:Name="CanvasLineInfo" Draw="CanvasLineInfo_Draw"/>
 
 
 				<ItemsControl></ItemsControl>

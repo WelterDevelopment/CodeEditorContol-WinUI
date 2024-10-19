@@ -165,8 +165,25 @@ public partial class CodeWriter : UserControl, INotifyPropertyChanged
 			while (!CanvasText.IsLoaded | !CanvasBeam.IsLoaded | !CanvasSelection.IsLoaded | !CanvasScrollbarMarkers.IsLoaded) // ToDo: Very ugly workaround, logic needs to be overthought
 				await Task.Delay(10);
 			await InitializeLines((string)e.NewValue);
+
+			TextChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Text)));
+
+			
+			
+			TextChangedTimer.Stop();
+			TextChangedTimer = new() { Interval = TimeSpan.FromMilliseconds(200) };
+			TextChangedTimerLastText = Text;
+			TextChangedTimer.Tick += (a, b) =>
+			{
+				if (Text != TextChangedTimerLastText)
+				{
+					textChanged();
+
+				}
+
+			};
+			TextChangedTimer.Start();
 		}
-		TextChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Text)));
 	}
 	private void RequestedThemeChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
 	{
@@ -235,7 +252,7 @@ public partial class CodeWriter : UserControl, INotifyPropertyChanged
 	public Color Color_FoldingMarker { get => Get(Color.FromArgb(255, 140, 140, 140)); set => Set(value); }
 	public Color Color_FoldingMarkerUnselected { get => Get(Color.FromArgb(150, 140, 140, 140)); set => Set(value); }
 	public Color Color_Background { get => Get(Color.FromArgb(25, 135, 135, 135)); set => Set(value); }
-	public Color Color_LeftBackground { get => Get(Colors.Transparent); set => Set(value); }
+	public Color Color_LeftBackground { get => Get(Color.FromArgb(10, 135, 135, 135)); set => Set(value); }
 	public Color Color_LineNumber { get => Get(Color.FromArgb(255, 210, 210, 210)); set => Set(value); }
 	public Color Color_LineNumberUnselected { get => Get(Color.FromArgb(160, 210, 210, 210)); set => Set(value); }
 	public Color Color_SelelectedLineBackground { get => Get(Color.FromArgb(20, 210, 210, 210)); set => Set(value); }
